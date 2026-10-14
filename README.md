@@ -91,5 +91,6 @@ app/src/main/java/com/khongvinh/carsurvival/
 ├── Game.kt           # Luật chơi: di chuyển, va chạm, vòng bo, sinh vật cản/vật phẩm
 ├── Renderer.kt       # Vẽ đường, xe, vật phẩm, vòng bo, HUD, menu
 ├── Entities.kt       # Kiểu dữ liệu: xe, vũ khí, vật cản, vật phẩm, đạn, hạt hiệu ứng
-└── SaveData.kt       # Lưu tiền, kỷ lục, cấp nâng cấp
+├── Sfx.kt            # Hiệu ứng âm thanh tổng hợp (SoundPool)
+└── SaveData.kt       # Lưu tiền, ải đã vượt, gara, nâng cấp
 ```
