@@ -36,6 +36,11 @@ class MainActivity : Activity() {
         gameView.onHostPause()
     }
 
+    override fun onDestroy() {
+        super.onDestroy()
+        gameView.release()
+    }
+
     @Deprecated("Deprecated in Java")
     override fun onBackPressed() {
         if (!gameView.onBack()) {

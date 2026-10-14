@@ -2,21 +2,45 @@ package com.khongvinh.carsurvival
 
 import android.content.Context
 
-/** Persistent wallet, best level and upgrade levels. */
+/** Persistent wallet, stage progress, garage and upgrade levels. */
 class SaveData(context: Context) {
     private val prefs = context.getSharedPreferences("car_survival", Context.MODE_PRIVATE)
 
     var money = prefs.getInt("money", 0)
-    var bestLevel = prefs.getInt("bestLevel", 0)
+
+    /** Number of stages (ải) cleared, 0..[Game.STAGES]. */
+    var bestStage = prefs.getInt("bestStage", 0)
+
+    /** Stage chosen in the menu to start a run from. */
+    var stageSel = prefs.getInt("stageSel", 1)
     val upgrades = IntArray(Upgrade.entries.size) { prefs.getInt("up$it", 0) }
+    var ownedCars = prefs.getInt("ownedCars", 1)
+    var ownedWeapons = prefs.getInt("ownedWeapons", 1)
+    var car = prefs.getInt("car", 0)
+    var weapon = prefs.getInt("weapon", 0)
+    var sound = prefs.getBoolean("sound", true)
 
     fun level(u: Upgrade) = upgrades[u.ordinal]
+
+    val carType get() = CarType.entries[car]
+    val weaponType get() = WeaponType.entries[weapon]
+    val garageUnlocked get() = bestStage >= 1
+    val cloneUnlocked get() = bestStage >= 5
+
+    fun ownsCar(i: Int) = ownedCars and (1 shl i) != 0
+    fun ownsWeapon(i: Int) = ownedWeapons and (1 shl i) != 0
 
     fun save() {
         val e = prefs.edit()
         e.putInt("money", money)
-        e.putInt("bestLevel", bestLevel)
+        e.putInt("bestStage", bestStage)
+        e.putInt("stageSel", stageSel)
         upgrades.forEachIndexed { i, v -> e.putInt("up$i", v) }
+        e.putInt("ownedCars", ownedCars)
+        e.putInt("ownedWeapons", ownedWeapons)
+        e.putInt("car", car)
+        e.putInt("weapon", weapon)
+        e.putBoolean("sound", sound)
         e.apply()
     }
 }

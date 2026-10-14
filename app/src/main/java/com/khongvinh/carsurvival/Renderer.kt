@@ -6,6 +6,7 @@ import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.RectF
 import android.graphics.Typeface
+import kotlin.math.ceil
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.sin
@@ -37,6 +38,10 @@ class Renderer(private val g: Game) {
             State.SHOP -> {
                 drawRoad(c, g.menuScroll)
                 drawShop(c)
+            }
+            State.GARAGE -> {
+                drawRoad(c, g.menuScroll)
+                drawGarage(c)
             }
             else -> {
                 drawRoad(c, g.distance)
@@ -106,13 +111,7 @@ class Renderer(private val g: Game) {
         for (o in g.obstacles) if (o.type == ObstacleType.OIL) drawObstacle(c, o)
         for (o in g.obstacles) if (o.type != ObstacleType.OIL) drawObstacle(c, o)
         for (it in g.items) drawItem(c, it)
-        fill.color = 0xFFFFEB3B.toInt()
-        for (b in g.bullets) {
-            fill.color = 0x66FF9800
-            c.drawRoundRect(b.x - 5f, b.y, b.x + 5f, b.y + 40f, 5f, 5f, fill)
-            fill.color = 0xFFFFEB3B.toInt()
-            c.drawRoundRect(b.x - 4f, b.y - 10f, b.x + 4f, b.y + 14f, 4f, 4f, fill)
-        }
+        for (s in g.shots) drawShot(c, s)
         if (g.state != State.GAME_OVER) drawPlayer(c)
         for (p in g.particles) {
             fill.color = p.color
@@ -154,7 +153,15 @@ class Renderer(private val g: Game) {
     private fun drawPlayer(c: Canvas) {
         val p = g.player
         val blink = p.hurtT > 0f && ((g.anim * 20f).toInt() % 2 == 0)
-        if (!blink) drawCar(c, p.x, p.y, p.w, p.h, 0xFFE53935.toInt(), p.tilt, true)
+        if (p.cloneT > 0f) {
+            val fade = p.cloneT < 2f && (g.anim * 10f).toInt() % 2 == 0
+            if (!fade) {
+                drawCar(c, p.cloneX, p.y, p.w, p.h, p.color, p.tilt, true)
+                fill.color = 0x5564FFDA
+                c.drawRoundRect(p.cloneX - p.w / 2, p.y - p.h / 2, p.cloneX + p.w / 2, p.y + p.h / 2, p.w * 0.32f, p.w * 0.32f, fill)
+            }
+        }
+        if (!blink) drawCar(c, p.x, p.y, p.w, p.h, p.color, p.tilt, true)
         if (p.weaponT > 0f) {
             // twin guns on the hood
             fill.color = 0xFF263238.toInt()
@@ -395,17 +402,25 @@ class Renderer(private val g: Game) {
         // Level & status
         text.textSize = 28f
         text.color = 0xFFB0BEC5.toInt()
-        c.drawText("MÀN ${g.level}", 22f, 122f, text)
-        var sx = 150f
-        if (p.shieldT > 0f) {
-            text.color = 0xFF82B1FF.toInt()
-            c.drawText("🛡 ${p.shieldT.toInt() + 1}s", sx, 122f, text)
-            sx += 110f
+        text.textSize = 24f
+        c.drawText("ẢI ${g.stage} • MÀN ${g.levelInStage}/${Game.LEVELS_PER_STAGE}", 22f, 122f, text)
+        text.textAlign = Paint.Align.RIGHT
+        var sx = W - 22f
+        if (p.cloneT > 0f) {
+            text.color = 0xFF64FFDA.toInt()
+            c.drawText("👥${p.cloneT.toInt() + 1}", sx, 122f, text)
+            sx -= 80f
         }
         if (p.weaponT > 0f) {
             text.color = 0xFFFF8A80.toInt()
-            c.drawText("🚀 ${p.weaponT.toInt() + 1}s", sx, 122f, text)
+            c.drawText("${g.save.weaponType.icon}${p.weaponT.toInt() + 1}", sx, 122f, text)
+            sx -= 80f
         }
+        if (p.shieldT > 0f) {
+            text.color = 0xFF82B1FF.toInt()
+            c.drawText("🛡${p.shieldT.toInt() + 1}", sx, 122f, text)
+        }
+        text.textAlign = Paint.Align.LEFT
 
         // Money
         text.textAlign = Paint.Align.RIGHT
@@ -413,18 +428,27 @@ class Renderer(private val g: Game) {
         text.color = 0xFFFFD740.toInt()
         c.drawText("${g.save.money} $", W - 110f, 70f, text)
 
-        // Timer
+        // Storm timer: Bo 1 (60 s) -> Bo 2 (20 s) -> Bo 3 (5 s)
         text.textAlign = Paint.Align.CENTER
-        val t = g.timeLeft
-        val danger = t <= 10f
-        text.textSize = if (danger) 64f + sin(g.anim * 10f) * 4f else 60f
+        val closed = g.phase >= Game.PHASE_TIME.size
+        val t = g.phaseLeft
+        text.textSize = 24f
+        text.color = 0xFFEA80FC.toInt()
+        c.drawText(if (closed) "VÒNG BO" else "BO ${g.phase + 1}", W / 2, 36f, text)
+        val danger = closed || g.phase == 2 || t <= 10f
+        text.textSize = if (danger) 58f + sin(g.anim * 10f) * 4f else 54f
         text.color = when {
-            t <= 0f -> 0xFFE040FB.toInt()
+            closed -> 0xFFE040FB.toInt()
             danger -> 0xFFFF5252.toInt()
             else -> Color.WHITE
         }
-        val label = if (t <= 0f) "0.0" else if (danger) String.format("%.1f", t) else t.toInt().toString()
-        c.drawText(label, W / 2, 82f, text)
+        val secs = ceil(t).toInt()
+        val label = when {
+            closed -> "☠"
+            g.phase == 2 -> secs.toString()
+            else -> "${secs / 60}:${(secs % 60).toString().padStart(2, '0')}"
+        }
+        c.drawText(label, W / 2, 90f, text)
 
         // Progress bar
         r.set(22f, 140f, W - 70f, 154f)
@@ -439,12 +463,19 @@ class Renderer(private val g: Game) {
         c.drawText("🏁", W - 40f, 160f, text)
 
         // Storm warning
-        if (g.state == State.PLAYING && g.countdown <= 0f && g.stormWarning) {
-            text.textSize = 34f
+        val msg = when {
+            g.state != State.PLAYING || g.countdown > 0f -> null
+            closed -> "VÒNG BO ĐÃ KHÉP — BẠN ĐANG BỊ TIÊU DIỆT!"
+            g.phase == 2 -> "⚠ BO 3 — VỀ ĐÍCH NGAY!"
+            g.phase == 1 -> "⚠ BO 2 — 2 làn ngoài sắp nguy hiểm!"
+            g.phaseLeft <= 30f -> "⚠ Vòng bo đang thu hẹp"
+            else -> null
+        }
+        if (msg != null) {
+            text.textSize = 32f
             val a = (155 + 100 * sin(g.anim * 8f)).toInt()
             text.color = Color.argb(a, 234, 128, 252)
-            val msg = if (g.timeLeft <= 0f) "HẾT GIỜ! VÒNG BO ĐANG TIÊU DIỆT BẠN!" else "⚠ VÒNG BO ĐANG THU HẸP!"
-            c.drawText(msg, W / 2, 220f, text)
+            c.drawText(msg, W / 2, 215f, text)
         }
         c.restore()
 
@@ -459,20 +490,73 @@ class Renderer(private val g: Game) {
 
     // -------------------------------------------------------------- overlays
 
+    private fun drawShot(c: Canvas, s: Projectile) {
+        when (s.kind) {
+            WeaponType.GUN -> {
+                fill.color = 0x66FF9800
+                c.drawRoundRect(s.x - 5f, s.y, s.x + 5f, s.y + 40f, 5f, 5f, fill)
+                fill.color = 0xFFFFEB3B.toInt()
+                c.drawRoundRect(s.x - 4f, s.y - 10f, s.x + 4f, s.y + 14f, 4f, 4f, fill)
+            }
+            WeaponType.CROSSBOW -> {
+                stroke.color = 0xFF8D6E63.toInt()
+                stroke.strokeWidth = 6f
+                c.drawLine(s.x, s.y, s.x, s.y + 56f, stroke)
+                fill.color = 0xFFB0BEC5.toInt()
+                path.reset()
+                path.moveTo(s.x, s.y - 16f)
+                path.lineTo(s.x + 9f, s.y + 4f)
+                path.lineTo(s.x - 9f, s.y + 4f)
+                path.close()
+                c.drawPath(path, fill)
+                fill.color = 0xFFFFFFFF.toInt()
+                c.drawRect(s.x - 8f, s.y + 46f, s.x + 8f, s.y + 56f, fill)
+            }
+            WeaponType.CATAPULT -> {
+                val k = s.travel / Projectile.CATAPULT_RANGE
+                val lift = sin(k * Math.PI.toFloat())
+                val size = 18f + 14f * lift
+                fill.color = 0x55000000
+                c.drawCircle(s.x + 10f, s.y + 10f + 60f * lift, 16f, fill)
+                fill.color = 0xFF6D4C41.toInt()
+                c.drawCircle(s.x, s.y - 50f * lift, size, fill)
+                fill.color = 0xFF8D6E63.toInt()
+                c.drawCircle(s.x - size * 0.3f, s.y - 50f * lift - size * 0.3f, size * 0.45f, fill)
+                // landing marker
+                stroke.color = 0x88FF5252.toInt()
+                stroke.strokeWidth = 3f
+                val landY = s.y - (Projectile.CATAPULT_RANGE - s.travel)
+                c.drawCircle(s.x, landY, 30f, stroke)
+            }
+        }
+    }
+
     private fun drawOverlay(c: Canvas) {
         val W = g.W
         val H = g.H
         when (g.state) {
-            State.PLAYING -> if (g.countdown > 0f) {
-                val n = g.countdown.toInt() + 1
-                text.textSize = 180f
-                text.color = Color.WHITE
-                drawShadowText(c, n.toString(), W / 2, H * 0.45f)
-                text.textSize = 40f
-                drawShadowText(c, "Đến đích trong ${g.timeLimit.toInt()} giây!", W / 2, H * 0.45f + 80f)
-                text.textSize = 30f
-                text.color = 0xFFE0E0E0.toInt()
-                drawShadowText(c, "Kéo ngón tay để lái xe", W / 2, H * 0.45f + 130f)
+            State.PLAYING -> {
+                if (g.countdown > 0f) {
+                    val n = g.countdown.toInt() + 1
+                    text.textSize = 180f
+                    text.color = Color.WHITE
+                    drawShadowText(c, n.toString(), W / 2, H * 0.45f)
+                    text.textSize = 44f
+                    text.color = 0xFFFFD740.toInt()
+                    drawShadowText(c, "ẢI ${g.stage} — MÀN ${g.levelInStage}", W / 2, H * 0.45f + 80f)
+                    text.textSize = 30f
+                    text.color = 0xFFE0E0E0.toInt()
+                    drawShadowText(c, "Mỗi đợt ${g.obstaclesPerWave()} chướng ngại vật", W / 2, H * 0.45f + 130f)
+                    drawShadowText(c, "Về đích trước khi vòng bo khép lại!", W / 2, H * 0.45f + 175f)
+                    drawShadowText(c, "Kéo ngón tay để lái xe", W / 2, H * 0.45f + 220f)
+                } else if (g.phase == 2) {
+                    // Bo 3: big 5..1 countdown in the middle of the screen
+                    val n = ceil(g.phaseLeft).toInt().coerceAtLeast(1)
+                    val frac = g.phaseLeft - (n - 1)
+                    text.textSize = 200f + 60f * frac
+                    text.color = Color.argb((90 + 120 * frac).toInt(), 255, 82, 82)
+                    c.drawText(n.toString(), W / 2, H * 0.48f, text)
+                }
             }
             State.PAUSED -> {
                 dim(c)
@@ -481,19 +565,52 @@ class Renderer(private val g: Game) {
             }
             State.LEVEL_DONE -> {
                 dim(c)
-                title(c, "HOÀN THÀNH MÀN ${g.level}!", H * 0.26f, 0xFF69F0AE.toInt())
-                text.textSize = 36f
-                text.color = Color.WHITE
-                var y = H * 0.36f
-                for (line in listOf(
+                title(c, "HOÀN THÀNH MÀN ${g.levelInStage}!", H * 0.24f, 0xFF69F0AE.toInt())
+                text.textSize = 34f
+                text.color = 0xFFFFD740.toInt()
+                c.drawText("Ải ${g.stage} — còn ${Game.LEVELS_PER_STAGE - g.levelInStage} màn", W / 2, H * 0.30f, text)
+                lines(
+                    c, H * 0.38f,
                     "Tiền nhặt được: ${g.levelCoins} $",
                     "Thưởng thời gian: ${g.timeBonus} $",
                     "Phá hủy: ${g.levelKills} xe/vật cản",
                     "Máu còn lại: ${g.player.hp.toInt()}",
-                )) {
-                    c.drawText(line, W / 2, y, text)
-                    y += 56f
+                )
+                drawButtons(c)
+            }
+            State.STAGE_DONE -> {
+                dim(c)
+                title(c, "VƯỢT ẢI ${g.stage}!", H * 0.2f, 0xFFFFD740.toInt())
+                lines(
+                    c, H * 0.29f,
+                    "Thưởng vượt ải: ${g.stageBonus} $",
+                    "Thưởng thời gian: ${g.timeBonus} $",
+                    "Tổng tiền: ${g.save.money} $",
+                )
+                val unlock = when (g.stage) {
+                    1 -> "🔓 MỞ KHÓA GARA: đổi xe & vũ khí (Nỏ, Máy ném đá)!"
+                    5 -> "🔓 MỞ KHÓA VẬT PHẨM 👥 NHÂN BẢN: x2 mạng trong 10 giây!"
+                    else -> null
                 }
+                if (unlock != null) {
+                    text.textSize = 30f
+                    val a = (180 + 75 * sin(g.anim * 6f)).toInt()
+                    text.color = Color.argb(a, 100, 255, 218)
+                    val w = text.measureText(unlock)
+                    if (w > W - 30f) text.textSize *= (W - 30f) / w
+                    c.drawText(unlock, W / 2, H * 0.55f, text)
+                }
+                drawButtons(c)
+            }
+            State.VICTORY -> {
+                dim(c)
+                title(c, "CHIẾN THẮNG!", H * 0.25f, 0xFFFFD740.toInt())
+                lines(
+                    c, H * 0.36f,
+                    "Bạn đã vượt qua cả ${Game.STAGES} ải!",
+                    "Tiền kiếm được: ${g.runCoins} $",
+                    "Bạn là tay đua sinh tồn số 1!",
+                )
                 drawButtons(c)
             }
             State.GAME_OVER -> {
@@ -505,50 +622,161 @@ class Renderer(private val g: Game) {
                     if (g.deathByStorm) "Bạn đã bị vòng bo tiêu diệt!" else "Xe của bạn đã bị phá hủy!",
                     W / 2, H * 0.35f, text,
                 )
-                text.color = Color.WHITE
-                c.drawText("Đã tới màn: ${g.level}", W / 2, H * 0.42f, text)
-                c.drawText("Tiền kiếm được: ${g.runCoins} $", W / 2, H * 0.42f + 56f, text)
-                c.drawText("Kỷ lục: màn ${g.save.bestLevel}", W / 2, H * 0.42f + 112f, text)
+                lines(
+                    c, H * 0.42f,
+                    "Dừng ở: ải ${g.stage} — màn ${g.levelInStage}",
+                    "Tiền kiếm được: ${g.runCoins} $",
+                    "Đã vượt: ${g.save.bestStage}/${Game.STAGES} ải",
+                )
                 drawButtons(c)
             }
             else -> {}
         }
     }
 
+    private fun lines(c: Canvas, top: Float, vararg ls: String) {
+        text.textSize = 34f
+        text.color = Color.WHITE
+        var y = top
+        for (l in ls) {
+            c.drawText(l, g.W / 2, y, text)
+            y += 54f
+        }
+    }
+
     private fun drawMenu(c: Canvas) {
         val W = g.W
         val H = g.H
+        val s = g.save
         fill.color = 0x99000000.toInt()
         c.drawRect(0f, 0f, W, H, fill)
         val bob = sin(g.anim * 3f) * 10f
-        drawCar(c, W / 2, H * 0.4f + bob, 110f, 190f, 0xFFE53935.toInt(), sin(g.anim * 2f) * 6f, true)
-        title(c, "ĐUA XE", H * 0.14f, 0xFFFFD740.toInt())
-        title(c, "SINH TỒN", H * 0.14f + 100f, 0xFFE040FB.toInt())
+        val car = s.carType
+        drawCar(c, W / 2, H * 0.33f + bob, car.w * 1.35f, car.h * 1.35f, car.color, sin(g.anim * 2f) * 6f, true)
+        title(c, "ĐUA XE", H * 0.1f + g.topInset, 0xFFFFD740.toInt())
+        title(c, "SINH TỒN", H * 0.1f + 95f + g.topInset, 0xFFE040FB.toInt())
         text.textSize = 30f
-        text.color = 0xFFE0E0E0.toInt()
-        c.drawText("Về đích trước khi vòng bo khép lại!", W / 2, H * 0.14f + 160f, text)
+        text.color = 0xFFFFD740.toInt()
+        c.drawText("Tiền: ${s.money} $   •   Đã vượt ${s.bestStage}/${Game.STAGES} ải", W / 2, H * 0.47f, text)
+        drawButtons(c)
+        // stage selector label between ◀ ▶
+        val y = H * 0.5f
+        text.textSize = 30f
+        text.color = 0xFFB0BEC5.toInt()
+        c.drawText("BẮT ĐẦU TỪ", W / 2, y + 34f, text)
+        text.textSize = 50f
+        text.color = Color.WHITE
+        c.drawText("ẢI ${s.stageSel}", W / 2, y + 88f, text)
+        text.textSize = 24f
+        text.color = 0xFFB0BEC5.toInt()
+        var ly = H - 120f
+        for (line in listOf(
+            "✚ Máu  $ Tiền  🛡 Lá chắn  🚀 Vũ khí  ⏱ +5s" + if (s.cloneUnlocked) "  👥 Nhân bản" else "",
+            "Vòng bo: Bo 1 (60s) → Bo 2 (20s) → Bo 3 (5s)",
+            "5 màn = 1 ải • ${Game.STAGES} ải • qua ải 1 mở Gara, ải 5 mở Nhân bản",
+        )) {
+            val w = text.measureText(line)
+            val old = text.textSize
+            if (w > W - 20f) text.textSize *= (W - 20f) / w
+            c.drawText(line, W / 2, ly, text)
+            text.textSize = old
+            ly += 36f
+        }
+    }
+
+    private fun drawGarage(c: Canvas) {
+        val W = g.W
+        val s = g.save
+        fill.color = 0xDD000000.toInt()
+        c.drawRect(0f, 0f, W, g.H, fill)
+        title(c, "GARA", 110f + g.topInset, 0xFFE040FB.toInt())
         text.textSize = 34f
         text.color = 0xFFFFD740.toInt()
-        c.drawText("Tiền: ${g.save.money} $   •   Kỷ lục: màn ${g.save.bestLevel}", W / 2, H * 0.53f, text)
-        drawButtons(c)
-        text.textSize = 26f
+        c.drawText("Tiền: ${s.money} $", W / 2, 180f + g.topInset, text)
+        text.textSize = 30f
         text.color = 0xFFB0BEC5.toInt()
-        var y = H - 200f
-        for (line in listOf(
-            "✚ Hồi máu    $ Tiền    🛡 Lá chắn",
-            "🚀 Vũ khí tự bắn    ⏱ +5 giây",
-            "Né xe, đá, thùng, nón giao thông và vết dầu",
-        )) {
-            c.drawText(line, W / 2, y, text)
-            y += 42f
+        c.drawText("XE", W / 2, 235f, text)
+
+        CarType.entries.forEachIndexed { i, car ->
+            val rc = g.carCard(i)
+            val owned = s.ownsCar(i)
+            val sel = s.car == i
+            card(c, rc, sel)
+            drawCar(c, rc.left + 60f, rc.centerY() - 10f, car.w * 0.9f, car.h * 0.9f, car.color, 0f, true)
+            text.textAlign = Paint.Align.LEFT
+            text.textSize = 32f
+            text.color = Color.WHITE
+            c.drawText(car.title, rc.left + 120f, rc.top + 48f, text)
+            text.textSize = 22f
+            text.color = 0xFFB0BEC5.toInt()
+            c.drawText("Máu x${car.hpMul}", rc.left + 120f, rc.top + 84f, text)
+            c.drawText("Tốc độ x${car.speedMul}", rc.left + 120f, rc.top + 112f, text)
+            c.drawText("Lái ${car.handling.toInt()}  Giáp ${(car.armor * 100).toInt()}%", rc.left + 120f, rc.top + 140f, text)
+            status(c, rc, owned, sel, car.cost)
         }
+
+        text.textAlign = Paint.Align.CENTER
+        text.textSize = 30f
+        text.color = 0xFFB0BEC5.toInt()
+        c.drawText("VŨ KHÍ (nhặt 🚀 để kích hoạt)", W / 2, 775f, text)
+        WeaponType.entries.forEachIndexed { i, w ->
+            val rc = g.weaponCard(i)
+            val owned = s.ownsWeapon(i)
+            val sel = s.weapon == i
+            card(c, rc, sel)
+            text.textAlign = Paint.Align.CENTER
+            text.textSize = 56f
+            text.color = Color.WHITE
+            c.drawText(w.icon, rc.centerX(), rc.top + 70f, text)
+            text.textSize = 28f
+            c.drawText(w.title, rc.centerX(), rc.top + 112f, text)
+            text.textSize = 19f
+            text.color = 0xFFB0BEC5.toInt()
+            c.drawText(w.desc, rc.centerX(), rc.top + 145f, text)
+            status(c, rc, owned, sel, w.cost)
+        }
+        text.textAlign = Paint.Align.CENTER
+        drawButtons(c)
+    }
+
+    private fun card(c: Canvas, rc: RectF, selected: Boolean) {
+        fill.color = 0xFF263238.toInt()
+        c.drawRoundRect(rc, 20f, 20f, fill)
+        if (selected) {
+            stroke.color = 0xFF69F0AE.toInt()
+            stroke.strokeWidth = 6f
+            c.drawRoundRect(rc, 20f, 20f, stroke)
+        }
+    }
+
+    private fun status(c: Canvas, rc: RectF, owned: Boolean, selected: Boolean, cost: Int) {
+        val label: String
+        val color: Int
+        when {
+            selected -> {
+                label = "ĐANG DÙNG"; color = 0xFF69F0AE.toInt()
+            }
+            owned -> {
+                label = "CHỌN"; color = Color.WHITE
+            }
+            g.save.money >= cost -> {
+                label = "MUA $cost$"; color = 0xFFFFD740.toInt()
+            }
+            else -> {
+                label = "🔒 $cost$"; color = 0xFF9E9E9E.toInt()
+            }
+        }
+        text.textAlign = Paint.Align.CENTER
+        text.textSize = 26f
+        text.color = color
+        c.drawText(label, rc.centerX(), rc.bottom - 22f, text)
     }
 
     private fun drawShop(c: Canvas) {
         val W = g.W
         fill.color = 0xCC000000.toInt()
         c.drawRect(0f, 0f, W, g.H, fill)
-        title(c, "NÂNG CẤP", 140f, 0xFFFFD740.toInt())
+        title(c, "NÂNG CẤP", 140f + g.topInset, 0xFFFFD740.toInt())
         text.textSize = 38f
         text.color = 0xFFFFD740.toInt()
         c.drawText("Tiền: ${g.save.money} $", W / 2, 220f, text)
