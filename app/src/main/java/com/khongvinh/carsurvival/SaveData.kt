@@ -25,6 +25,8 @@ class SaveData(context: Context) {
     var car = prefs.getInt("car", 0)
     var weapon = prefs.getInt("weapon", 0)
     var sound = prefs.getBoolean("sound", true)
+    var music = prefs.getBoolean("music", true)
+    var bestScore = prefs.getInt("bestScore", 0)
 
     fun level(u: Upgrade) = upgrades[u.ordinal]
 
@@ -49,6 +51,8 @@ class SaveData(context: Context) {
         e.putInt("car", car)
         e.putInt("weapon", weapon)
         e.putBoolean("sound", sound)
+        e.putBoolean("music", music)
+        e.putInt("bestScore", bestScore)
         e.apply()
     }
 }

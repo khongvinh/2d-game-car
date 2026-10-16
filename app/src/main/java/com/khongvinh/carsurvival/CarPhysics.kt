@@ -1,5 +1,6 @@
 package com.khongvinh.carsurvival
 
+import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.hypot
@@ -108,7 +109,14 @@ class CarPhysics {
         }
 
         // lean control (stronger in the air)
-        c.spin += lean * (if (anyGround) 2.5f else 5.5f) * h
+        c.spin += lean * (if (anyGround) 2.5f else 6.5f) * h
+        if (!anyGround && lean == 0f) {
+            // gentle self-levelling in the air so casual players land on their wheels
+            var a = c.angle % (2f * PI.toFloat())
+            if (a > PI.toFloat()) a -= 2f * PI.toFloat()
+            if (a < -PI.toFloat()) a += 2f * PI.toFloat()
+            c.spin -= a * 2.2f * h
+        }
         c.spin *= (1f - (if (anyGround) 1.5f else 0.6f) * h)
 
         if (c.boosting) {

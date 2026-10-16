@@ -136,10 +136,13 @@ class Particle(
     val size: Float,
     val color: Int,
     val gravity: Float = 0f,
+    /** How much the particle grows over its life (smoke, dust). */
+    val grow: Float = 0f,
 )
 
 class FloatText(val text: String, var x: Float, var y: Float, val color: Int) {
     var life = 1.3f
+    var size = 44f
 }
 
 class Decor(val kind: Int, val x: Float, val size: Float)

@@ -36,6 +36,11 @@ class MainActivity : Activity() {
         gameView.onHostPause()
     }
 
+    override fun onResume() {
+        super.onResume()
+        gameView.onHostResume()
+    }
+
     override fun onDestroy() {
         super.onDestroy()
         gameView.release()

@@ -20,7 +20,7 @@ import kotlin.random.Random
  *
  * The UI uses a virtual canvas [VIRTUAL_HEIGHT] units tall; width follows the screen.
  */
-class Game(val save: SaveData, val sfx: Sfx) {
+class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
     companion object {
         const val VIRTUAL_HEIGHT = 720f
         const val METER = 30f
@@ -78,6 +78,22 @@ class Game(val save: SaveData, val sfx: Sfx) {
     var maxDist = 0f
     var endReason = ""
     var newRecord = false
+
+    // death sequence, damage feedback and run stats
+    var dyingT = 0f
+    private var dyingReason = ""
+    var wrecked = false
+    var hurtFlash = 0f
+    private var pendingDmg = 0f
+    private var dmgTimer = 0f
+    private var airT = 0f
+    var maxAir = 0f
+    var maxKmh = 0f
+    var minStormGap = Float.MAX_VALUE
+    var intense = false
+    var score = 0
+    var newBestScore = false
+    val achievements = ArrayList<String>()
     var shake = 0f
     var stormHurt = 0f
     var revived = false
@@ -176,6 +192,9 @@ class Game(val save: SaveData, val sfx: Sfx) {
         lastSection = 0
         newRecord = false
         revived = false
+        dyingT = 0f; wrecked = false; hurtFlash = 0f; pendingDmg = 0f; dmgTimer = 0f
+        airT = 0f; maxAir = 0f; maxKmh = 0f; minStormGap = Float.MAX_VALUE; intense = false
+        score = 0; newBestScore = false; achievements.clear()
         shake = 0f
         texts.add(FloatText("NGÀY ${save.day} — ẢI $stage", 0f, car.y - 160f, 0xFFFFD740.toInt()).also { it.life = 2.5f })
         sfx.play(Sfx.S.GO)
@@ -277,6 +296,7 @@ class Game(val save: SaveData, val sfx: Sfx) {
             newRecord = save.best[stage] > 0
             save.best[stage] = m
         }
+        finishStats(false)
         save.day++
         save.save()
         sfx.play(Sfx.S.LOSE, 0.8f)
@@ -289,12 +309,32 @@ class Game(val save: SaveData, val sfx: Sfx) {
         stageBonus = 200 * stage
         save.money += distMoney + runMoney + stageBonus
         save.best[stage] = max(save.best[stage], m)
+        finishStats(true)
         save.bestStage = max(save.bestStage, stage)
         save.stageSel = min(STAGES, max(save.stageSel, stage + 1))
         save.day++
         save.save()
         sfx.play(Sfx.S.STAGE)
         setState(if (stage >= STAGES) State.VICTORY else State.STAGE_DONE)
+    }
+
+    /** Score and achievements (🏆) for the result screens. */
+    private fun finishStats(finished: Boolean) {
+        score = (maxDist * 10f).toInt() + kills * 100 + smashed * 50 + (if (finished) 5000 * stage else 0)
+        if (score > save.bestScore) {
+            newBestScore = save.bestScore > 0
+            save.bestScore = score
+        }
+        achievements.clear()
+        if (finished) achievements.add("🏁 Tới trạm cứu hộ")
+        if (finished && car.hp >= car.maxHp * 0.9f) achievements.add("✨ Không trầy xước")
+        if (newRecord) achievements.add("📏 Kỷ lục quãng đường")
+        if (newBestScore) achievements.add("⭐ Điểm cao nhất mới")
+        if (kills >= 50) achievements.add("🧟 Đồ tể zombie") else if (kills >= 20) achievements.add("🧟 Sát thủ zombie")
+        if (smashed >= 15) achievements.add("💥 Xe ủi")
+        if (maxAir >= 2f) achievements.add("🦅 Phi công") else if (maxAir >= 1f) achievements.add("🛫 Bay cao")
+        if (maxKmh >= 150f) achievements.add("⚡ Tốc độ bàn thờ")
+        if (minStormGap < 8f && (finished || maxDist > 50f)) achievements.add("🌪 Thoát bão trong gang tấc")
     }
 
     fun pause() {
@@ -329,6 +369,16 @@ class Game(val save: SaveData, val sfx: Sfx) {
         anim += dt
         stateTime += dt
         if (shake > 0f) shake -= dt
+        if (hurtFlash > 0f) hurtFlash -= dt
+        music.enabled = save.music
+        when (state) {
+            State.MENU, State.SHOP, State.GARAGE -> music.play(Music.Track.CHILL, 1f)
+            State.PLAYING -> music.play(if (intense) Music.Track.INTENSE else Music.Track.CHILL, 1f)
+            State.PAUSED -> music.play(if (intense) Music.Track.INTENSE else Music.Track.CHILL, 0.3f)
+            State.RESULT -> music.play(Music.Track.CHILL, 0.6f)
+            State.STAGE_DONE, State.VICTORY -> music.play(Music.Track.VICTORY, 1f)
+        }
+        music.update(dt)
         when (state) {
             State.PLAYING -> updatePlay(dt)
             State.PAUSED -> {}
@@ -341,6 +391,24 @@ class Game(val save: SaveData, val sfx: Sfx) {
 
     private fun updatePlay(dt: Float) {
         val c = car
+        if (dyingT > 0f) {
+            // the wreck keeps tumbling and burning for a moment before the result screen
+            dyingT -= dt
+            c.boosting = false
+            var left = dt
+            while (left > 1e-5f) {
+                val h = min(SUBSTEP, left)
+                physics(h)
+                left -= h
+            }
+            stormX += STORM_SPEED[phase] * dt * 0.3f
+            burn(dt, true)
+            updateDebris(dt)
+            updateEffects(dt)
+            updateCamera(dt)
+            if (dyingT <= 0f) endRun(dyingReason)
+            return
+        }
         updateStorm(dt)
 
         // physics in fixed substeps
@@ -390,13 +458,42 @@ class Game(val save: SaveData, val sfx: Sfx) {
         updateShots(dt)
         updateEffects(dt)
 
+        // run stats: air time (with a small stunt bonus), top speed, storm distance
+        val kmh = abs(c.forwardSpeed) / METER * 3.6f
+        maxKmh = max(maxKmh, kmh)
+        val gapM = (c.x - Car.HALF_LEN - stormX) / METER
+        if (stormX > 0f) minStormGap = min(minStormGap, gapM)
+        if (!c.grounded[0] && !c.grounded[1]) {
+            airT += dt
+        } else {
+            if (airT > 1.2f) {
+                val bonus = (airT * 10f).toInt()
+                runMoney += bonus
+                texts.add(FloatText("BAY ${"%.1f".format(airT)}s  +$bonus$", c.x, c.y - 160f, 0xFF80D8FF.toInt()))
+            }
+            maxAir = max(maxAir, airT)
+            airT = 0f
+        }
+        if (!intense && (distanceM > goalM * 0.5f || phase >= 1 || gapM < 40f || c.hp < c.maxHp * 0.25f)) intense = true
+
+        // dust kicked up by the wheels
+        if (abs(c.forwardSpeed) > 220f && Random.nextFloat() < dt * 30f) {
+            for (i in 0..1) if (c.grounded[i]) {
+                val wx = c.x + Car.WHEEL_X[i] * cos(c.angle)
+                particles.add(Particle(wx - 20f, terrain.heightAt(wx) - 6f, -c.vx * 0.15f + rnd(-30f, 30f), rnd(-90f, -30f), 0.7f, 0.7f, rnd(8f, 14f), 0xFFD7B48A.toInt(), 0f, 1.6f))
+            }
+        }
+        dmgTimer += dt
+        if (pendingDmg > 0f && dmgTimer > 0.5f) flushDamage()
+        burn(dt, false)
+
         // storm damage
         if (c.x - Car.HALF_LEN < stormX) {
-            c.hp -= 80f * dt
+            damageCar(80f * dt, instant = false, ignoreShield = true)
             stormHurt = 0.2f
             if (Random.nextFloat() < 0.5f) particles.add(Particle(c.x + rnd(-60f, 60f), c.y + rnd(-30f, 30f), 0f, -100f, 0.5f, 0.5f, 7f, 0xFFE040FB.toInt()))
             if (c.hp <= 0f && !tryRevive(true)) {
-                endRun("Bị vòng bo tiêu diệt!"); return
+                startDying("Bị vòng bo tiêu diệt!"); return
             }
         }
 
@@ -421,7 +518,7 @@ class Game(val save: SaveData, val sfx: Sfx) {
             c.stuckT = 0f
         }
         if (c.hp <= 0f && !tryRevive(false)) {
-            endRun("Xe bị phá hủy!"); return
+            startDying("Xe bị phá hủy!"); return
         }
         if (c.y > terrain.heightAt(c.x) + 400f && !tryRevive(false)) {
             endRun("Rơi khỏi đường!"); return
@@ -431,12 +528,85 @@ class Game(val save: SaveData, val sfx: Sfx) {
             stageComplete(); return
         }
 
-        // camera
+        updateCamera(dt)
+    }
+
+    private fun updateCamera(dt: Float) {
+        val c = car
         val lookAhead = (c.vx * 0.3f).coerceIn(-100f, 320f)
         val tx = c.x - viewW * 0.32f + lookAhead
         val ty = c.y - viewH * 0.58f
         camX += (tx - camX) * min(1f, dt * 5f)
         camY += (ty - camY) * min(1f, dt * 4f)
+    }
+
+    /** Applies damage to the car and shows the lost HP floating above it. */
+    private fun damageCar(amount: Float, instant: Boolean = true, ignoreShield: Boolean = false) {
+        val c = car
+        if (amount <= 0f || dyingT > 0f || (c.shieldT > 0f && !ignoreShield)) return
+        c.hp -= amount
+        hurtFlash = max(hurtFlash, if (instant) 0.35f else 0.12f)
+        pendingDmg += amount
+        if (instant) flushDamage()
+    }
+
+    private fun flushDamage() {
+        if (pendingDmg >= 1f) {
+            texts.add(
+                FloatText("-${pendingDmg.toInt()}", car.x + rnd(-40f, 40f), car.y - 100f, 0xFFFF1744.toInt())
+                    .also { it.size = 58f; it.life = 1f },
+            )
+        }
+        pendingDmg = 0f
+        dmgTimer = 0f
+    }
+
+    /** Flames and smoke from the engine when HP is low (and from the wreck). */
+    private fun burn(dt: Float, wreck: Boolean) {
+        val c = car
+        val critical = c.hp < c.maxHp * 0.15f
+        if (!critical && !wreck) return
+        val cs = cos(c.angle)
+        val sn = sin(c.angle)
+        val lx = if (wreck) rnd(-60f, 60f) else 55f
+        val ly = -30f
+        val fx = c.x + lx * cs - ly * sn
+        val fy = c.y + lx * sn + ly * cs
+        val rate = if (wreck) 3 else 2
+        repeat(rate) {
+            if (Random.nextFloat() < dt * 40f) {
+                particles.add(Particle(fx + rnd(-10f, 10f), fy, rnd(-40f, 40f) - c.vx * 0.1f, rnd(-220f, -120f), 0.45f, 0.45f, rnd(7f, 14f), if (Random.nextBoolean()) 0xFFFF6D00.toInt() else 0xFFFFC400.toInt(), -150f))
+            }
+            if (Random.nextFloat() < dt * 25f) {
+                particles.add(Particle(fx, fy - 10f, rnd(-30f, 30f) - c.vx * 0.2f, rnd(-120f, -70f), 1.3f, 1.3f, rnd(12f, 20f), 0xFF424242.toInt(), -40f, 1.8f))
+            }
+        }
+    }
+
+    /** Car is destroyed: big explosion, the wreck flies up, then the result screen. */
+    private fun startDying(reason: String) {
+        val c = car
+        flushDamage()
+        dyingT = 2f
+        dyingReason = reason
+        wrecked = true
+        c.hp = 0f
+        c.boosting = false
+        pointers.clear()
+        updateControls()
+        explode(c.x, c.y - 10f, 0xFFFF6D00.toInt(), 80)
+        explode(c.x + 40f, c.y - 30f, 0xFFFFEA00.toInt(), 40)
+        repeat(7) {
+            debris.add(Debris(Debris.METAL, c.x + rnd(-60f, 60f), c.y - 20f, c.vx * 0.5f + rnd(-350f, 350f), -rnd(350f, 800f), 0f, rnd(-14f, 14f), rnd(24f, 50f), rnd(10f, 20f), save.carType.color))
+        }
+        c.vy -= 520f
+        c.vx *= 0.4f
+        c.spin += rnd(-5f, 5f)
+        shake = 0.9f
+        hurtFlash = 0.6f
+        texts.add(FloatText("BÙMMM!", c.x, c.y - 170f, 0xFFFFAB00.toInt()).also { it.size = 80f; it.life = 1.6f })
+        sfx.play(Sfx.S.BOOM)
+        sfx.play(Sfx.S.EXPLODE)
     }
 
     /** Clone pickup: one free revive while active. */
@@ -490,8 +660,8 @@ class Game(val save: SaveData, val sfx: Sfx) {
         val c = car
         val landed = phys.step(
             terrain, c, h,
-            gas = gas && c.fuel > 0f, brake = brake,
-            lean = (if (leanFwd) 1f else 0f) - (if (leanBack) 1f else 0f),
+            gas = gas && c.fuel > 0f && dyingT <= 0f, brake = brake && dyingT <= 0f,
+            lean = if (dyingT > 0f) 0f else (if (leanFwd) 1f else 0f) - (if (leanBack) 1f else 0f),
             topSpeed = topSpeed, engineAcc = engineAcc, mu = mu,
         )
         if (landed) {
@@ -532,12 +702,12 @@ class Game(val save: SaveData, val sfx: Sfx) {
                     val keep = 1f - z.type.mass * 0.7f * (1f - armor * 0.5f)
                     c.vx *= keep
                     c.vy *= keep
-                    if (c.shieldT <= 0f) c.hp -= z.type.mass * 35f * (1f - armor)
+                    damageCar(z.type.mass * 35f * (1f - armor))
                 } else {
                     // slow contact: zombie claws at the car
                     val side = sign(z.x - c.x)
                     z.x = c.x + side * (Car.HALF_LEN + z.type.w / 2 + 1f)
-                    if (c.shieldT <= 0f) c.hp -= 10f * (1f - armor) * dt
+                    damageCar(10f * (1f - armor) * dt, instant = false)
                     if (Random.nextFloat() < dt * 3f) bleed(z.x, z.y - z.type.h * 0.6f, 3)
                 }
             }
@@ -577,7 +747,7 @@ class Game(val save: SaveData, val sfx: Sfx) {
                     c.vx *= keep
                     c.vy *= keep
                     if (c.shieldT <= 0f) {
-                        c.hp -= o.type.damage * (1f - armor)
+                        damageCar(o.type.damage * (1f - armor))
                         shake = max(shake, 0.15f)
                     }
                 }
@@ -592,7 +762,7 @@ class Game(val save: SaveData, val sfx: Sfx) {
                         c.vx -= c.fwdX * fs * 1.25f
                         c.vy -= c.fwdY * fs * 1.25f
                         if (into > 150f) {
-                            if (c.shieldT <= 0f) c.hp -= into * 0.012f * (1f - armor)
+                            damageCar(into * 0.012f * (1f - armor))
                             sfx.play(Sfx.S.LAND, 0.5f)
                             o.flash = 0.1f
                         }
@@ -652,7 +822,7 @@ class Game(val save: SaveData, val sfx: Sfx) {
         val c = car
         val d = hypot(c.x - cx, c.y - cy)
         if (d < 260f) {
-            if (c.shieldT <= 0f) c.hp -= o.type.damage * (1f - armor)
+            damageCar(o.type.damage * (1f - armor))
             c.vy -= 380f
             c.spin += rnd(-1.5f, 1.5f)
         }
@@ -973,6 +1143,7 @@ class Game(val save: SaveData, val sfx: Sfx) {
                 b("shop", "NÂNG CẤP", cx, 356f, 460f, blue),
                 b("garage", if (save.garageUnlocked) "GARA" else "GARA 🔒 (qua ải 1)", cx, 462f, 460f, purple, save.garageUnlocked),
                 Button("sound", if (save.sound) "🔊" else "🔇", W - 100f, 20f, W - 24f, 96f, 0x66000000),
+                Button("music", "🎵", W - 190f, 20f, W - 114f, 96f, if (save.music) 0x66000000 else 0x66B71C1C),
             )
             State.SHOP, State.GARAGE -> listOf(
                 b("menu", "MENU", W / 2 - 250f, H - 100f, 300f, grey),
@@ -1032,6 +1203,7 @@ class Game(val save: SaveData, val sfx: Sfx) {
 
     fun touchDown(id: Int, x: Float, y: Float) {
         if (state == State.PLAYING) {
+            if (dyingT > 0f) return
             if (pauseBtn.contains(x, y)) {
                 sfx.play(Sfx.S.CLICK)
                 pause()
@@ -1074,6 +1246,10 @@ class Game(val save: SaveData, val sfx: Sfx) {
             "sound" -> {
                 save.sound = !save.sound
                 sfx.enabled = save.sound
+                save.save()
+            }
+            "music" -> {
+                save.music = !save.music
                 save.save()
             }
         }

@@ -11,7 +11,8 @@ import android.view.SurfaceView
 /** Hosts the game loop on a background thread and forwards (multi-)touches to [Game]. */
 class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback, Runnable {
     private val sfx = Sfx(context)
-    private val game = Game(SaveData(context), sfx)
+    private val music = Music()
+    private val game = Game(SaveData(context), sfx, music)
 
     @Volatile
     private var running = false
@@ -101,9 +102,17 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
 
     fun onHostPause() {
         synchronized(game) { game.pause() }
+        music.suspend()
     }
 
-    fun release() = sfx.release()
+    fun onHostResume() {
+        music.suspended = false
+    }
+
+    fun release() {
+        sfx.release()
+        music.release()
+    }
 
     /** Returns true when the back press was consumed by the game. */
     fun onBack(): Boolean = synchronized(game) { game.back() }

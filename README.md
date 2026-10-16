@@ -58,9 +58,23 @@ hay thư viện ngoài, không cần file ảnh/âm thanh.
 | 🏹 Nỏ | Sát thương 3, xuyên 3 mục tiêu | 1200 |
 | ☄ Máy ném đá | Đá bay vòng cung, nổ diện rộng | 2500 |
 
-### Âm thanh
-Hiệu ứng âm thanh (tông zombie, gỗ vỡ, nổ, súng/nỏ/máy ném đá, tên lửa, tiếp đất, bíp đếm ngược,
-bão, thắng/thua…) được tổng hợp bằng code khi mở game. Bật/tắt bằng nút 🔊 ở menu.
+### Địa hình
+Đồi dốc nhiều tầng, đá nhô, ổ gà, đoạn "ván giặt" rung lắc và dốc nhảy — càng lên ải cao càng
+gồ ghề. Mặt dốc lên tối đa ~38° để luôn leo được nếu đủ đà/động cơ.
+
+### Hiệu ứng
+- Mỗi lần va chạm hiện số máu bị trừ bay lên và viền màn hình chớp đỏ.
+- Máu dưới 15%: xe bốc cháy, khói đen cuồn cuộn.
+- Xe bị phá hủy (hoặc bị bão nuốt): nổ tung, mảnh vỡ văng ra, xác xe cháy đen.
+- Bảng tổng kết chỉ hiện **điểm số**, thống kê và **🏆 thành tích** của ngày chạy
+  (kỷ lục, sát thủ zombie, xe ủi, bay cao, tốc độ bàn thờ, thoát bão trong gang tấc…).
+
+### Âm thanh & nhạc nền
+- Hiệu ứng âm thanh (tông zombie, gỗ vỡ, nổ, súng/nỏ/máy ném đá, tên lửa, tiếp đất, bíp đếm ngược,
+  bão, thắng/thua…) được tổng hợp bằng code. Bật/tắt bằng nút 🔊 ở menu.
+- Nhạc nền cũng được soạn và tổng hợp bằng code: **chill** ở menu và đầu ván, chuyển sang
+  **kịch tính** khi qua nửa đường / bão tăng tốc / máu thấp, và **nhạc chiến thắng** tung hô khi tới
+  trạm cứu hộ. Bật/tắt bằng nút 🎵 ở menu.
 
 ## Cài đặt trên điện thoại
 
@@ -90,5 +104,6 @@ app/src/main/java/com/khongvinh/carsurvival/
 ├── Renderer.kt       # Vẽ bầu trời, núi, địa hình, xe, zombie, bão, HUD, menu, gara
 ├── Entities.kt       # Kiểu dữ liệu: xe, vũ khí, nâng cấp, zombie, vật cản, vật phẩm, hiệu ứng
 ├── Sfx.kt            # Hiệu ứng âm thanh tổng hợp (SoundPool)
+├── Music.kt          # Nhạc nền tổng hợp: chill, kịch tính, chiến thắng (AudioTrack)
 └── SaveData.kt       # Lưu tiền, ngày, ải đã vượt, kỷ lục, gara, nâng cấp
 ```

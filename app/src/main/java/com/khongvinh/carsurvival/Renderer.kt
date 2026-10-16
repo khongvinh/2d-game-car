@@ -5,6 +5,7 @@ import android.graphics.Color
 import android.graphics.LinearGradient
 import android.graphics.Paint
 import android.graphics.Path
+import android.graphics.RadialGradient
 import android.graphics.RectF
 import android.graphics.Shader
 import android.graphics.Typeface
@@ -12,6 +13,7 @@ import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.ceil
 import kotlin.math.cos
+import kotlin.math.floor
 import kotlin.math.hypot
 import kotlin.math.max
 import kotlin.math.min
@@ -34,46 +36,71 @@ class Renderer(private val g: Game) {
     }
     private val path = Path()
     private val r = RectF()
-    private var skyH = -1f
-    private var sky: LinearGradient? = null
 
     fun render(c: Canvas) {
         drawBackground(c)
         drawWorld(c)
+        fill.shader = vignette
+        c.drawRect(0f, 0f, g.W, g.H, fill)
+        fill.shader = null
         when (g.state) {
             State.MENU -> drawMenu(c)
             State.SHOP -> drawShop(c)
             State.GARAGE -> drawGarage(c)
-            else -> {
+            State.PLAYING, State.PAUSED -> {
+                drawDamageOverlay(c)
                 drawHud(c)
                 drawOverlay(c)
             }
+            else -> drawOverlay(c)
         }
     }
 
     // ------------------------------------------------------------ backdrop
 
     private fun drawBackground(c: Canvas) {
+        ensureShaders()
         val W = g.W
         val H = g.H
-        if (skyH != H) {
-            skyH = H
-            sky = LinearGradient(0f, 0f, 0f, H, 0xFFD9824B.toInt(), 0xFFF7D9A6.toInt(), Shader.TileMode.CLAMP)
-        }
-        fill.shader = sky
+        fill.shader = skyShader
         c.drawRect(0f, 0f, W, H, fill)
+        fill.shader = sunShader
+        c.drawRect(0f, 0f, W, H * 0.75f, fill)
         fill.shader = null
-        fill.color = 0x66FFF3E0
-        c.drawCircle(W * 0.78f, H * 0.22f, 120f, fill)
-        fill.color = 0xCCFFF8E1.toInt()
-        c.drawCircle(W * 0.78f, H * 0.22f, 70f, fill)
-        mesas(c, 0.08f, H * 0.62f, 0xFFD39A6A.toInt(), 1.0f, 150f)
-        mesas(c, 0.2f, H * 0.72f, 0xFFB9774A.toInt(), 1.9f, 120f)
+        fill.color = 0xFFFFF6E0.toInt()
+        c.drawCircle(W * 0.78f, H * 0.26f, 54f, fill)
+
+        // drifting clouds
+        for (k in 0 until 6) {
+            val span = W + 700f
+            val raw = k * 431f + g.anim * (6f + k * 2.5f) - g.camX * Game.ZOOM * 0.02f
+            val cx = ((raw % span) + span) % span - 350f
+            cloud(c, cx, 60f + (k * 47) % 140, 0.6f + (k % 3) * 0.25f)
+        }
+        // vultures circling
+        stroke.color = 0xAA3E2723.toInt()
+        stroke.strokeWidth = 3f
+        for (k in 0 until 3) {
+            val a = g.anim * 0.35f + k * 2.1f
+            val bx = W * 0.45f + cos(a) * (160f + k * 40f)
+            val by = 150f + sin(a) * 40f + k * 20f
+            val flap = sin(g.anim * 5f + k) * 7f
+            c.drawLine(bx - 16f, by - flap, bx, by, stroke)
+            c.drawLine(bx, by, bx + 16f, by - flap, stroke)
+        }
+
+        mesas(c, 0.05f, H * 0.6f, farShader, 1.0f, 180f)
+        // dusty haze between layers
+        fill.color = 0x33FBE3B0
+        c.drawRect(0f, H * 0.45f, W, H, fill)
+        city(c, 0.12f, H * 0.68f)
+        mesas(c, 0.22f, H * 0.76f, midShader, 1.9f, 120f)
     }
 
-    private fun mesas(c: Canvas, par: Float, base: Float, color: Int, seed: Float, amp: Float) {
+    private fun mesas(c: Canvas, par: Float, base: Float, shader: Shader?, seed: Float, amp: Float) {
         val W = g.W
         path.reset()
+        topPath.reset()
         path.moveTo(0f, g.H)
         var sx = 0f
         val off = g.camX * Game.ZOOM * par
@@ -82,14 +109,22 @@ class Renderer(private val g: Game) {
             val u = (sx + off) * 0.004f
             var h = amp * (0.55f + 0.45f * sin(u + seed) + 0.25f * sin(u * 2.3f + seed * 3f))
             h = h.coerceIn(amp * 0.15f, amp * 0.85f) // flat mesa tops
-            path.lineTo(sx, base - h - lift)
+            val y = base - h - lift
+            path.lineTo(sx, y)
+            if (sx == 0f) topPath.moveTo(sx, y) else topPath.lineTo(sx, y)
             sx += 24f
         }
         path.lineTo(W, g.H)
         path.close()
-        fill.color = color
+        fill.shader = shader
         c.drawPath(path, fill)
+        fill.shader = null
+        stroke.color = 0x40FFF3E0
+        stroke.strokeWidth = 3f
+        c.drawPath(topPath, stroke)
     }
+
+    /** Silhouettes of a ruined city on the horizon. */
 
     // --------------------------------------------------------------- world
 
@@ -110,6 +145,15 @@ class Renderer(private val g: Game) {
         drawRecord(c)
         drawCheckpoints(c)
 
+        // soft shadows on the ground
+        fill.color = 0x40000000
+        for (z in g.zombies) if (z.x in x0..x1) c.drawOval(z.x - z.type.w * 0.8f, z.y - 6f, z.x + z.type.w * 0.8f, z.y + 6f, fill)
+        val car = g.car
+        val gy = g.terrain.heightAt(car.x)
+        val lift = ((gy - car.y - 50f) / 500f).coerceIn(0f, 0.8f)
+        fill.color = Color.argb((90 * (1f - lift)).toInt(), 0, 0, 0)
+        c.drawOval(car.x - 100f * (1f - lift * 0.5f), gy - 9f, car.x + 100f * (1f - lift * 0.5f), gy + 9f, fill)
+
         for (o in g.obstacles) if (o.x in x0..x1) drawObstacle(c, o)
         for (it in g.items) if (it.x in x0..x1) drawItem(c, it)
         for (z in g.zombies) if (z.x in x0..x1) drawZombie(c, z)
@@ -117,17 +161,22 @@ class Renderer(private val g: Game) {
         drawShots(c)
         drawPlayerCar(c)
         for (p in g.particles) {
+            val ratio = (p.life / p.maxLife).coerceIn(0f, 1f)
             fill.color = p.color
-            fill.alpha = (255 * (p.life / p.maxLife)).toInt().coerceIn(0, 255)
-            c.drawCircle(p.x, p.y, p.size, fill)
+            fill.alpha = (255 * ratio * (if (p.grow > 0f) 0.55f else 1f)).toInt().coerceIn(0, 255)
+            c.drawCircle(p.x, p.y, p.size * (1f + p.grow * (1f - ratio)), fill)
         }
         fill.alpha = 255
         for (t in g.texts) {
-            text.textSize = 44f
             val a = (255 * min(1f, t.life)).toInt()
-            text.color = Color.BLACK
+            // pop in, then float
+            text.textSize = t.size * (1f + max(0f, t.life - 1.1f) * 1.2f)
+            text.style = Paint.Style.STROKE
+            text.strokeWidth = 7f
+            text.color = 0xFF1A1A1A.toInt()
             text.alpha = a
-            c.drawText(t.text, t.x + 3f, t.y + 3f, text)
+            c.drawText(t.text, t.x, t.y, text)
+            text.style = Paint.Style.FILL
             text.color = t.color
             text.alpha = a
             c.drawText(t.text, t.x, t.y, text)
@@ -143,40 +192,83 @@ class Renderer(private val g: Game) {
         val i1 = t.indexOf(g.camX + g.viewW) + 3
         val bottom = g.camY + g.viewH + 400f
         path.reset()
+        topPath.reset()
         for (i in i0..i1) {
             val x = Terrain.START_X + i * Terrain.SEG
             val y = t.point(i)
             if (i == i0) {
-                path.moveTo(x, bottom); path.lineTo(x, y)
+                path.moveTo(x, bottom); path.lineTo(x, y); topPath.moveTo(x, y)
             } else {
-                path.lineTo(x, y)
+                path.lineTo(x, y); topPath.lineTo(x, y)
             }
         }
         path.lineTo(Terrain.START_X + i1 * Terrain.SEG, bottom)
         path.close()
-        fill.color = 0xFF8D5B36.toInt()
+        fill.shader = groundShader
         c.drawPath(path, fill)
-        fill.color = 0x33000000
+        fill.shader = null
+
+        // buried rocks and strata
         for (i in i0..i1) {
             val x = Terrain.START_X + i * Terrain.SEG
             val y = t.point(i)
-            val h = (i * 7919) and 0x7fffffff
-            if (h % 5 == 0) c.drawCircle(x + 10f, y + 60f + (h % 3) * 30f, 8f + (h % 4) * 3f, fill)
-            if (h % 7 == 0) c.drawRect(x, y + 120f, x + 80f, y + 130f, fill)
+            val h = hash(i)
+            if (h % 6 == 0) {
+                fill.color = 0x30000000
+                c.drawOval(x - 18f, y + 50f + (h % 4) * 30f, x + 22f + (h % 3) * 10f, y + 72f + (h % 4) * 30f, fill)
+                fill.color = 0x22FFFFFF
+                c.drawOval(x - 12f, y + 52f + (h % 4) * 30f, x + 6f, y + 60f + (h % 4) * 30f, fill)
+            }
+            if (h % 9 == 1) {
+                fill.color = 0x26000000
+                c.drawRect(x, y + 110f + (h % 5) * 12f, x + 90f, y + 117f + (h % 5) * 12f, fill)
+            }
         }
-        path.reset()
+        // road crust: dark edge, sandy top, bright rim
+        stroke.color = 0xFF4A2B17.toInt()
+        stroke.strokeWidth = 20f
+        topPath.offset(0f, 9f)
+        c.drawPath(topPath, stroke)
+        stroke.color = 0xFFB27A47.toInt()
+        stroke.strokeWidth = 9f
+        topPath.offset(0f, -6f)
+        c.drawPath(topPath, stroke)
+        stroke.color = 0xFFE9BC85.toInt()
+        stroke.strokeWidth = 3f
+        topPath.offset(0f, -4f)
+        c.drawPath(topPath, stroke)
+
+        // dry grass, pebbles and bushes on the surface
         for (i in i0..i1) {
             val x = Terrain.START_X + i * Terrain.SEG
-            val y = t.point(i)
-            if (i == i0) path.moveTo(x, y + 6f) else path.lineTo(x, y + 6f)
+            val y = t.point(i) - 1f
+            val h = hash(i * 7 + 3)
+            when (h % 7) {
+                0, 1 -> {
+                    stroke.color = if (h % 2 == 0) 0xFFA1A33A.toInt() else 0xFF7F7A2A.toInt()
+                    stroke.strokeWidth = 3f
+                    val bx = x + (h % 30)
+                    val sway = sin(g.anim * 2f + i) * 3f
+                    c.drawLine(bx, y, bx - 6f + sway, y - 16f, stroke)
+                    c.drawLine(bx + 3f, y, bx + 3f + sway, y - 22f, stroke)
+                    c.drawLine(bx + 6f, y, bx + 12f + sway, y - 14f, stroke)
+                }
+                2 -> {
+                    fill.color = 0xFF6D4C41.toInt()
+                    c.drawCircle(x + 14f, y + 2f, 5f, fill)
+                    fill.color = 0xFF8D6E63.toInt()
+                    c.drawCircle(x + 26f, y + 3f, 3.5f, fill)
+                }
+                3 -> if (h % 3 == 0) {
+                    stroke.color = 0xFF5D4037.toInt()
+                    stroke.strokeWidth = 2.5f
+                    c.drawLine(x, y, x - 10f, y - 20f, stroke)
+                    c.drawLine(x, y, x + 8f, y - 24f, stroke)
+                    c.drawLine(x - 5f, y - 10f, x - 16f, y - 16f, stroke)
+                    c.drawLine(x + 4f, y - 12f, x + 15f, y - 18f, stroke)
+                }
+            }
         }
-        stroke.color = 0xFF5D3A22.toInt()
-        stroke.strokeWidth = 16f
-        c.drawPath(path, stroke)
-        stroke.color = 0xFFC08A5B.toInt()
-        stroke.strokeWidth = 5f
-        path.offset(0f, -7f)
-        c.drawPath(path, stroke)
     }
 
     private fun drawDecor(c: Canvas, d: Decor) {
@@ -314,8 +406,22 @@ class Renderer(private val g: Game) {
                 c.restore()
             }
         }
+        // headlight beam
+        if (!g.wrecked) {
+            c.save()
+            c.translate(car.x, car.y)
+            c.rotate(car.angle * 180f / PI.toFloat())
+            fill.color = 0x26FFF59D
+            path.reset()
+            path.moveTo(86f, -8f)
+            path.lineTo(330f, -60f)
+            path.lineTo(330f, 50f)
+            path.close()
+            c.drawPath(path, fill)
+            c.restore()
+        }
         val hurt = car.hurtT > 0f && (g.anim * 20f).toInt() % 2 == 0
-        if (!hurt) drawCar(c, type, car.x, car.y, car.angle, car.wheelRot, car.aim, car.boosting, g.save.weaponType, false)
+        if (!hurt) drawCar(c, type, car.x, car.y, car.angle, car.wheelRot, car.aim, car.boosting, g.save.weaponType, false, car.compress, g.wrecked)
         if (car.shieldT > 0f) {
             val fade = if (car.shieldT < 1.5f && (g.anim * 8f).toInt() % 2 == 0) 0.4f else 1f
             fill.color = 0x3340C4FF
@@ -331,6 +437,7 @@ class Renderer(private val g: Game) {
     }
 
     /** Draws a car around its body centre (x forward, y down), wheels at [Car.WHEEL_X]. */
+
     fun drawCar(
         c: Canvas,
         type: CarType,
@@ -342,24 +449,40 @@ class Renderer(private val g: Game) {
         boosting: Boolean,
         weapon: WeaponType,
         ghost: Boolean,
+        compress: FloatArray? = null,
+        wreck: Boolean = false,
     ) {
         c.save()
         c.translate(x, y)
         c.rotate(angle * 180f / PI.toFloat())
-        val body = if (ghost) 0xFF64FFDA.toInt() else type.color
+        val body = when {
+            wreck -> 0xFF2E2A27.toInt()
+            ghost -> 0xFF64FFDA.toInt()
+            else -> type.color
+        }
+
+        // suspension struts and wheels (behind the body)
+        for (i in 0..1) {
+            val wy = Car.WHEEL_Y - min(12f, (compress?.get(i) ?: 0f) * 0.6f)
+            stroke.color = 0xFF37474F.toInt()
+            stroke.strokeWidth = 7f
+            c.drawLine(Car.WHEEL_X[i], 4f, Car.WHEEL_X[i], wy, stroke)
+        }
 
         // booster rocket on the back
         fill.color = 0xFF616161.toInt()
         c.drawRoundRect(-104f, -30f, -66f, -10f, 8f, 8f, fill)
+        fill.color = 0x44FFFFFF
+        c.drawRoundRect(-102f, -28f, -70f, -22f, 4f, 4f, fill)
         fill.color = 0xFFB71C1C.toInt()
         c.drawRect(-74f, -32f, -66f, -8f, fill)
         if (boosting) {
             val f = 30f + Random.nextFloat() * 40f
-            fill.color = 0xCCFF9800.toInt()
+            fill.color = 0xCCFF6D00.toInt()
             path.reset()
-            path.moveTo(-104f, -30f)
-            path.lineTo(-104f - f - 30f, -20f)
-            path.lineTo(-104f, -10f)
+            path.moveTo(-104f, -32f)
+            path.lineTo(-104f - f - 40f, -20f)
+            path.lineTo(-104f, -8f)
             path.close()
             c.drawPath(path, fill)
             fill.color = 0xFFFFEB3B.toInt()
@@ -369,6 +492,8 @@ class Renderer(private val g: Game) {
             path.lineTo(-104f, -14f)
             path.close()
             c.drawPath(path, fill)
+            fill.color = 0xFFFFFFFF.toInt()
+            c.drawCircle(-106f, -20f, 5f, fill)
         }
 
         path.reset()
@@ -396,25 +521,60 @@ class Renderer(private val g: Game) {
         path.close()
         fill.color = body
         c.drawPath(path, fill)
-        stroke.color = 0x88000000.toInt()
+        // shading: bright upper band, dark lower band, a few scratches
+        c.save()
+        c.clipPath(path)
+        fill.color = 0x40FFFFFF
+        c.drawRect(-120f, -80f, 120f, -24f, fill)
+        fill.color = 0x26FFFFFF
+        c.drawRect(-120f, -24f, 120f, -14f, fill)
+        fill.color = 0x40000000
+        c.drawRect(-120f, 6f, 120f, 40f, fill)
+        fill.color = 0x30000000
+        c.drawCircle(-50f, 2f, 6f, fill)
+        c.drawCircle(60f, -4f, 4f, fill)
+        c.drawCircle(-20f, 10f, 5f, fill)
+        if (wreck) {
+            // glowing embers on the burnt shell
+            for (k in 0 until 6) {
+                val on = (g.anim * 8f + k * 1.7f).toInt() % 3 != 0
+                fill.color = if (on) 0xFFFF6D00.toInt() else 0xFF8D2B00.toInt()
+                c.drawCircle(-70f + k * 28f, -10f + (k % 3) * 8f, 3.5f, fill)
+            }
+        }
+        c.restore()
+        stroke.color = 0xAA1A1A1A.toInt()
         stroke.strokeWidth = 3f
         c.drawPath(path, stroke)
 
-        fill.color = if (ghost) 0x8800695C.toInt() else 0xFF263238.toInt()
+        val glass = when {
+            wreck -> 0xFF111111.toInt()
+            ghost -> 0x8800695C.toInt()
+            else -> 0xFF263238.toInt()
+        }
+        fill.color = glass
+        stroke.color = 0x66FFFFFF
+        stroke.strokeWidth = 3f
         when (type) {
             CarType.PICKUP -> {
                 path.reset()
                 path.moveTo(-10f, -38f); path.lineTo(18f, -38f); path.lineTo(32f, -18f); path.lineTo(-10f, -18f); path.close()
                 c.drawPath(path, fill)
+                if (!wreck) c.drawLine(4f, -36f, 14f, -20f, stroke)
                 fill.color = 0x33000000
                 c.drawRect(-82f, -12f, -28f, -4f, fill)
+                stroke.color = 0x55000000
+                c.drawLine(-82f, -14f, -26f, -14f, stroke)
             }
             CarType.MUSCLE -> {
                 path.reset()
                 path.moveTo(-6f, -33f); path.lineTo(22f, -33f); path.lineTo(38f, -18f); path.lineTo(-6f, -18f); path.close()
                 c.drawPath(path, fill)
-                fill.color = Color.WHITE
-                c.drawRect(-80f, -6f, 86f, 0f, fill)
+                if (!wreck) c.drawLine(8f, -31f, 18f, -20f, stroke)
+                if (!wreck) {
+                    fill.color = Color.WHITE
+                    c.drawRect(-80f, -6f, 86f, 0f, fill)
+                }
                 fill.color = 0xFF212121.toInt()
                 c.drawRect(-88f, -22f, -70f, -16f, fill)
             }
@@ -422,13 +582,16 @@ class Renderer(private val g: Game) {
                 path.reset()
                 path.moveTo(38f, -52f); path.lineTo(52f, -26f); path.lineTo(20f, -26f); path.lineTo(20f, -52f); path.close()
                 c.drawPath(path, fill)
-                fill.color = 0xFFE53935.toInt()
-                c.drawRect(-60f, -40f, -20f, -30f, fill)
-                c.drawRect(-45f, -50f, -35f, -20f, fill)
+                if (!wreck) c.drawLine(32f, -48f, 40f, -30f, stroke)
+                if (!wreck) {
+                    fill.color = 0xFFE53935.toInt()
+                    c.drawRect(-60f, -40f, -20f, -30f, fill)
+                    c.drawRect(-45f, -50f, -35f, -20f, fill)
+                }
             }
             CarType.TANK -> {
                 c.drawRect(-20f, -34f, 20f, -24f, fill)
-                fill.color = 0x55000000
+                fill.color = 0x66000000
                 for (k in 0 until 6) c.drawCircle(-70f + k * 28f, 10f, 3f, fill)
                 fill.color = 0xFF33401F.toInt()
                 c.drawRect(-86f, 0f, 86f, 6f, fill)
@@ -437,75 +600,95 @@ class Renderer(private val g: Game) {
         // front ram
         fill.color = 0xFF9E9E9E.toInt()
         c.drawRect(84f, -8f, 98f, 20f, fill)
+        fill.color = 0x55FFFFFF
+        c.drawRect(84f, -8f, 98f, -2f, fill)
         fill.color = 0xFF757575.toInt()
         for (k in 0 until 3) {
             path.reset()
-            path.moveTo(98f, -6f + k * 9f); path.lineTo(110f, -2f + k * 9f); path.lineTo(98f, 2f + k * 9f); path.close()
+            path.moveTo(98f, -6f + k * 9f); path.lineTo(112f, -2f + k * 9f); path.lineTo(98f, 2f + k * 9f); path.close()
             c.drawPath(path, fill)
         }
-        fill.color = 0xFFFFF59D.toInt()
-        c.drawCircle(84f, -6f, 5f, fill)
-        fill.color = 0xFFFF1744.toInt()
-        c.drawRect(-88f, -6f, -82f, 4f, fill)
-
-        for (i in 0..1) drawWheel(c, Car.WHEEL_X[i], Car.WHEEL_Y, wheelRot, type == CarType.TANK)
-
-        // roof weapon (aims independently)
-        c.save()
-        c.translate(-10f, -Car.HALF_H - 22f)
-        fill.color = 0xFF424242.toInt()
-        c.drawRect(-14f, 0f, 14f, 12f, fill)
-        c.rotate((aim - angle) * 180f / PI.toFloat())
-        when (weapon) {
-            WeaponType.GUN -> {
-                fill.color = 0xFF37474F.toInt()
-                c.drawRoundRect(-14f, -10f, 16f, 8f, 4f, 4f, fill)
-                fill.color = 0xFF212121.toInt()
-                c.drawRect(14f, -6f, 58f, 2f, fill)
-            }
-            WeaponType.CROSSBOW -> {
-                fill.color = 0xFF6D4C41.toInt()
-                c.drawRect(-16f, -5f, 46f, 3f, fill)
-                stroke.color = 0xFF5D4037.toInt()
-                stroke.strokeWidth = 5f
-                r.set(14f, -30f, 44f, 28f)
-                c.drawArc(r, -90f, 180f, false, stroke)
-                stroke.color = 0xFFECEFF1.toInt()
-                stroke.strokeWidth = 2f
-                c.drawLine(29f, -30f, 18f, -1f, stroke)
-                c.drawLine(29f, 28f, 18f, -1f, stroke)
-            }
-            WeaponType.CATAPULT -> {
-                fill.color = 0xFF795548.toInt()
-                c.drawRect(-18f, -4f, 18f, 6f, fill)
-                stroke.color = 0xFF6D4C41.toInt()
-                stroke.strokeWidth = 7f
-                c.drawLine(0f, 0f, -30f, -34f, stroke)
-                fill.color = 0xFF5D4037.toInt()
-                c.drawCircle(-32f, -38f, 11f, fill)
-            }
+        if (!wreck) {
+            fill.color = 0x66FFF59D
+            c.drawCircle(84f, -6f, 10f, fill)
+            fill.color = 0xFFFFF9C4.toInt()
+            c.drawCircle(84f, -6f, 5f, fill)
+            fill.color = 0xFFFF1744.toInt()
+            c.drawRect(-88f, -6f, -82f, 4f, fill)
         }
-        c.restore()
+
+        for (i in 0..1) {
+            val wy = Car.WHEEL_Y - min(12f, (compress?.get(i) ?: 0f) * 0.6f)
+            drawWheel(c, Car.WHEEL_X[i], wy, wheelRot, type == CarType.TANK || wreck)
+        }
+
+        if (!wreck) {
+            // roof weapon (aims independently)
+            c.save()
+            c.translate(-10f, -Car.HALF_H - 22f)
+            fill.color = 0xFF424242.toInt()
+            c.drawRect(-14f, 0f, 14f, 12f, fill)
+            c.rotate((aim - angle) * 180f / PI.toFloat())
+            when (weapon) {
+                WeaponType.GUN -> {
+                    fill.color = 0xFF37474F.toInt()
+                    c.drawRoundRect(-14f, -10f, 16f, 8f, 4f, 4f, fill)
+                    fill.color = 0x44FFFFFF
+                    c.drawRect(-12f, -9f, 14f, -5f, fill)
+                    fill.color = 0xFF212121.toInt()
+                    c.drawRect(14f, -6f, 58f, 2f, fill)
+                }
+                WeaponType.CROSSBOW -> {
+                    fill.color = 0xFF6D4C41.toInt()
+                    c.drawRect(-16f, -5f, 46f, 3f, fill)
+                    stroke.color = 0xFF5D4037.toInt()
+                    stroke.strokeWidth = 5f
+                    r.set(14f, -30f, 44f, 28f)
+                    c.drawArc(r, -90f, 180f, false, stroke)
+                    stroke.color = 0xFFECEFF1.toInt()
+                    stroke.strokeWidth = 2f
+                    c.drawLine(29f, -30f, 18f, -1f, stroke)
+                    c.drawLine(29f, 28f, 18f, -1f, stroke)
+                }
+                WeaponType.CATAPULT -> {
+                    fill.color = 0xFF795548.toInt()
+                    c.drawRect(-18f, -4f, 18f, 6f, fill)
+                    stroke.color = 0xFF6D4C41.toInt()
+                    stroke.strokeWidth = 7f
+                    c.drawLine(0f, 0f, -30f, -34f, stroke)
+                    fill.color = 0xFF5D4037.toInt()
+                    c.drawCircle(-32f, -38f, 11f, fill)
+                }
+            }
+            c.restore()
+        }
         c.restore()
     }
 
-    private fun drawWheel(c: Canvas, x: Float, y: Float, rot: Float, tank: Boolean) {
-        fill.color = 0xFF1B1B1B.toInt()
+    private fun drawWheel(c: Canvas, x: Float, y: Float, rot: Float, dark: Boolean) {
+        fill.color = 0xFF151515.toInt()
         c.drawCircle(x, y, Car.WHEEL_R, fill)
-        fill.color = if (tank) 0xFF5D6B3A.toInt() else 0xFF9E9E9E.toInt()
+        // tread blocks
+        fill.color = 0xFF2B2B2B.toInt()
+        for (k in 0 until 10) {
+            val a = rot + k * 0.628f
+            c.drawCircle(x + cos(a) * 21f, y + sin(a) * 21f, 4f, fill)
+        }
+        fill.color = if (dark) 0xFF5D6B3A.toInt() else 0xFFB0B0B0.toInt()
         c.drawCircle(x, y, 12f, fill)
+        fill.color = 0x55FFFFFF
+        c.drawCircle(x - 3f, y - 3f, 6f, fill)
         stroke.color = 0xFF424242.toInt()
         stroke.strokeWidth = 3f
-        for (k in 0 until 3) {
-            val a = rot + k * 2.094f
-            c.drawLine(x, y, x + cos(a) * 12f, y + sin(a) * 12f, stroke)
+        for (k in 0 until 5) {
+            val a = rot + k * 1.2566f
+            c.drawLine(x, y, x + cos(a) * 11f, y + sin(a) * 11f, stroke)
         }
-        fill.color = Color.BLACK
-        for (k in 0 until 8) {
-            val a = rot + k * 0.785f
-            c.drawCircle(x + cos(a) * 22f, y + sin(a) * 22f, 3.5f, fill)
-        }
+        fill.color = 0xFF424242.toInt()
+        c.drawCircle(x, y, 3f, fill)
     }
+
+    /** Zombie with the origin at its feet. */
 
     // ------------------------------------------------------------- zombies
 
@@ -521,28 +704,65 @@ class Renderer(private val g: Game) {
     private fun zombieFigure(c: Canvas, w: Float, h: Float, shirt: Int, swing: Float, dir: Float, fat: Boolean) {
         val skin = 0xFF8BC34A.toInt()
         val skinDark = 0xFF689F38.toInt()
-        stroke.color = 0xFF37474F.toInt()
-        stroke.strokeWidth = if (fat) 14f else 9f
+        val outline = 0xFF1B1B1B.toInt()
+        val legW = if (fat) 14f else 9f
+        val armW = if (fat) 10f else 7f
+        // outlines first
+        stroke.color = outline
+        stroke.strokeWidth = legW + 4f
         c.drawLine(0f, -h * 0.45f, swing * 12f, 0f, stroke)
         c.drawLine(0f, -h * 0.45f, -swing * 12f, 0f, stroke)
-        stroke.color = skinDark
-        stroke.strokeWidth = if (fat) 10f else 7f
+        stroke.strokeWidth = armW + 4f
         c.drawLine(0f, -h * 0.76f, dir * w * 0.95f, -h * 0.72f + swing * 4f, stroke)
+        c.drawLine(0f, -h * 0.74f, dir * w * 1.05f, -h * 0.7f - swing * 4f, stroke)
+        // legs (torn trousers) and feet
+        stroke.color = 0xFF37474F.toInt()
+        stroke.strokeWidth = legW
+        c.drawLine(0f, -h * 0.45f, swing * 12f, 0f, stroke)
+        c.drawLine(0f, -h * 0.45f, -swing * 12f, 0f, stroke)
+        fill.color = 0xFF3E2723.toInt()
+        c.drawOval(swing * 12f - 6f + dir * 3f, -5f, swing * 12f + 6f + dir * 5f, 2f, fill)
+        c.drawOval(-swing * 12f - 6f + dir * 3f, -5f, -swing * 12f + 6f + dir * 5f, 2f, fill)
+        // back arm
+        stroke.color = skinDark
+        stroke.strokeWidth = armW
+        c.drawLine(0f, -h * 0.76f, dir * w * 0.95f, -h * 0.72f + swing * 4f, stroke)
+        // torso with torn hem and a blood stain
+        r.set(-w / 2, -h * 0.86f, w / 2, -h * 0.42f)
+        fill.color = outline
+        c.drawRoundRect(r.left - 2f, r.top - 2f, r.right + 2f, r.bottom + 2f, 12f, 12f, fill)
         fill.color = shirt
-        c.drawRoundRect(-w / 2, -h * 0.86f, w / 2, -h * 0.42f, 10f, 10f, fill)
+        c.drawRoundRect(r, 10f, 10f, fill)
+        fill.color = 0x33FFFFFF
+        c.drawRect(-w / 2 + 3f, -h * 0.84f, w / 2 - 3f, -h * 0.78f, fill)
+        fill.color = 0xFF2E2E2E.toInt()
+        c.drawRect(-w / 2, -h * 0.47f, w / 2, -h * 0.43f, fill)
+        fill.color = 0xAA7F0000.toInt()
+        c.drawCircle(w * 0.12f, -h * 0.6f, w * 0.16f, fill)
         fill.color = 0x55000000
-        c.drawRect(-w * 0.2f, -h * 0.55f, w * 0.1f, -h * 0.5f, fill)
         c.drawRect(w * 0.1f, -h * 0.75f, w * 0.3f, -h * 0.7f, fill)
+        // head
         val hr = if (fat) h * 0.12f else h * 0.11f
+        val hx = dir * 3f
+        val hy = -h * 0.86f - hr * 0.9f
+        fill.color = outline
+        c.drawCircle(hx, hy, hr + 2.5f, fill)
         fill.color = skin
-        c.drawCircle(dir * 3f, -h * 0.86f - hr * 0.9f, hr, fill)
+        c.drawCircle(hx, hy, hr, fill)
+        fill.color = skinDark
+        c.drawCircle(hx - dir * hr * 0.4f, hy - hr * 0.3f, hr * 0.35f, fill)
+        // glowing eye and jaw
+        fill.color = 0x66FF1744
+        c.drawCircle(dir * (hr * 0.5f + 3f), hy - hr * 0.1f, 5f, fill)
         fill.color = 0xFFFF1744.toInt()
-        c.drawCircle(dir * (hr * 0.5f + 3f), -h * 0.86f - hr, 2.8f, fill)
+        c.drawCircle(dir * (hr * 0.5f + 3f), hy - hr * 0.1f, 2.6f, fill)
         fill.color = 0xFF33691E.toInt()
         val mx0 = dir * hr * 0.2f
         val mx1 = dir * (hr * 0.8f + 3f)
-        c.drawRect(min(mx0, mx1), -h * 0.86f - hr * 0.5f, max(mx0, mx1), -h * 0.86f - hr * 0.3f, fill)
+        c.drawRect(min(mx0, mx1), hy + hr * 0.4f, max(mx0, mx1), hy + hr * 0.6f, fill)
+        // front arm reaching for the car
         stroke.color = skin
+        stroke.strokeWidth = armW
         c.drawLine(0f, -h * 0.74f, dir * w * 1.05f, -h * 0.7f - swing * 4f, stroke)
     }
 
@@ -723,17 +943,25 @@ class Renderer(private val g: Game) {
     // ----------------------------------------------------------------- HUD
 
     private fun bar(c: Canvas, x: Float, y: Float, w: Float, frac: Float, color: Int, label: String) {
-        text.textAlign = Paint.Align.LEFT
-        text.textSize = 26f
-        text.color = Color.WHITE
-        c.drawText(label, x, y + 22f, text)
-        r.set(x + 44f, y, x + 44f + w, y + 26f)
-        fill.color = 0xAA212121.toInt()
-        c.drawRoundRect(r, 9f, 9f, fill)
-        fill.color = color
-        r.right = r.left + w * frac.coerceIn(0f, 1f)
-        if (frac > 0f) c.drawRoundRect(r, 9f, 9f, fill)
         text.textAlign = Paint.Align.CENTER
+        text.textSize = 24f
+        text.color = Color.WHITE
+        c.drawText(label, x + 16f, y + 21f, text)
+        r.set(x + 40f, y, x + 40f + w, y + 26f)
+        fill.color = 0xCC1B1B1B.toInt()
+        c.drawRoundRect(r, 13f, 13f, fill)
+        val f = frac.coerceIn(0f, 1f)
+        if (f > 0f) {
+            r.set(x + 42f, y + 2f, x + 42f + (w - 4f) * f, y + 24f)
+            fill.color = color
+            c.drawRoundRect(r, 11f, 11f, fill)
+            fill.color = 0x55FFFFFF
+            r.set(r.left + 3f, r.top + 2f, max(r.left + 4f, r.right - 3f), r.top + 9f)
+            c.drawRoundRect(r, 5f, 5f, fill)
+        }
+        // tick marks
+        fill.color = 0x40000000
+        for (k in 1 until 4) c.drawRect(x + 40f + w * k / 4f - 1f, y + 3f, x + 40f + w * k / 4f + 1f, y + 23f, fill)
     }
 
     private fun drawHud(c: Canvas) {
@@ -741,60 +969,68 @@ class Renderer(private val g: Game) {
         val H = g.H
         val car = g.car
 
+        // left: health, fuel, boost, ammo
+        glassPanel(c, 12f, 12f, 330f, 176f)
         val hpF = car.hp / car.maxHp
-        bar(c, 24f, 20f, 240f, hpF, if (hpF > 0.3f) 0xFF43A047.toInt() else 0xFFE53935.toInt(), "✚")
+        bar(c, 22f, 22f, 270f, hpF, if (hpF > 0.3f) 0xFF43A047.toInt() else 0xFFE53935.toInt(), "✚")
         val fuelLow = car.fuel / car.maxFuel < 0.2f && (g.anim * 4f).toInt() % 2 == 0
-        bar(c, 24f, 56f, 240f, car.fuel / car.maxFuel, if (fuelLow) 0xFFFF5252.toInt() else 0xFFFF9800.toInt(), "⛽")
-        bar(c, 24f, 92f, 240f, car.boost / car.maxBoost, 0xFF29B6F6.toInt(), "🚀")
+        bar(c, 22f, 58f, 270f, car.fuel / car.maxFuel, if (fuelLow) 0xFFFF5252.toInt() else 0xFFFF9800.toInt(), "⛽")
+        bar(c, 22f, 94f, 270f, car.boost / car.maxBoost, 0xFF29B6F6.toInt(), "🚀")
         text.textAlign = Paint.Align.LEFT
         text.textSize = 28f
         text.color = Color.WHITE
-        c.drawText("${g.save.weaponType.icon} ${car.ammo}", 24f, 152f, text)
+        c.drawText("${g.save.weaponType.icon} ${car.ammo}", 26f, 158f, text)
         var sx = 150f
         if (car.shieldT > 0f) {
             text.color = 0xFF82B1FF.toInt()
-            c.drawText("🛡${car.shieldT.toInt() + 1}", sx, 152f, text)
+            c.drawText("🛡${car.shieldT.toInt() + 1}", sx, 158f, text)
             sx += 80f
         }
         if (car.cloneT > 0f) {
             text.color = 0xFF64FFDA.toInt()
-            c.drawText("👥${car.cloneT.toInt() + 1}", sx, 152f, text)
+            c.drawText("👥${car.cloneT.toInt() + 1}", sx, 158f, text)
         }
         text.textAlign = Paint.Align.CENTER
 
-        // progress bar (start -> goal) with record and storm markers
+        // top centre: progress bar (start -> goal) with level ticks, record and storm markers
         val pl = W * 0.3f
         val pr = W * 0.7f
-        val py = 34f
-        stroke.color = 0xAA212121.toInt()
-        stroke.strokeWidth = 12f
+        val py = 36f
+        glassPanel(c, pl - 30f, 8f, pr + 64f, 132f)
+        stroke.color = 0xCC1B1B1B.toInt()
+        stroke.strokeWidth = 14f
         c.drawLine(pl, py, pr, py, stroke)
         val prog = (g.distanceM / g.goalM).coerceIn(0f, 1f)
         fill.color = 0xFFECEFF1.toInt()
         for (k in 1 until Game.LEVELS_PER_STAGE) {
             val kx = pl + (pr - pl) * k / Game.LEVELS_PER_STAGE
-            c.drawRect(kx - 2f, py - 10f, kx + 2f, py + 10f, fill)
+            c.drawRect(kx - 2f, py - 11f, kx + 2f, py + 11f, fill)
         }
         stroke.color = 0xFF29B6F6.toInt()
-        stroke.strokeWidth = 8f
+        stroke.strokeWidth = 9f
         c.drawLine(pl, py, pl + (pr - pl) * prog, py, stroke)
         val best = g.save.best[g.stage] / g.goalM
         if (best > 0f) {
             fill.color = 0xFFFFC107.toInt()
             val bx = pl + (pr - pl) * best.coerceIn(0f, 1f)
-            c.drawRect(bx - 3f, py - 16f, bx + 3f, py + 16f, fill)
+            c.drawRect(bx - 3f, py - 17f, bx + 3f, py + 17f, fill)
         }
         if (g.stormX > 0f) {
+            val sxp = pl + (pr - pl) * (g.stormX / Game.METER / g.goalM).coerceIn(0f, 1f)
+            fill.color = 0x66E040FB
+            c.drawCircle(sxp, py, 17f, fill)
             fill.color = 0xFFE040FB.toInt()
-            c.drawCircle(pl + (pr - pl) * (g.stormX / Game.METER / g.goalM).coerceIn(0f, 1f), py, 11f, fill)
+            c.drawCircle(sxp, py, 10f, fill)
         }
+        val cxp = pl + (pr - pl) * prog
+        fill.color = Color.WHITE
+        c.drawCircle(cxp, py, 15f, fill)
         fill.color = 0xFFE53935.toInt()
-        c.drawCircle(pl + (pr - pl) * prog, py, 13f, fill)
+        c.drawCircle(cxp, py, 11f, fill)
         text.textSize = 30f
-        c.drawText("🏁", pr + 26f, py + 10f, text)
-        text.textSize = 24f
+        c.drawText("🏁", pr + 30f, py + 10f, text)
         text.color = Color.WHITE
-        c.drawText("${g.distanceM.toInt()}m / ${g.goalM.toInt()}m  •  ẢI ${g.stage} — MÀN ${g.levelInStage}/${Game.LEVELS_PER_STAGE}  •  NGÀY ${g.save.day}", W / 2, py + 44f, text)
+        fitText(c, "${g.distanceM.toInt()}m / ${g.goalM.toInt()}m  •  ẢI ${g.stage} — MÀN ${g.levelInStage}/${Game.LEVELS_PER_STAGE}  •  NGÀY ${g.save.day}", W / 2 + 17f, py + 44f, 24f, pr - pl + 70f)
 
         val closed = g.phase >= Game.PHASE_TIME.size
         val secs = ceil(g.phaseLeft).toInt()
@@ -804,26 +1040,37 @@ class Renderer(private val g: Game) {
             else -> "BO ${g.phase + 1}  ${secs / 60}:${(secs % 60).toString().padStart(2, '0')}"
         }
         val gap = ((car.x - Car.HALF_LEN - g.stormX) / Game.METER).toInt()
-        text.textSize = 30f
         text.color = if (closed || g.phase == 2) 0xFFFF5252.toInt() else 0xFFEA80FC.toInt()
-        c.drawText("$timer   •   Bão cách ${max(0, gap)}m", W / 2, py + 84f, text)
+        fitText(c, "🌪 $timer   •   Bão cách ${max(0, gap)}m", W / 2 + 17f, py + 84f, 28f, pr - pl + 70f)
 
+        // money & pause
+        val moneyText = "+${g.runMoney}$"
+        text.textSize = 32f
+        val mw = text.measureText(moneyText)
+        glassPanel(c, W - 132f - mw, 18f, W - 108f, 86f, 30f)
         text.textAlign = Paint.Align.RIGHT
-        text.textSize = 34f
         text.color = 0xFFFFD740.toInt()
-        c.drawText("+${g.runMoney}$", W - 116f, 66f, text)
+        c.drawText(moneyText, W - 120f, 64f, text)
         text.textAlign = Paint.Align.CENTER
         drawButton(c, g.pauseBtn, false)
 
+        // warnings
         val warn = when {
+            g.wrecked -> null
             gap in 0..25 -> "⚠ BÃO ĐANG ĐUỔI KỊP!"
             car.fuel <= 0f -> "HẾT XĂNG!"
             car.flipT > 0.3f -> "LẬT XE! Nhấn ↺ ↻ để lật lại"
+            car.hp < car.maxHp * 0.15f -> "🔥 XE ĐANG CHÁY!"
             else -> null
         }
         if (warn != null && g.state == State.PLAYING) {
-            text.textSize = 40f
-            text.color = Color.argb((160 + 95 * sin(g.anim * 8f)).toInt(), 255, 82, 82)
+            text.textSize = 42f
+            text.style = Paint.Style.STROKE
+            text.strokeWidth = 8f
+            text.color = 0xCC000000.toInt()
+            c.drawText(warn, W / 2, H * 0.3f, text)
+            text.style = Paint.Style.FILL
+            text.color = Color.argb((180 + 75 * sin(g.anim * 8f)).toInt(), 255, 82, 82)
             c.drawText(warn, W / 2, H * 0.3f, text)
         }
         if (g.stormHurt > 0f) {
@@ -834,26 +1081,41 @@ class Renderer(private val g: Game) {
         // speedometer
         val kmh = abs(car.forwardSpeed) / Game.METER * 3.6f
         val cx = W / 2
-        val cy = H + 10f
-        fill.color = 0xDD212121.toInt()
-        c.drawCircle(cx, cy, 130f, fill)
+        val cy = H + 12f
+        fill.color = 0xE61B1B1B.toInt()
+        c.drawCircle(cx, cy, 134f, fill)
+        stroke.color = 0x66FFFFFF
+        stroke.strokeWidth = 3f
+        c.drawCircle(cx, cy, 134f, stroke)
+        r.set(cx - 118f, cy - 118f, cx + 118f, cy + 118f)
+        stroke.strokeWidth = 8f
+        stroke.color = 0xFF43A047.toInt()
+        c.drawArc(r, 180f, 108f, false, stroke)
+        stroke.color = 0xFFFFA000.toInt()
+        c.drawArc(r, 288f, 45f, false, stroke)
+        stroke.color = 0xFFE53935.toInt()
+        c.drawArc(r, 333f, 27f, false, stroke)
         stroke.color = Color.WHITE
         stroke.strokeWidth = 3f
-        for (k in 0..10) {
-            val a = PI.toFloat() + k / 10f * PI.toFloat()
-            c.drawLine(cx + cos(a) * 112f, cy + sin(a) * 112f, cx + cos(a) * 124f, cy + sin(a) * 124f, stroke)
+        for (k in 0..12) {
+            val a = PI.toFloat() + k / 12f * PI.toFloat()
+            val inner = if (k % 2 == 0) 98f else 104f
+            c.drawLine(cx + cos(a) * inner, cy + sin(a) * inner, cx + cos(a) * 112f, cy + sin(a) * 112f, stroke)
         }
         val na = PI.toFloat() + (kmh / 240f).coerceIn(0f, 1f) * PI.toFloat()
         stroke.color = 0xFFFF5252.toInt()
         stroke.strokeWidth = 6f
-        c.drawLine(cx, cy, cx + cos(na) * 108f, cy + sin(na) * 108f, stroke)
-        text.textSize = 30f
+        c.drawLine(cx, cy, cx + cos(na) * 104f, cy + sin(na) * 104f, stroke)
+        fill.color = 0xFF424242.toInt()
+        c.drawCircle(cx, cy, 14f, fill)
+        text.textSize = 32f
         text.color = Color.WHITE
-        c.drawText("${kmh.toInt()}", cx, cy - 40f, text)
+        c.drawText("${kmh.toInt()}", cx, cy - 44f, text)
         text.textSize = 18f
-        c.drawText("km/h", cx, cy - 18f, text)
+        text.color = 0xFFB0BEC5.toInt()
+        c.drawText("km/h", cx, cy - 22f, text)
 
-        if (g.state == State.PLAYING) for (b in g.controls()) drawButton(c, b, g.isHeld(b.id))
+        if (g.state == State.PLAYING && !g.wrecked) for (b in g.controls()) drawButton(c, b, g.isHeld(b.id))
 
         if (g.state == State.PLAYING && g.phase == 2) {
             val n = ceil(g.phaseLeft).toInt().coerceAtLeast(1)
@@ -865,17 +1127,23 @@ class Renderer(private val g: Game) {
     }
 
     private fun drawButton(c: Canvas, b: Button, held: Boolean) {
+        val grow = if (held) 4f else 0f
+        r.set(b.l - grow, b.t - grow, b.r + grow, b.b + grow)
+        fill.color = 0x40000000
+        c.drawRoundRect(r.left + 3f, r.top + 6f, r.right + 3f, r.bottom + 6f, 26f, 26f, fill)
         fill.color = b.color
-        if (held) fill.alpha = 200
-        r.set(b.l, b.t, b.r, b.b)
-        c.drawRoundRect(r, 24f, 24f, fill)
+        fill.alpha = if (held) 230 else (b.color ushr 24).coerceAtLeast(110)
+        c.drawRoundRect(r, 26f, 26f, fill)
+        fill.color = 0x30FFFFFF
+        c.drawRoundRect(r.left + 4f, r.top + 4f, r.right - 4f, r.top + (r.bottom - r.top) * 0.45f, 22f, 22f, fill)
         fill.alpha = 255
-        stroke.color = 0x88FFFFFF.toInt()
-        stroke.strokeWidth = 3f
-        c.drawRoundRect(r, 24f, 24f, stroke)
+        stroke.color = if (held) 0xEEFFFFFF.toInt() else 0x88FFFFFF.toInt()
+        stroke.strokeWidth = if (held) 4f else 3f
+        c.drawRoundRect(r, 26f, 26f, stroke)
         text.textAlign = Paint.Align.CENTER
         text.color = Color.WHITE
-        fitText(c, b.label, b.cx, b.cy + min(52f, (b.b - b.t) * 0.38f) * 0.36f, min(52f, (b.b - b.t) * 0.38f), b.r - b.l - 16f)
+        val size = min(52f, (b.b - b.t) * 0.38f)
+        fitText(c, b.label, b.cx, b.cy + size * 0.36f, size, b.r - b.l - 16f)
     }
 
     // ------------------------------------------------------------ screens
@@ -890,10 +1158,20 @@ class Renderer(private val g: Game) {
         text.textSize = size
         val w = text.measureText(s)
         if (w > maxW) text.textSize *= maxW / w
-        text.color = Color.BLACK
-        c.drawText(s, x + 4f, y + 4f, text)
+        text.style = Paint.Style.STROKE
+        text.strokeWidth = text.textSize * 0.14f
+        text.color = 0xFF1A0E08.toInt()
+        c.drawText(s, x + 3f, y + 5f, text)
+        c.drawText(s, x, y, text)
+        text.style = Paint.Style.FILL
         text.color = color
         c.drawText(s, x, y, text)
+        // glossy top highlight
+        c.save()
+        c.clipRect(x - w, y - text.textSize, x + w, y - text.textSize * 0.45f)
+        text.color = 0x55FFFFFF
+        c.drawText(s, x, y, text)
+        c.restore()
     }
 
     private fun drawMenuButtons(c: Canvas) {
@@ -904,13 +1182,26 @@ class Renderer(private val g: Game) {
             fill.color = if (b.enabled) b.color else 0xFF616161.toInt()
             r.set(b.l, b.t, b.r, b.b)
             c.drawRoundRect(r, 24f, 24f, fill)
-            fill.color = 0x33FFFFFF
-            r.set(b.l, b.t, b.r, b.cy)
-            c.drawRoundRect(r, 24f, 24f, fill)
+            fill.color = 0x38FFFFFF
+            r.set(b.l + 4f, b.t + 4f, b.r - 4f, b.cy)
+            c.drawRoundRect(r, 20f, 20f, fill)
+            fill.color = 0x30000000
+            r.set(b.l + 4f, b.b - 14f, b.r - 4f, b.b - 4f)
+            c.drawRoundRect(r, 8f, 8f, fill)
+            stroke.color = 0x66FFFFFF
+            stroke.strokeWidth = 2f
+            r.set(b.l, b.t, b.r, b.b)
+            c.drawRoundRect(r, 24f, 24f, stroke)
             text.textAlign = Paint.Align.CENTER
-            text.textSize = min(40f, (b.b - b.t) * 0.45f)
+            val size = min(40f, (b.b - b.t) * 0.45f)
+            text.textSize = size
             val w = text.measureText(b.label)
             if (w > b.r - b.l - 20f) text.textSize *= (b.r - b.l - 20f) / w
+            text.style = Paint.Style.STROKE
+            text.strokeWidth = 5f
+            text.color = 0x66000000
+            c.drawText(b.label, b.cx, b.cy + text.textSize * 0.36f, text)
+            text.style = Paint.Style.FILL
             text.color = if (b.enabled) Color.WHITE else 0xFFBDBDBD.toInt()
             c.drawText(b.label, b.cx, b.cy + text.textSize * 0.36f, text)
         }
@@ -926,37 +1217,54 @@ class Renderer(private val g: Game) {
     private fun drawMenu(c: Canvas) {
         val W = g.W
         val s = g.save
-        fill.color = 0x55000000
+        fill.color = 0x40000000
         c.drawRect(0f, 0f, W, g.H, fill)
         val lx = W * 0.27f
         val lw = W * 0.5f
-        title(c, "ĐUA XE", lx, 110f, 0xFFFFD740.toInt(), 96f, lw)
-        title(c, "SINH TỒN", lx, 205f, 0xFFFF5252.toInt(), 96f, lw)
+        val bob = sin(g.anim * 2f) * 4f
+        title(c, "ĐUA XE", lx, 115f + bob, 0xFFFFD740.toInt(), 104f, lw)
+        title(c, "SINH TỒN", lx, 215f + bob, 0xFFFF5252.toInt(), 104f, lw)
+
+        // slogan ribbon
+        val slogan = "CHẠY CÀNG XA — CÀNG SỐNG SÓT!"
+        val pulse = 1f + 0.03f * sin(g.anim * 4f)
+        text.textSize = 34f * pulse
+        val sw = min(lw, text.measureText(slogan) + 60f)
+        val sy = 248f
+        fill.color = 0x55000000
+        path.reset()
+        path.moveTo(lx - sw / 2 - 18f, sy + 6f); path.lineTo(lx + sw / 2 + 18f, sy + 6f)
+        path.lineTo(lx + sw / 2 + 4f, sy + 34f); path.lineTo(lx + sw / 2 + 18f, sy + 62f)
+        path.lineTo(lx - sw / 2 - 18f, sy + 62f); path.lineTo(lx - sw / 2 - 4f, sy + 34f); path.close()
+        c.drawPath(path, fill)
+        path.offset(-3f, -6f)
+        fill.color = 0xF0B71C1C.toInt()
+        c.drawPath(path, fill)
+        stroke.color = 0xFFFFD740.toInt()
+        stroke.strokeWidth = 3f
+        c.drawPath(path, stroke)
         text.textAlign = Paint.Align.CENTER
         text.color = Color.WHITE
-        fitText(c, "Lái xe xuyên đàn zombie — chạy trước cơn bão!", lx, 258f, 30f, lw)
-        text.color = 0xFFFFD740.toInt()
-        fitText(c, "💰 ${s.money}$   •   📅 Ngày ${s.day}   •   🏆 ${s.bestStage}/${Game.STAGES} ải", lx, 306f, 30f, lw)
+        fitText(c, slogan, lx - 3f, sy + 40f, 34f * pulse, sw - 30f)
 
-        val cx = W * 0.74f
+        // stats chips
+        val chips = listOf("💰 ${s.money}$", "📅 Ngày ${s.day}", "🏆 ${s.bestStage}/${Game.STAGES} ải", "⭐ ${s.bestScore}")
+        text.textSize = 26f
+        var total = 0f
+        for (ch in chips) total += text.measureText(ch) + 26f * 1.2f + 14f
+        var cx = lx - total / 2
+        for (ch in chips) cx += chip(c, ch, cx, 330f, 26f, 0xAA1B1B1B.toInt(), 0xFFFFE082.toInt()) + 14f
+
+        // stage selector
+        val sx = W * 0.74f
         text.textSize = 46f
         text.color = Color.WHITE
-        c.drawText("ẢI ${s.stageSel}", cx, 172f, text)
+        title(c, "ẢI ${s.stageSel}", sx, 172f, Color.WHITE, 50f)
+        text.textAlign = Paint.Align.CENTER
         text.textSize = 22f
-        text.color = 0xFFFFE0B2.toInt()
-        c.drawText("${g.stageGoalM(s.stageSel).toInt()}m • kỷ lục ${s.best[s.stageSel]}m", cx, 204f, text)
-        drawMenuButtons(c)
-
         text.color = 0xFFFFF3E0.toInt()
-        var y = g.H - 110f
-        for (line in listOf(
-            "GA: tăng tốc • PHANH: lùi • ↺ ↻: nghiêng xe • 🚀: tên lửa đẩy • súng tự bắn",
-            "Vòng bo: Bo 1 (60s) → Bo 2 (20s) → Bo 3 (5s) • 1 ải = 5 màn • màn đầu: ${g.perHundredFor(s.stageSel)} chướng ngại/100m",
-            "Qua ải 1 mở GARA (xe, nỏ, máy ném đá) • qua ải 5 mở vật phẩm 👥 Nhân bản",
-        )) {
-            fitText(c, line, lx, y, 22f, lw)
-            y += 34f
-        }
+        c.drawText("${g.stageGoalM(s.stageSel).toInt()}m • kỷ lục ${s.best[s.stageSel]}m", sx, 204f, text)
+        drawMenuButtons(c)
     }
 
     private fun card(c: Canvas, rc: FloatArray, selected: Boolean) {
@@ -1063,75 +1371,293 @@ class Renderer(private val g: Game) {
         c.drawText(label, (rc[0] + rc[2]) / 2, rc[3] - 18f, text)
     }
 
-    private fun lines(c: Canvas, x: Float, top: Float, vararg ls: String) {
-        text.textAlign = Paint.Align.CENTER
-        text.color = Color.WHITE
-        var y = top
-        for (l in ls) {
-            fitText(c, l, x, y, 32f, g.W - 80f)
-            y += 46f
-        }
-    }
-
     private fun drawOverlay(c: Canvas) {
         val W = g.W
         val H = g.H
+        val tiles = listOf(
+            Triple("📏", "${g.maxDist.toInt()}m", "quãng đường"),
+            Triple("🧟", "${g.kills}", "zombie"),
+            Triple("💥", "${g.smashed}", "vật cản"),
+            Triple("💰", "+${g.distMoney + g.runMoney + g.stageBonus}$", "tiền"),
+        )
         when (g.state) {
             State.PAUSED -> {
                 dim(c)
                 title(c, "TẠM DỪNG", W / 2, H * 0.24f, Color.WHITE)
                 drawMenuButtons(c)
             }
-            State.RESULT -> {
-                dim(c)
-                title(c, "NGÀY ${g.save.day - 1} KẾT THÚC", W / 2, 100f, 0xFFFF5252.toInt(), 68f)
-                text.textAlign = Paint.Align.CENTER
-                text.textSize = 36f
-                text.color = 0xFFFFAB91.toInt()
-                c.drawText(g.endReason, W / 2, 152f, text)
-                lines(
-                    c, W / 2, 220f,
-                    "Quãng đường: ${g.maxDist.toInt()}m / ${g.goalM.toInt()}m" + if (g.newRecord) "  🏆 KỶ LỤC MỚI!" else "",
-                    "Zombie bị tông: ${g.kills}   •   Vật cản phá: ${g.smashed}",
-                    "Tiền quãng đường: ${g.distMoney}$   •   Tiền thưởng: ${g.runMoney}$",
-                    "Tổng nhận: ${g.distMoney + g.runMoney}$   •   Ví: ${g.save.money}$",
-                )
-                text.color = 0xFFFFE0B2.toInt()
-                fitText(c, "Nâng cấp động cơ, xăng, tên lửa… để đi xa hơn vào ngày mai!", W / 2, H - 160f, 26f, W - 80f)
-                drawMenuButtons(c)
-            }
+            State.RESULT -> resultPanel(
+                c, "NGÀY ${g.save.day - 1} KẾT THÚC", 0xFFFF5252.toInt(),
+                g.endReason, 0xFFFFAB91.toInt(), tiles, emptyList(),
+            )
             State.STAGE_DONE -> {
-                dim(c)
-                title(c, "VƯỢT ẢI ${g.stage}!", W / 2, 110f, 0xFFFFD740.toInt(), 80f)
-                lines(
-                    c, W / 2, 200f,
-                    "Đã tới trạm cứu hộ!   •   Ngày ${g.save.day - 1}",
-                    "Zombie bị tông: ${g.kills}   •   Vật cản phá: ${g.smashed}",
-                    "Thưởng vượt ải: ${g.stageBonus}$   •   Tổng nhận: ${g.distMoney + g.runMoney + g.stageBonus}$",
-                )
                 val unlock = when (g.stage) {
-                    1 -> "🔓 MỞ KHÓA GARA: đổi xe & vũ khí (Nỏ, Máy ném đá)!"
-                    5 -> "🔓 MỞ KHÓA VẬT PHẨM 👥 NHÂN BẢN: thêm 1 mạng trong 10 giây!"
-                    else -> null
+                    1 -> listOf("🔓 Mở khóa GARA")
+                    5 -> listOf("🔓 Mở khóa 👥 Nhân bản")
+                    else -> emptyList()
                 }
-                if (unlock != null) {
-                    text.color = Color.argb((180 + 75 * sin(g.anim * 6f)).toInt(), 100, 255, 218)
-                    fitText(c, unlock, W / 2, 380f, 34f, W - 80f)
-                }
-                drawMenuButtons(c)
-            }
-            State.VICTORY -> {
-                dim(c)
-                title(c, "CHIẾN THẮNG!", W / 2, 140f, 0xFFFFD740.toInt(), 90f)
-                lines(
-                    c, W / 2, 240f,
-                    "Bạn đã vượt qua cả ${Game.STAGES} ải và sống sót!",
-                    "Số ngày: ${g.save.day - 1}",
-                    "Ví: ${g.save.money}$",
+                resultPanel(
+                    c, "VƯỢT ẢI ${g.stage}!", 0xFFFFD740.toInt(),
+                    "Đã tới trạm cứu hộ!", 0xFF69F0AE.toInt(), tiles, unlock,
                 )
-                drawMenuButtons(c)
             }
+            State.VICTORY -> resultPanel(
+                c, "CHIẾN THẮNG!", 0xFFFFD740.toInt(),
+                "Bạn đã sống sót qua cả ${Game.STAGES} ải!", 0xFF69F0AE.toInt(), tiles, listOf("👑 Huyền thoại sinh tồn"),
+            )
             else -> {}
         }
     }
+
+    private var bgW = -1f
+
+
+    private var bgH = -1f
+
+
+    private var skyShader: Shader? = null
+
+
+    private var sunShader: Shader? = null
+
+
+    private var farShader: Shader? = null
+
+
+    private var midShader: Shader? = null
+
+
+    private var vignette: Shader? = null
+
+
+    private var hurtShader: Shader? = null
+
+
+    private val groundShader = LinearGradient(
+        0f, Terrain.BASE_Y - 260f, 0f, Terrain.BASE_Y + 560f,
+        intArrayOf(0xFFC99059.toInt(), 0xFF9C653B.toInt(), 0xFF5A361E.toInt()),
+        floatArrayOf(0f, 0.35f, 1f), Shader.TileMode.CLAMP,
+    )
+
+
+    private val topPath = Path()
+
+
+    private fun ensureShaders() {
+        if (bgW == g.W && bgH == g.H) return
+        bgW = g.W
+        bgH = g.H
+        val W = g.W
+        val H = g.H
+        skyShader = LinearGradient(
+            0f, 0f, 0f, H * 0.85f,
+            intArrayOf(0xFF8E3B46.toInt(), 0xFFD9714A.toInt(), 0xFFF6B26B.toInt(), 0xFFFBE3B0.toInt()),
+            floatArrayOf(0f, 0.35f, 0.7f, 1f), Shader.TileMode.CLAMP,
+        )
+        sunShader = RadialGradient(
+            W * 0.78f, H * 0.26f, 260f,
+            intArrayOf(0xFFFFF4D6.toInt(), 0x88FFD59E.toInt(), 0x00FFD59E),
+            floatArrayOf(0f, 0.3f, 1f), Shader.TileMode.CLAMP,
+        )
+        farShader = LinearGradient(0f, H * 0.3f, 0f, H * 0.7f, 0xFFC98F7A.toInt(), 0xFFE7B892.toInt(), Shader.TileMode.CLAMP)
+        midShader = LinearGradient(0f, H * 0.45f, 0f, H * 0.85f, 0xFFA35E3F.toInt(), 0xFFC4855A.toInt(), Shader.TileMode.CLAMP)
+        vignette = RadialGradient(
+            W / 2, H / 2, max(W, H) * 0.72f,
+            intArrayOf(0x00000000, 0x00000000, 0x66000000),
+            floatArrayOf(0f, 0.62f, 1f), Shader.TileMode.CLAMP,
+        )
+        hurtShader = RadialGradient(
+            W / 2, H / 2, max(W, H) * 0.65f,
+            intArrayOf(0x00FF0000, 0x00FF0000, 0xFFD50000.toInt()),
+            floatArrayOf(0f, 0.5f, 1f), Shader.TileMode.CLAMP,
+        )
+    }
+
+
+    private fun hash(k: Int): Int = ((k * 73856093) xor ((k shr 2) * 19349663) xor 0x5bd1e995) and 0x7fffffff
+
+
+    private fun cloud(c: Canvas, x: Float, y: Float, s: Float) {
+        fill.color = 0x22000000
+        c.drawOval(x - 80f * s, y - 6f * s, x + 90f * s, y + 30f * s, fill)
+        fill.color = 0xCCFFF1DC.toInt()
+        c.drawOval(x - 90f * s, y - 20f * s, x + 90f * s, y + 22f * s, fill)
+        c.drawCircle(x - 30f * s, y - 22f * s, 32f * s, fill)
+        c.drawCircle(x + 25f * s, y - 30f * s, 40f * s, fill)
+        fill.color = 0x66FFFFFF
+        c.drawCircle(x + 15f * s, y - 40f * s, 22f * s, fill)
+    }
+
+
+    private fun city(c: Canvas, par: Float, base: Float) {
+        val off = g.camX * Game.ZOOM * par
+        val slot = 80f
+        var k = floor(off / slot).toInt() - 1
+        val end = floor((off + g.W) / slot).toInt() + 1
+        while (k <= end) {
+            val h = hash(k)
+            if (h % 7 < 3) {
+                val x = k * slot - off
+                val bh = 50f + (h % 9) * 16f
+                val bw = slot * (0.55f + (h % 4) * 0.12f)
+                fill.color = 0xFFA86E52.toInt()
+                path.reset()
+                path.moveTo(x, base + 40f)
+                path.lineTo(x, base - bh)
+                if (h % 2 == 0) {
+                    // broken top
+                    path.lineTo(x + bw * 0.35f, base - bh)
+                    path.lineTo(x + bw * 0.5f, base - bh + 22f)
+                    path.lineTo(x + bw * 0.7f, base - bh + 8f)
+                } else {
+                    path.lineTo(x + bw * 0.5f, base - bh)
+                    path.lineTo(x + bw * 0.5f, base - bh - 18f)
+                    path.lineTo(x + bw * 0.6f, base - bh - 18f)
+                    path.lineTo(x + bw * 0.6f, base - bh)
+                }
+                path.lineTo(x + bw, base - bh * 0.85f)
+                path.lineTo(x + bw, base + 40f)
+                path.close()
+                c.drawPath(path, fill)
+                fill.color = 0x55693A28
+                var wy = base - bh + 30f
+                while (wy < base) {
+                    var wx = x + 8f
+                    while (wx < x + bw - 12f) {
+                        if (hash(k * 31 + (wx + wy).toInt()) % 3 != 0) c.drawRect(wx, wy, wx + 7f, wy + 9f, fill)
+                        wx += 16f
+                    }
+                    wy += 20f
+                }
+            }
+            k++
+        }
+    }
+
+
+    private fun drawDamageOverlay(c: Canvas) {
+        val car = g.car
+        var a = 0f
+        if (g.hurtFlash > 0f) a = min(1f, g.hurtFlash * 2.2f) * 0.85f
+        if (car.hp < car.maxHp * 0.25f && !g.wrecked && g.state == State.PLAYING) {
+            a = max(a, 0.25f + 0.2f * sin(g.anim * 6f))
+        }
+        if (a <= 0f) return
+        fill.shader = hurtShader
+        fill.alpha = (255 * a).toInt().coerceIn(0, 255)
+        c.drawRect(0f, 0f, g.W, g.H, fill)
+        fill.shader = null
+        fill.alpha = 255
+    }
+
+
+    private fun glassPanel(c: Canvas, l: Float, t: Float, rr: Float, b: Float, radius: Float = 18f) {
+        r.set(l, t, rr, b)
+        fill.color = 0x8C101418.toInt()
+        c.drawRoundRect(r, radius, radius, fill)
+        stroke.color = 0x40FFFFFF
+        stroke.strokeWidth = 2f
+        c.drawRoundRect(r, radius, radius, stroke)
+    }
+
+
+    private fun chip(c: Canvas, s: String, x: Float, y: Float, size: Float, bg: Int, fg: Int): Float {
+        text.textSize = size
+        val w = text.measureText(s) + size * 1.2f
+        r.set(x, y, x + w, y + size * 1.6f)
+        fill.color = bg
+        c.drawRoundRect(r, size * 0.8f, size * 0.8f, fill)
+        stroke.color = 0x55FFFFFF
+        stroke.strokeWidth = 2f
+        c.drawRoundRect(r, size * 0.8f, size * 0.8f, stroke)
+        text.textAlign = Paint.Align.CENTER
+        text.color = fg
+        c.drawText(s, x + w / 2, y + size * 1.15f, text)
+        return w
+    }
+
+
+    private fun resultPanel(
+        c: Canvas,
+        heading: String,
+        headColor: Int,
+        sub: String,
+        subColor: Int,
+        tiles: List<Triple<String, String, String>>,
+        extraChips: List<String>,
+    ) {
+        val W = g.W
+        val H = g.H
+        dim(c, 0x8C)
+        val l = W / 2 - 540f
+        val rr = W / 2 + 540f
+        glassPanel(c, l, 24f, rr, H - 150f, 30f)
+        title(c, heading, W / 2, 98f, headColor, 64f, rr - l - 60f)
+        text.textAlign = Paint.Align.CENTER
+        text.color = subColor
+        fitText(c, sub, W / 2, 140f, 28f, rr - l - 60f)
+
+        // score
+        text.textSize = 22f
+        text.color = 0xFFB0BEC5.toInt()
+        c.drawText("ĐIỂM", W / 2, 182f, text)
+        title(c, "%,d".format(g.score).replace(',', '.'), W / 2, 250f, 0xFFFFD740.toInt(), 68f)
+        text.textAlign = Paint.Align.CENTER
+        text.textSize = 22f
+        text.color = if (g.newBestScore) 0xFF69F0AE.toInt() else 0xFFB0BEC5.toInt()
+        c.drawText(if (g.newBestScore) "★ ĐIỂM CAO NHẤT MỚI ★" else "Cao nhất: ${g.save.bestScore}", W / 2, 282f, text)
+
+        // stat tiles
+        val tw = 230f
+        val gap = 20f
+        var tx = W / 2 - (tiles.size * tw + (tiles.size - 1) * gap) / 2
+        for ((icon, value, label) in tiles) {
+            r.set(tx, 300f, tx + tw, 404f)
+            fill.color = 0x33FFFFFF
+            c.drawRoundRect(r, 18f, 18f, fill)
+            text.textAlign = Paint.Align.CENTER
+            text.textSize = 30f
+            text.color = Color.WHITE
+            c.drawText(icon, tx + tw / 2, 336f, text)
+            fitText(c, value, tx + tw / 2, 372f, 32f, tw - 16f)
+            text.color = 0xFFB0BEC5.toInt()
+            fitText(c, label, tx + tw / 2, 396f, 18f, tw - 16f)
+            tx += tw + gap
+        }
+
+        // achievements
+        text.textSize = 26f
+        text.color = 0xFFFFD740.toInt()
+        c.drawText("🏆 THÀNH TÍCH", W / 2, 446f, text)
+        val all = extraChips + g.achievements
+        if (all.isEmpty()) {
+            text.textSize = 22f
+            text.color = 0xFF90A4AE.toInt()
+            c.drawText("—", W / 2, 486f, text)
+        } else {
+            // centre each row of chips
+            text.textSize = 22f
+            val rows = ArrayList<ArrayList<String>>()
+            var rowW = 0f
+            rows.add(ArrayList())
+            for (a in all) {
+                val w = text.measureText(a) + 22f * 1.2f + 12f
+                if (rowW + w > rr - l - 60f && rows.last().isNotEmpty()) {
+                    rows.add(ArrayList()); rowW = 0f
+                }
+                rows.last().add(a); rowW += w
+            }
+            var y = 462f
+            for (row in rows.take(2)) {
+                var w = 0f
+                for (a in row) w += text.measureText(a) + 22f * 1.2f + 12f
+                var x = W / 2 - w / 2
+                for (a in row) x += chip(c, a, x, y, 22f, 0xCC4E3B00.toInt(), 0xFFFFE082.toInt()) + 12f
+                y += 46f
+                text.textSize = 22f
+            }
+        }
+        drawMenuButtons(c)
+    }
+
 }
