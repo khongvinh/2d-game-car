@@ -4,15 +4,21 @@ import android.content.Context
 
 /** Persistent wallet, stage progress, garage and upgrade levels. */
 class SaveData(context: Context) {
-    private val prefs = context.getSharedPreferences("car_survival", Context.MODE_PRIVATE)
+    private val prefs = context.getSharedPreferences("car_survival_v3", Context.MODE_PRIVATE)
 
     var money = prefs.getInt("money", 0)
 
     /** Number of stages (ải) cleared, 0..[Game.STAGES]. */
     var bestStage = prefs.getInt("bestStage", 0)
 
-    /** Stage chosen in the menu to start a run from. */
+    /** Stage chosen in the menu. */
     var stageSel = prefs.getInt("stageSel", 1)
+
+    /** Days survived (one run = one day), like Earn to Die. */
+    var day = prefs.getInt("day", 1)
+
+    /** Best distance (m) reached on each stage, to draw the "record" flag. */
+    val best = IntArray(Game.STAGES + 1) { prefs.getInt("best$it", 0) }
     val upgrades = IntArray(Upgrade.entries.size) { prefs.getInt("up$it", 0) }
     var ownedCars = prefs.getInt("ownedCars", 1)
     var ownedWeapons = prefs.getInt("ownedWeapons", 1)
@@ -35,6 +41,8 @@ class SaveData(context: Context) {
         e.putInt("money", money)
         e.putInt("bestStage", bestStage)
         e.putInt("stageSel", stageSel)
+        e.putInt("day", day)
+        best.forEachIndexed { i, v -> e.putInt("best$i", v) }
         upgrades.forEachIndexed { i, v -> e.putInt("up$i", v) }
         e.putInt("ownedCars", ownedCars)
         e.putInt("ownedWeapons", ownedWeapons)
@@ -42,18 +50,5 @@ class SaveData(context: Context) {
         e.putInt("weapon", weapon)
         e.putBoolean("sound", sound)
         e.apply()
-    }
-}
-
-enum class Upgrade(val title: String, val desc: String) {
-    HP("Máu tối đa", "+25 máu mỗi cấp"),
-    ARMOR("Giáp xe", "-10% sát thương mỗi cấp"),
-    WEAPON("Vũ khí", "Bắn lâu và nhanh hơn"),
-    SHIELD("Lá chắn", "+1.5 giây mỗi cấp");
-
-    fun cost(level: Int) = 120 * (level + 1)
-
-    companion object {
-        const val MAX_LEVEL = 5
     }
 }

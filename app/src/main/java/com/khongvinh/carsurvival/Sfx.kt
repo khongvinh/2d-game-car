@@ -17,7 +17,7 @@ import kotlin.random.Random
  * to a small WAV file in the cache dir and played through a [SoundPool].
  */
 class Sfx(context: Context) {
-    enum class S { COIN, POWER, HIT, EXPLODE, SHOOT, BOW, CATAPULT, BOOM, BEEP, GO, WIN, STAGE, LOSE, STORM, CLONE, CLICK }
+    enum class S { COIN, POWER, HIT, EXPLODE, SHOOT, BOW, CATAPULT, BOOM, BEEP, GO, WIN, STAGE, LOSE, STORM, CLONE, CLICK, SPLAT, WOOD, BOOST, LAND }
 
     private val pool: SoundPool = SoundPool.Builder()
         .setMaxStreams(10)
@@ -164,6 +164,22 @@ class Sfx(context: Context) {
             tone(it, 0.05f, 0.4f, 900f, 1350f, 0.3f, false, 2f)
         }
         S.CLICK -> buf(0.05f).also { tone(it, 0f, 0.05f, 1500f, 1000f, 0.4f, true, 8f) }
+        S.SPLAT -> buf(0.25f).also {
+            noise(it, 0f, 0.25f, 0.9f, 0.18f, 7f)
+            tone(it, 0f, 0.12f, 220f, 70f, 0.5f, false, 6f)
+        }
+        S.WOOD -> buf(0.25f).also {
+            noise(it, 0f, 0.2f, 0.7f, 0.45f, 9f)
+            tone(it, 0f, 0.15f, 260f, 180f, 0.5f, true, 7f)
+        }
+        S.BOOST -> buf(0.5f).also {
+            noise(it, 0f, 0.5f, 0.7f, 0.25f, 1.5f)
+            tone(it, 0f, 0.5f, 90f, 160f, 0.3f, true, 1.5f)
+        }
+        S.LAND -> buf(0.2f).also {
+            noise(it, 0f, 0.2f, 0.6f, 0.06f, 6f)
+            tone(it, 0f, 0.15f, 90f, 50f, 0.5f, false, 6f)
+        }
     }
 
     private fun writeWav(f: File, b: Buf) {

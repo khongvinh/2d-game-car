@@ -1,74 +1,70 @@
-# Đua Xe Sinh Tồn 🚗💨
+# Đua Xe Sinh Tồn 🚗🧟
 
-Game lái xe 2D cho Android (Kotlin + Canvas, không dùng engine hay thư viện ngoài).
+Game lái xe sinh tồn 2D cho Android theo phong cách *Earn to Die*: màn hình ngang, cuộn ngang,
+xe có vật lý (nhún, bay, lật), lao qua đồi sa mạc đầy zombie, thùng gỗ, thùng phuy, xác xe —
+và chạy trước **cơn bão (vòng bo)** đuổi phía sau. Viết bằng Kotlin + Canvas, không dùng engine
+hay thư viện ngoài, không cần file ảnh/âm thanh.
 
-## Luật chơi
+## Cách chơi
 
-- Xe tự tăng tốc; **kéo ngón tay sang trái/phải** để lái. Về **ĐÍCH** trước khi vòng bo khép lại.
-- **Vòng bo** (vùng tím) có 3 giai đoạn, mỗi màn đếm lại từ đầu:
-  | Giai đoạn | Thời gian | Vòng bo | Sát thương ngoài bo |
-  |---|---|---|---|
-  | Bo 1 | 60 giây | Thu dần từ toàn màn hình về mép đường | 15/giây |
-  | Bo 2 | 20 giây | Thu về 2 làn giữa (2 làn ngoài nguy hiểm) | 25/giây |
-  | Bo 3 | 5 giây (đếm ngược 5-4-3-2-1) | Khép hoàn toàn | 45/giây |
-  | Hết bo | — | Toàn bộ là vùng chết | 150/giây |
-- Va chạm làm **mất máu** và **giảm tốc độ**. Hết máu là thua.
-
-### Độ khó
-- **Màn 1: mỗi đợt 3 chướng ngại vật, mỗi màn sau +1** (cấp số cộng: 3, 4, 5, …).
-- Từ màn 7 có thể chặn 2 làn cùng lúc, từ màn 13 chặn 3 làn (luôn chừa 1 làn trống).
-- Tốc độ xe và chiều dài đường tăng dần theo màn.
-
-### Ải
-- **5 màn = 1 ải, tổng cộng 20 ải** (100 màn). Vượt ải được thưởng `100 × số ải` tiền.
-- Ở menu có thể chọn bắt đầu từ bất kỳ ải nào đã mở.
-- **Qua ải 1** → mở **GARA**: đổi xe và vũ khí.
-- **Qua ải 5** → mở vật phẩm **👥 Nhân bản**: thêm một xe sao chép chạy song song trong 10 giây — tính là thêm 1 mạng (đỡ một cú va chạm), cũng bắn và nhặt đồ.
-
-### Chướng ngại vật
-| Vật cản | Sát thương | Bắn phá được |
-|---|---|---|
-| Xe con | 25 | ✔ |
-| Xe tải (từ màn 3) | 35 | ✔ |
-| Thùng phuy | 15 | ✔ |
-| Nón giao thông | 8 | ✔ |
-| Đá tảng | 30 | chỉ Máy ném đá |
-| Vết dầu | 0 – làm xe trượt | ✘ |
-
-### Vật phẩm
-| Biểu tượng | Tác dụng |
+| Nút | Tác dụng |
 |---|---|
-| ✚ Máu | +30 máu |
-| $ Tiền | +tiền |
-| 🛡 Lá chắn | Bất tử 6 giây, đâm nát vật cản |
-| 🚀 Vũ khí | Tự bắn bằng vũ khí đang chọn trong 7 giây |
-| ⏱ Đồng hồ | +5 giây cho giai đoạn bo hiện tại |
-| 👥 Nhân bản | x2 mạng trong 10 giây (mở sau ải 5) |
+| **GA** (phải, hoặc chạm nửa phải màn hình) | Tăng tốc (tốn xăng) |
+| **PHANH** | Phanh / lùi |
+| **↺ ↻** | Nghiêng xe ra sau / ra trước (dùng khi bay để tiếp đất bằng bánh) |
+| **🚀** | Tên lửa đẩy (có bình riêng) |
+| Súng trên nóc | Tự động bắn zombie và vật cản phía trước (hết đạn thì thôi) |
 
-### Gara (mở sau ải 1)
-| Xe | Máu | Tốc độ | Đặc điểm | Giá |
+- Mỗi lần chạy là **một ngày**. Ván kết thúc khi **hết xăng**, **xe bị phá hủy**, **lật xe**
+  hoặc **bị bão nuốt**. Bạn nhận tiền theo quãng đường, zombie tông được, vật cản phá được,
+  tiền nhặt được — rồi **nâng cấp** và chạy lại để đi xa hơn, cho tới khi về **TRẠM CỨU HỘ**.
+- Tông zombie ở tốc độ cao thì chúng văng đi; đi chậm thì chúng bám vào cào xe.
+- Thùng gỗ cần đủ tốc độ mới phá được, xác xe cần rất nhanh (hoặc tên lửa), thùng phuy phát nổ.
+
+### Vòng bo (cơn bão tím)
+| Giai đoạn | Thời gian | Tốc độ bão |
+|---|---|---|
+| Bo 1 | 60 giây | Chậm — chỉ nuốt xe bị kẹt/hết xăng |
+| Bo 2 | 20 giây | Nhanh |
+| Bo 3 | 5 giây (đếm ngược 5-4-3-2-1) | Rất nhanh |
+| Hết bo | — | Gần như tức thì: ai chưa về đích sẽ bị tiêu diệt |
+
+### Ải và màn
+- **20 ải**, mỗi ải là một con đường dài hơn ải trước (700m → 2600m), chia làm **5 màn** (cột mốc).
+  Qua mỗi mốc được thưởng tiền.
+- **Độ khó theo cấp số cộng:** màn 1 có **3 zombie/vật cản mỗi 100m**, mỗi màn sau **+1**
+  (tối đa 20). Địa hình cũng dốc hơn, nhiều dốc nhảy hơn; zombie béo xuất hiện từ ải 2, xác xe từ ải 2.
+- **Qua ải 1** → mở **GARA**: đổi xe và vũ khí.
+- **Qua ải 5** → mở vật phẩm **👥 Nhân bản**: trong 10 giây bạn có thêm 1 mạng
+  (bị phá hủy, lật xe hay dính bão sẽ hồi sinh ngay).
+
+### Vật phẩm trên đường
+`$` tiền · `⛽` xăng · `✚` sửa xe · `🛡` lá chắn 6 giây · `🎯` +15 đạn · `⏱` +5 giây & đẩy bão lùi · `👥` nhân bản
+
+### Nâng cấp
+Động cơ · Bình xăng · Tên lửa đẩy · Giáp & máu · Đạn dược · Lốp xe — mỗi loại 5 cấp.
+
+### Gara
+| Xe | Máu | Tốc độ | Giáp | Giá |
 |---|---|---|---|---|
-| Xe đua | x1.0 | x1.0 | Cân bằng | có sẵn |
-| Bán tải | x1.4 | x0.96 | Giáp 5% | 800 |
-| Siêu xe | x0.85 | x1.12 | Lái rất nhạy | 1500 |
-| Bọc thép | x1.8 | x0.92 | Giáp 20%, lái nặng | 3000 |
+| Bán tải cũ | x1.0 | x1.0 | 0% | có sẵn |
+| Xe cơ bắp | x0.9 | x1.18 | 0% | 1500 |
+| Xe tải thùng | x1.5 | x0.95 | 10%, bình xăng lớn | 3000 |
+| Xe bọc thép | x2.0 | x1.05 | 30%, động cơ khỏe | 6000 |
 
 | Vũ khí | Đặc điểm | Giá |
 |---|---|---|
-| 🔫 Súng máy | 2 nòng, bắn nhanh | có sẵn |
-| 🏹 Nỏ | Tên sát thương 3, xuyên 3 mục tiêu | 1000 |
-| ☄ Máy ném đá | Đá bay vòng cung, nổ diện rộng, phá được cả đá tảng | 2000 |
-
-### Nâng cấp
-Máu tối đa · Giáp xe · Vũ khí · Lá chắn — mỗi loại tối đa 5 cấp.
+| 🔫 Súng máy | Bắn nhanh | có sẵn |
+| 🏹 Nỏ | Sát thương 3, xuyên 3 mục tiêu | 1200 |
+| ☄ Máy ném đá | Đá bay vòng cung, nổ diện rộng | 2500 |
 
 ### Âm thanh
-Toàn bộ hiệu ứng âm thanh (tiền, va chạm, nổ, súng/nỏ/máy ném đá, bíp đếm ngược, vòng bo, thắng/thua…)
-được tổng hợp bằng code khi mở game, không cần file âm thanh. Bật/tắt bằng nút 🔊 ở menu.
+Hiệu ứng âm thanh (tông zombie, gỗ vỡ, nổ, súng/nỏ/máy ném đá, tên lửa, tiếp đất, bíp đếm ngược,
+bão, thắng/thua…) được tổng hợp bằng code khi mở game. Bật/tắt bằng nút 🔊 ở menu.
 
 ## Cài đặt trên điện thoại
 
-1. Vào tab **Actions** của repo → chọn lần chạy **Build APK** mới nhất → tải artifact **DuaXeSinhTon-apk**.
+1. Vào tab **Actions** của repo → lần chạy **Build APK** mới nhất → tải artifact **DuaXeSinhTon-apk**.
 2. Giải nén lấy `app-debug.apk`, chép vào điện thoại và mở để cài (cho phép "Cài ứng dụng không rõ nguồn gốc").
 
 Yêu cầu Android 7.0 (API 24) trở lên.
@@ -86,11 +82,13 @@ Cần JDK 17 và Android SDK (API 35):
 
 ```
 app/src/main/java/com/khongvinh/carsurvival/
-├── MainActivity.kt   # Activity toàn màn hình
-├── GameView.kt       # SurfaceView + vòng lặp game, cảm ứng
-├── Game.kt           # Luật chơi: di chuyển, va chạm, vòng bo, sinh vật cản/vật phẩm
-├── Renderer.kt       # Vẽ đường, xe, vật phẩm, vòng bo, HUD, menu
-├── Entities.kt       # Kiểu dữ liệu: xe, vũ khí, vật cản, vật phẩm, đạn, hạt hiệu ứng
+├── MainActivity.kt   # Activity toàn màn hình, nằm ngang
+├── GameView.kt       # SurfaceView + vòng lặp game, cảm ứng đa điểm
+├── Game.kt           # Luật chơi: ải/màn, zombie, vật cản, vũ khí, vật phẩm, bão, nâng cấp
+├── CarPhysics.kt     # Vật lý xe: nhún lò xo, bám đường, nghiêng, tên lửa, va chạm thân xe
+├── Terrain.kt        # Sinh địa hình đồi dốc, dốc nhảy, cảnh vật
+├── Renderer.kt       # Vẽ bầu trời, núi, địa hình, xe, zombie, bão, HUD, menu, gara
+├── Entities.kt       # Kiểu dữ liệu: xe, vũ khí, nâng cấp, zombie, vật cản, vật phẩm, hiệu ứng
 ├── Sfx.kt            # Hiệu ứng âm thanh tổng hợp (SoundPool)
-└── SaveData.kt       # Lưu tiền, ải đã vượt, gara, nâng cấp
+└── SaveData.kt       # Lưu tiền, ngày, ải đã vượt, kỷ lục, gara, nâng cấp
 ```

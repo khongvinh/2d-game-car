@@ -8,7 +8,7 @@ import android.view.MotionEvent
 import android.view.SurfaceHolder
 import android.view.SurfaceView
 
-/** Hosts the game loop on a background thread and forwards touches to [Game]. */
+/** Hosts the game loop on a background thread and forwards (multi-)touches to [Game]. */
 class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback, Runnable {
     private val sfx = Sfx(context)
     private val game = Game(SaveData(context), sfx)
@@ -17,7 +17,7 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
     private var running = false
     private var thread: Thread? = null
 
-    /** Screen pixels per virtual unit; the game is laid out on a 720-unit-wide canvas. */
+    /** Screen pixels per virtual unit; the game is laid out on a 720-unit-tall canvas. */
     @Volatile
     private var scale = 1f
 
@@ -33,14 +33,8 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
 
     override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) {
         synchronized(game) {
-            scale = width / Game.VIRTUAL_WIDTH
-            game.resize(Game.VIRTUAL_WIDTH, height / scale)
-            val cutoutTop = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                rootWindowInsets?.displayCutout?.safeInsetTop ?: 0
-            } else {
-                0
-            }
-            game.topInset = cutoutTop / scale
+            scale = height / Game.VIRTUAL_HEIGHT
+            game.resize(width / scale, Game.VIRTUAL_HEIGHT)
         }
     }
 
@@ -89,13 +83,17 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
 
     @SuppressLint("ClickableViewAccessibility")
     override fun onTouchEvent(event: MotionEvent): Boolean {
-        val x = event.x / scale
-        val y = event.y / scale
         synchronized(game) {
             when (event.actionMasked) {
-                MotionEvent.ACTION_DOWN -> game.touchDown(x, y)
-                MotionEvent.ACTION_MOVE -> game.touchMove(x, y)
-                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> game.touchUp()
+                MotionEvent.ACTION_DOWN, MotionEvent.ACTION_POINTER_DOWN -> {
+                    val i = event.actionIndex
+                    game.touchDown(event.getPointerId(i), event.getX(i) / scale, event.getY(i) / scale)
+                }
+                MotionEvent.ACTION_MOVE -> for (i in 0 until event.pointerCount) {
+                    game.touchMove(event.getPointerId(i), event.getX(i) / scale, event.getY(i) / scale)
+                }
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_POINTER_UP -> game.touchUp(event.getPointerId(event.actionIndex))
+                MotionEvent.ACTION_CANCEL -> for (i in 0 until event.pointerCount) game.touchUp(event.getPointerId(i))
             }
         }
         return true
