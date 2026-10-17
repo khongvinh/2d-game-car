@@ -195,7 +195,15 @@ cd tools/dev/preview && gradle ram       # thử tông xác xe 4 lần
 - Có thể cân nhắc: tăng tốc bão ở Bo 1 nếu muốn áp lực sớm hơn; thêm loại zombie/boss; thêm bản đồ khác (thành phố, rừng); lưu đám mây; phát hành Google Play (cần khóa ký release riêng, targetSdk 35).
 - Chưa tạo Pull Request; khi người dùng muốn gộp vào nhánh chính thì tạo PR từ claude/2d-driving-game-f0kpjk.
 
-## 10. Hướng dẫn cho phiên chat mới
+## 10. Các phiên chat
+
+| Phiên | Tiêu đề | Phạm vi |
+|---|---|---|
+| #1 | Đua Xe Sinh Tồn #1 — v1.0→v4.1: tạo game, kiểu Earn to Die, bão 3 bo, nhạc, thanh độ bền vật cản | Từ đầu đến v4.1 (commit 52ae6f0) + tài liệu bàn giao, công cụ tools/dev, quy tắc CLAUDE.md |
+
+- Quy tắc làm việc (đặt tiêu đề phiên, tự lưu tiến trình khi ngữ cảnh ≥ 90% rồi nhắc mở chat mới) nằm trong CLAUDE.md ở gốc repo.
+
+## 11. Hướng dẫn cho phiên chat mới
 - Mở phiên mới với repo khongvinh/2d-game-car, nhánh claude/2d-driving-game-f0kpjk.
 - Câu mở đầu gợi ý: "Đọc docs/TIEN_TRINH_DU_AN.md trong repo khongvinh/2d-game-car (nhánh claude/2d-driving-game-f0kpjk) rồi làm tiếp: ..."
 - Trợ lý nên: đọc tài liệu này, chạy tools/dev/setup.sh, kiểm tra build, rồi mới sửa code; mỗi bản mới tăng versionCode và gửi APK.
