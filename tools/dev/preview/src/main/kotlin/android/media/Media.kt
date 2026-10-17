@@ -1,0 +1,21 @@
+package android.media
+
+class AudioAttributes {
+    companion object { const val USAGE_GAME = 14; const val CONTENT_TYPE_SONIFICATION = 4; const val CONTENT_TYPE_MUSIC = 2 }
+    class Builder {
+        fun setUsage(@Suppress("UNUSED_PARAMETER") u: Int) = this
+        fun setContentType(@Suppress("UNUSED_PARAMETER") c: Int) = this
+        fun build() = AudioAttributes()
+    }
+}
+
+class SoundPool {
+    class Builder {
+        fun setMaxStreams(@Suppress("UNUSED_PARAMETER") n: Int) = this
+        fun setAudioAttributes(@Suppress("UNUSED_PARAMETER") a: AudioAttributes) = this
+        fun build() = SoundPool()
+    }
+    fun load(@Suppress("UNUSED_PARAMETER") p: String, @Suppress("UNUSED_PARAMETER") pr: Int) = 1
+    fun play(id: Int, l: Float, r: Float, p: Int, loop: Int, rate: Float) = id + (l + r + p + loop + rate).toInt() * 0
+    fun release() {}
+}

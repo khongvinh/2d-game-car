@@ -6,3 +6,7 @@ local.properties
 *.iml
 .DS_Store
 captures/
+tools/dev/.cache/
+tools/dev/**/build/
+tools/dev/**/.gradle/
+tools/dev/out/
