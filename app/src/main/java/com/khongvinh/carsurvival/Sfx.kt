@@ -17,7 +17,7 @@ import kotlin.random.Random
  * to a small WAV file in the cache dir and played through a [SoundPool].
  */
 class Sfx(context: Context) {
-    enum class S { COIN, POWER, HIT, EXPLODE, SHOOT, BOW, CATAPULT, BOOM, BEEP, GO, WIN, STAGE, LOSE, STORM, CLONE, CLICK, SPLAT, WOOD, BOOST, LAND }
+    enum class S { COIN, POWER, HIT, EXPLODE, SHOOT, BOW, CATAPULT, BOOM, BEEP, GO, WIN, STAGE, LOSE, STORM, CLONE, CLICK, SPLAT, WOOD, BOOST, LAND, ROAR }
 
     private val pool: SoundPool = SoundPool.Builder()
         .setMaxStreams(10)
@@ -175,6 +175,11 @@ class Sfx(context: Context) {
         S.BOOST -> buf(0.5f).also {
             noise(it, 0f, 0.5f, 0.7f, 0.25f, 1.5f)
             tone(it, 0f, 0.5f, 90f, 160f, 0.3f, true, 1.5f)
+        }
+        S.ROAR -> buf(1.1f).also {
+            noise(it, 0f, 1.1f, 0.8f, 0.1f, 2.2f)
+            tone(it, 0f, 1.0f, 95f, 60f, 0.5f, true, 1.8f)
+            tone(it, 0.05f, 0.9f, 140f, 80f, 0.35f, false, 2f)
         }
         S.LAND -> buf(0.2f).also {
             noise(it, 0f, 0.2f, 0.6f, 0.06f, 6f)

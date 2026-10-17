@@ -1,6 +1,6 @@
 # TỔNG HỢP TIẾN TRÌNH DỰ ÁN "ĐUA XE SINH TỒN"
 
-Tài liệu bàn giao để tiếp tục làm việc ở phiên chat mới mà không bị thiếu sót. Cập nhật đến phiên bản v4.1 (ngày 17/10/2026).
+Tài liệu bàn giao để tiếp tục làm việc ở phiên chat mới mà không bị thiếu sót. Cập nhật đến phiên bản v4.2 (ngày 17/10/2026).
 
 ## 1. Thông tin chung
 
@@ -12,8 +12,8 @@ Tài liệu bàn giao để tiếp tục làm việc ở phiên chat mới mà k
 | Ngôn ngữ / công nghệ | Kotlin + Canvas (SurfaceView), không engine, không thư viện ngoài, không file ảnh/âm thanh |
 | Repo GitHub | khongvinh/2d-game-car |
 | Nhánh làm việc | claude/2d-driving-game-f0kpjk (chưa có Pull Request, chưa merge) |
-| Commit mới nhất | 52ae6f0 — vật cản có thanh độ bền, tông 4 lần là vỡ |
-| Phiên bản hiện tại | v4.1 (versionCode 5) |
+| Commit mới nhất | xem git log nhánh làm việc (v4.2: trùm cuối mỗi 5 ải) |
+| Phiên bản hiện tại | v4.2 (versionCode 6) |
 | Build tự động | GitHub Actions "Build APK" (.github/workflows/android.yml) — đang xanh, xuất artifact DuaXeSinhTon-apk |
 | Khóa ký | app/debug.keystore (cố định, mật khẩu android) nên các bản cài đè lên nhau được |
 
@@ -50,12 +50,23 @@ Tài liệu bàn giao để tiếp tục làm việc ở phiên chat mới mà k
 - Menu có khẩu hiệu "CHẠY CÀNG XA — CÀNG SỐNG SÓT!" trên dải băng đỏ; bỏ các dòng hướng dẫn.
 - Trau chuốt đồ họa: bầu trời nhiều lớp, mặt trời tỏa sáng, mây, kền kền, thành phố đổ nát, núi có sương, mặt đất có cỏ khô/sỏi, bóng đổ, bánh xe nhún, đèn pha, zombie có viền, HUD dạng kính mờ, đồng hồ tốc độ.
 
-### v4.1 — Thanh độ bền vật cản (hiện tại)
+### v4.1 — Thanh độ bền vật cản
 - Khi xe tông vật cản (xác xe, thùng gỗ) mà không đủ tốc độ phá ngay: hiện thanh độ bền 4 nấc trên vật cản.
 - Mỗi cú tông có đà (tốc độ vào vật cản trên 150 đơn vị/giây, khoảng 18 km/h) trừ 25%; cú thứ 4 thì "PHÁ TAN!".
 - Có thời gian chờ 0,35 giây giữa hai cú để phải lùi lấy đà thật sự; mỗi cú xe mất ít máu (tổng 4 cú khoảng 20 máu).
 - Đạn bắn vào vật cản cũng làm tụt thanh này. Đủ tốc độ thì vẫn phá ngay như cũ.
 - Người dùng xác nhận "Ok rồi đó".
+
+### v4.2 — Trùm cuối mỗi 5 ải (hiện tại)
+- Yêu cầu: thêm trùm cuối vào cuối mỗi 5 ải; vật phẩm gần chặng cuối nhiều để đủ sức bắn trùm; KHÔNG nhắc nhở/hướng dẫn, để người chơi tự khám phá.
+- Trùm ở ải 5, 10, 15, 20: Gã Khổng Lồ (máu 50), Bạo Chúa bọc giáp (90), Quái Vật Dung Nham (140), Vua Zombie đội vương miện (200).
+- Trùm đứng trong đấu trường trước trạm (từ goalX-1150 đến goalX-260), đi chậm về phía xe, ném tảng đá (sát thương 14 + 3 x cấp), đập đất khi xe ở gần dưới 300 (sát thương 10 + 4 x cấp, hất văng xe).
+- Cách hạ: vũ khí tự bắn vào trùm; tông có đà (sát thương = tốc độ vào / 35, x1,5 khi bật tên lửa, mỗi cú cách 0,45 giây, xe mất 5 + 2 x cấp máu); nổ (máy ném đá, thùng phuy) gây gấp đôi.
+- Cổng trạm đóng (thanh chắn đỏ trắng) cho đến khi trùm gục; xe không qua được vạch goalX-140.
+- Hạ trùm: nổ lớn, thưởng 300 x cấp $, điểm +3000 x cấp, thành tích "👹 Hạ <tên trùm>".
+- Ải có trùm: không đặt zombie/vật cản trong 1300 đơn vị cuối; đấu trường phẳng dần (fade địa hình 2600 đơn vị cuối, không có đá/dốc nhảy trong 2300 đơn vị cuối); 28% quãng đường cuối có thêm 4 vật phẩm mỗi 100m (2 đạn, sửa xe hoặc xăng, lá chắn hoặc đạn), không thông báo.
+- Thanh máu trùm hiện ở giữa trên màn hình khi trùm "thức dậy" (xe cách 1500 đơn vị); tiếng gầm (Sfx ROAR); nhạc chuyển sang kịch tính.
+- Mô phỏng: ải 5 xe gốc + 2 cấp đạn hạ trùm trong khoảng 20 giây; ải 20 xe nâng cấp cấp 4 + nỏ hạ Vua Zombie và về đích còn 21 máu.
 
 ## 3. Luật chơi hiện tại (v4.1)
 
@@ -138,8 +149,8 @@ Tài liệu bàn giao để tiếp tục làm việc ở phiên chat mới mà k
 | Game.kt | Luật chơi: trạng thái, ải/màn, sinh zombie/vật cản/vật phẩm, va chạm, vũ khí, bão, tiền, điểm, thành tích, nhạc theo trạng thái, nút bấm |
 | CarPhysics.kt | Vật lý xe thuần Kotlin: 2 bánh lò xo, bám đường, nghiêng, tên lửa, tự cân bằng khi bay, va chạm thân xe với đất |
 | Terrain.kt | Sinh địa hình: đồi nhiều tầng, đá, ổ gà, ván giặt, dốc nhảy, giới hạn dốc 38°, bo thung lũng, cảnh vật |
-| Renderer.kt | Vẽ toàn bộ: nền trời/núi/thành phố, địa hình, xe, zombie, vật cản + thanh độ bền, bão, HUD, menu, cửa hàng, gara, bảng tổng kết |
-| Entities.kt | Kiểu dữ liệu: State, CarType, WeaponType, Upgrade, ItemType, Zombie, Obstacle, Debris, Projectile, Particle, FloatText, Car... |
+| Renderer.kt | Vẽ toàn bộ: nền trời/núi/thành phố, địa hình, xe, zombie, trùm + đá ném + cổng trạm, vật cản + thanh độ bền, bão, HUD (cả thanh máu trùm), menu, cửa hàng, gara, bảng tổng kết |
+| Entities.kt | Kiểu dữ liệu: State, CarType, WeaponType, Upgrade, ItemType, Zombie, Obstacle, Boss, BossRock, Debris, Projectile, Particle, FloatText, Car... |
 | Sfx.kt | 20 hiệu ứng âm thanh tổng hợp ra WAV trong cache, phát bằng SoundPool |
 | Music.kt | 3 bài nhạc tổng hợp (chill 90 BPM La thứ, kịch tính 140 BPM Rê thứ, chiến thắng Đô trưởng), phát bằng AudioTrack có vòng lặp, chuyển bài mượt |
 | SaveData.kt | SharedPreferences "car_survival_v3": tiền, ngày, ải đã vượt, ải chọn, kỷ lục từng ải, nâng cấp, xe/vũ khí sở hữu, âm thanh, nhạc, điểm cao nhất |
@@ -167,6 +178,7 @@ cd tools/dev/compile && gradle compileKotlin   # chỉ kiểm tra biên dịch
 cd tools/dev/preview && gradle shots     # chụp ảnh màn hình + xuất nhạc WAV vào tools/dev/out/shots
 cd tools/dev/preview && gradle sim       # mô phỏng vật lý trên các ải
 cd tools/dev/preview && gradle ram       # thử tông xác xe 4 lần
+cd tools/dev/preview && gradle boss      # thử đánh trùm ải 5 và ải 20
 ```
 - tools/dev/preview chạy chính mã game trên JVM với lớp giả lập android.graphics/media/content bằng Java2D (emoji hiện ô vuông, trên điện thoại hiện bình thường).
 - Sign.java: đóng gói lại APK (resources.arsc không nén, căn lề 4 byte), thêm classes.dex, ký v2/v3 bằng app/debug.keystore.
@@ -192,14 +204,15 @@ cd tools/dev/preview && gradle ram       # thử tông xác xe 4 lần
 
 ## 9. Việc có thể làm tiếp / câu hỏi còn mở
 - Người dùng chưa phản hồi về: độ khó đường mới, nhạc nền, cảm giác điều khiển trên điện thoại thật.
-- Có thể cân nhắc: tăng tốc bão ở Bo 1 nếu muốn áp lực sớm hơn; thêm loại zombie/boss; thêm bản đồ khác (thành phố, rừng); lưu đám mây; phát hành Google Play (cần khóa ký release riêng, targetSdk 35).
+- Danh sách người dùng đã đồng ý làm dần: chỉnh độ khó sau khi chơi thử; bão gắt hơn từ đầu; thêm loại zombie mới (nhảy, mặc giáp); bản đồ mới (thành phố, rừng, tuyết); thêm xe/vũ khí (súng phun lửa, lưỡi cưa); chuẩn bị đưa lên Google Play (khóa ký release, icon, ảnh giới thiệu).
+- Đã xong từ danh sách này: trùm cuối mỗi 5 ải (v4.2).
 - Chưa tạo Pull Request; khi người dùng muốn gộp vào nhánh chính thì tạo PR từ claude/2d-driving-game-f0kpjk.
 
 ## 10. Các phiên chat
 
 | Phiên | Tiêu đề | Phạm vi |
 |---|---|---|
-| #1 | Đua Xe Sinh Tồn #1 — v1.0→v4.1: tạo game, kiểu Earn to Die, bão 3 bo, nhạc, thanh độ bền vật cản | Từ đầu đến v4.1 (commit 52ae6f0) + tài liệu bàn giao, công cụ tools/dev, quy tắc CLAUDE.md |
+| #1 | Đua Xe Sinh Tồn #1 — v1.0→v4.2: tạo game, kiểu Earn to Die, bão 3 bo, nhạc, độ bền vật cản, trùm cuối | Từ đầu đến v4.2 + tài liệu bàn giao, công cụ tools/dev, quy tắc CLAUDE.md |
 
 - Quy tắc làm việc (đặt tiêu đề phiên, tự lưu tiến trình khi ngữ cảnh ≥ 90% rồi nhắc mở chat mới) nằm trong CLAUDE.md ở gốc repo.
 

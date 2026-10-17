@@ -45,7 +45,9 @@ class Terrain(stage: Int, val length: Float, seed: Int) {
                 amp * 0.35f * sin(t * 6.3f + p3) +
                 amp * 0.12f * sin(t * 17f + p1)
             // fade the hills in after the start and out before the evacuation zone
-            val fade = min(((x - 200f) / 800f).coerceIn(0f, 1f), ((length - 200f - x) / 600f).coerceIn(0f, 1f))
+            // boss stages get a wide, gentle arena before the station
+            val endFade = if (stage % 5 == 0) 2600f else 600f
+            val fade = min(((x - 200f) / 800f).coerceIn(0f, 1f), ((length - 200f - x) / endFade).coerceIn(0f, 1f))
             val target = BASE_Y + hills * fade
             val y = prev + (target - prev).coerceIn(-maxStep, maxStep)
             ys[i] = y
@@ -58,7 +60,7 @@ class Terrain(stage: Int, val length: Float, seed: Int) {
         var i = 0
         while (i < n - 20) {
             val x = START_X + i * SEG
-            if (x < 500f || x > length - 500f) {
+            if (x < 500f || x > length - (if (stage % 5 == 0) 2300f else 500f)) {
                 i++; continue
             }
             val r = rnd.nextFloat()

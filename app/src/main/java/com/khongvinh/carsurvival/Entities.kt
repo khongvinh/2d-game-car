@@ -212,3 +212,37 @@ class Car {
         const val WHEEL_Y = 30f
     }
 }
+
+/** End-of-stage boss on every 5th stage; [tier] 1..4. */
+class Boss(val tier: Int, var x: Float, var y: Float) {
+    val name = NAMES[(tier - 1).coerceIn(0, NAMES.size - 1)]
+    val maxHp = HP[(tier - 1).coerceIn(0, HP.size - 1)]
+    var hp = maxHp
+    val w = 90f + tier * 10f
+    val h = 250f + tier * 20f
+    val speed = 45f + tier * 12f
+    var alive = true
+    var engaged = false
+    var throwCd = 2f
+    var slamCd = 1.5f
+    var ramCd = 0f
+    var flash = 0f
+    var throwAnim = 0f
+    var slamAnim = 0f
+    var anim = 0f
+
+    /** Small hits are summed and shown as one number. */
+    var pendingDmg = 0f
+    var dmgT = 0f
+
+    companion object {
+        val NAMES = arrayOf("GÃ KHỔNG LỒ", "BẠO CHÚA", "QUÁI VẬT DUNG NHAM", "VUA ZOMBIE")
+        val HP = floatArrayOf(50f, 90f, 140f, 200f)
+    }
+}
+
+/** Boulder thrown by a boss. */
+class BossRock(var x: Float, var y: Float, var vx: Float, var vy: Float) {
+    var alive = true
+    var rot = 0f
+}

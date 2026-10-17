@@ -60,6 +60,11 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
     val particles = ArrayList<Particle>()
     val texts = ArrayList<FloatText>()
 
+    /** End boss of every 5th stage (null on normal stages). */
+    var boss: Boss? = null
+    val bossRocks = ArrayList<BossRock>()
+    var bossKilled = false
+
     var camX = 0f
     var camY = 0f
     val viewW get() = W / ZOOM
@@ -181,6 +186,9 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
 
         zombies.clear(); obstacles.clear(); debris.clear(); items.clear()
         shots.clear(); particles.clear(); texts.clear()
+        bossRocks.clear()
+        bossKilled = false
+        boss = if (stage % 5 == 0) Boss(stage / 5, goalX - 520f, terrain.heightAt(goalX - 520f)) else null
         populate()
 
         stormX = -1500f
@@ -228,7 +236,7 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
             val obstacleShare = if (count > 10) 0.3f else 0.38f
             repeat(count) {
                 val x = start + rnd.nextFloat() * seg
-                if (x > goalX - 400f) return@repeat
+                if (x > goalX - (if (boss != null) 1300f else 400f)) return@repeat
                 val roll = rnd.nextFloat()
                 if (roll >= obstacleShare) {
                     val tRoll = rnd.nextFloat()
@@ -282,6 +290,15 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
                 val x = start + rnd.nextFloat() * seg
                 if (x < goalX - 400f) items.add(Item(special, x, terrain.heightAt(x) - 90f))
             }
+            // stocking up before the boss: the last stretch of a boss stage is rich in supplies
+            if (boss != null && start > goalX * 0.72f) {
+                val extra = listOf(ItemType.AMMO, ItemType.AMMO, if (rnd.nextBoolean()) ItemType.REPAIR else ItemType.FUEL,
+                    if (rnd.nextFloat() < 0.35f) ItemType.SHIELD else ItemType.AMMO)
+                for ((k, t) in extra.withIndex()) {
+                    val x = start + seg * (0.15f + 0.22f * k) + rnd.nextFloat() * 120f
+                    if (x < goalX - 1400f) items.add(Item(t, x, terrain.heightAt(x) - 90f))
+                }
+            }
             start += seg
         }
     }
@@ -320,13 +337,15 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
 
     /** Score and achievements (🏆) for the result screens. */
     private fun finishStats(finished: Boolean) {
-        score = (maxDist * 10f).toInt() + kills * 100 + smashed * 50 + (if (finished) 5000 * stage else 0)
+        score = (maxDist * 10f).toInt() + kills * 100 + smashed * 50 + (if (finished) 5000 * stage else 0) +
+            (if (bossKilled) 3000 * (stage / 5) else 0)
         if (score > save.bestScore) {
             newBestScore = save.bestScore > 0
             save.bestScore = score
         }
         achievements.clear()
         if (finished) achievements.add("🏁 Tới trạm cứu hộ")
+        if (bossKilled) boss?.let { achievements.add("👹 Hạ ${it.name.lowercase().replaceFirstChar { ch -> ch.uppercase() }}") }
         if (finished && car.hp >= car.maxHp * 0.9f) achievements.add("✨ Không trầy xước")
         if (newRecord) achievements.add("📏 Kỷ lục quãng đường")
         if (newBestScore) achievements.add("⭐ Điểm cao nhất mới")
@@ -357,6 +376,8 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
 
     private fun goMenu() {
         save.save()
+        boss = null
+        bossRocks.clear()
         zombies.clear(); obstacles.clear(); debris.clear(); items.clear()
         shots.clear(); particles.clear(); texts.clear()
         loadStage(save.stageSel.coerceIn(1, maxStartStage()))
@@ -456,6 +477,7 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
         updateItems()
         updateWeapon(dt)
         updateShots(dt)
+        updateBoss(dt)
         updateEffects(dt)
 
         // run stats: air time (with a small stunt bonus), top speed, storm distance
@@ -524,6 +546,12 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
             endRun("Rơi khỏi đường!"); return
         }
 
+        val b = boss
+        if (b != null && b.alive && c.x > goalX - 140f) {
+            // the station gate stays shut until the boss is down
+            c.x = goalX - 140f
+            if (c.vx > 0f) c.vx = -c.vx * 0.3f
+        }
         if (c.x >= goalX) {
             stageComplete(); return
         }
@@ -845,6 +873,9 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
 
     /** Damages / kills everything in a radius (barrels, catapult). */
     private fun blastArea(cx: Float, cy: Float, r: Float, dmg: Int) {
+        boss?.let { bb ->
+            if (bb.alive && abs(bb.x - cx) < r + bb.w / 2 && cy > bb.y - bb.h - r) hurtBoss(bb, dmg * 2f)
+        }
         for (z in zombies) {
             if (!z.alive) continue
             val d = hypot(z.x - cx, z.y - z.type.h / 2 - cy)
@@ -869,6 +900,144 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
         // chain reaction
         val chain = obstacles.filter { it.alive && it.type == ObstacleType.BARREL && it.hp <= 0 }
         for (b in chain) barrelBlast(b)
+    }
+
+    private fun updateBoss(dt: Float) {
+        updateBossRocks(dt)
+        val b = boss ?: return
+        if (!b.alive) return
+        val c = car
+        b.anim += dt
+        if (b.flash > 0f) b.flash -= dt
+        if (b.throwAnim > 0f) b.throwAnim -= dt
+        if (b.slamAnim > 0f) b.slamAnim -= dt
+        if (b.ramCd > 0f) b.ramCd -= dt
+        b.dmgT += dt
+        if (b.pendingDmg > 0f && b.dmgT > 0.5f) flushBossDamage(b)
+        b.y = terrain.heightAt(b.x)
+        val dx = c.x - b.x
+        if (!b.engaged) {
+            if (dx > -1500f) {
+                b.engaged = true
+                intense = true
+                shake = 0.5f
+                sfx.play(Sfx.S.ROAR)
+            }
+            return
+        }
+        val dir = if (dx >= 0f) 1f else -1f
+        // lumber towards the car, but guard the station
+        if (abs(dx) > 330f) b.x += dir * b.speed * dt
+        b.x = b.x.coerceIn(goalX - 1150f, goalX - 260f)
+
+        // boulder throw
+        b.throwCd -= dt
+        if (b.throwCd <= 0f && abs(dx) in 280f..1400f) {
+            b.throwCd = max(1.4f, 3f - 0.35f * b.tier) * (0.8f + Random.nextFloat() * 0.4f)
+            b.throwAnim = 0.45f
+            val x0 = b.x + dir * b.w * 0.3f
+            val y0 = b.y - b.h * 1.02f
+            val t = (abs(dx) / 750f).coerceIn(0.6f, 1.5f)
+            val tx = c.x + c.vx * t * 0.6f
+            val ty = c.y - 10f
+            bossRocks.add(BossRock(x0, y0, (tx - x0) / t, (ty - y0) / t - 0.5f * G * t))
+            sfx.play(Sfx.S.CATAPULT, 0.9f)
+        }
+        // ground slam when the car gets close
+        b.slamCd -= dt
+        if (b.slamCd <= 0f && abs(dx) < 300f) {
+            b.slamCd = max(1.6f, 2.8f - 0.25f * b.tier)
+            b.slamAnim = 0.5f
+            shake = max(shake, 0.45f)
+            sfx.play(Sfx.S.BOOM, 0.9f)
+            repeat(26) {
+                val a = Random.nextFloat() * 3.1416f
+                particles.add(Particle(b.x + rnd(-80f, 80f), b.y - 5f, cos(a) * rnd(150f, 450f), -sin(a) * rnd(100f, 320f), 0.7f, 0.7f, rnd(8f, 16f), 0xFFC9A27E.toInt(), 300f, 1.2f))
+            }
+            if (c.grounded[0] || c.grounded[1] || c.y > terrain.heightAt(c.x) - 160f) {
+                damageCar((10f + 4f * b.tier) * (1f - armor))
+                c.vx = dir * (420f + 60f * b.tier)
+                c.vy = -420f
+                c.spin += dir * 1.5f
+            }
+        }
+        // body contact: the car is stopped; a hard ram hurts the boss
+        val ox = Car.HALF_LEN + b.w / 2
+        if (abs(dx) < ox && c.y > b.y - b.h - 30f) {
+            val toward = -dir // direction from car to boss
+            val fs = c.forwardSpeed
+            val into = fs * toward * sign(c.fwdX)
+            c.x = b.x + dir * ox
+            if (into > 0f) {
+                if (into > Obstacle.RAM_SPEED && b.ramCd <= 0f) {
+                    b.ramCd = 0.45f
+                    val dmg = into / 35f * (if (c.boosting) 1.5f else 1f)
+                    hurtBoss(b, dmg)
+                    damageCar((5f + 2f * b.tier) * (1f - armor))
+                    shake = max(shake, 0.3f)
+                    sfx.play(Sfx.S.HIT, 0.9f)
+                    bleed(b.x - dir * b.w / 2, b.y - b.h * 0.5f, 10)
+                }
+                c.vx -= c.fwdX * fs * 1.3f
+                c.vy -= c.fwdY * fs * 1.3f
+            }
+        }
+    }
+
+    private fun hurtBoss(b: Boss, dmg: Float) {
+        if (!b.alive || dmg <= 0f) return
+        b.hp -= dmg
+        b.flash = 0.12f
+        b.pendingDmg += dmg
+        if (b.pendingDmg >= 5f || b.hp <= 0f) flushBossDamage(b)
+        if (b.hp <= 0f) {
+            b.hp = 0f
+            b.alive = false
+            bossKilled = true
+            kills++
+            explode(b.x, b.y - b.h * 0.5f, 0xFF7CB342.toInt(), 90)
+            explode(b.x, b.y - b.h * 0.8f, 0xFFFF6D00.toInt(), 60)
+            bleed(b.x, b.y - b.h * 0.5f, 40)
+            debris.add(Debris(Debris.FAT_ZOMBIE, b.x, b.y - b.h / 2, car.vx * 0.3f + 250f, -650f, 0f, 3f, b.w, b.h, 0xFF4E342E.toInt()).also { it.life = 8f })
+            addMoney(300 * b.tier, b.x, b.y - b.h - 60f)
+            texts.add(FloatText("${b.name} ĐÃ GỤC!", b.x, b.y - b.h * 0.55f, 0xFFFFD740.toInt()).also { it.size = 60f; it.life = 2.5f })
+            shake = 1f
+            sfx.play(Sfx.S.ROAR, 0.7f)
+            sfx.play(Sfx.S.BOOM)
+        }
+    }
+
+    private fun flushBossDamage(b: Boss) {
+        if (b.pendingDmg >= 1f) {
+            texts.add(FloatText("-${b.pendingDmg.toInt()}", b.x + rnd(-40f, 40f), b.y - b.h - 30f, 0xFFFFEA00.toInt()).also { it.size = 46f })
+        }
+        b.pendingDmg = 0f
+        b.dmgT = 0f
+    }
+
+    private fun updateBossRocks(dt: Float) {
+        val c = car
+        for (r in bossRocks) {
+            if (!r.alive) continue
+            r.vy += G * dt
+            r.x += r.vx * dt
+            r.y += r.vy * dt
+            r.rot += dt * 6f
+            if (hypot(r.x - c.x, r.y - c.y) < 75f) {
+                r.alive = false
+                damageCar((14f + 3f * (boss?.tier ?: 1)) * (1f - armor))
+                c.vx -= 200f
+                c.vy -= 150f
+                explode(r.x, r.y, 0xFF795548.toInt(), 24)
+                shake = max(shake, 0.35f)
+                sfx.play(Sfx.S.EXPLODE, 0.8f)
+            } else if (r.y > terrain.heightAt(r.x)) {
+                r.alive = false
+                explode(r.x, r.y, 0xFF8D6E63.toInt(), 14)
+                sfx.play(Sfx.S.LAND, 0.6f)
+            }
+        }
+        bossRocks.removeAll { !it.alive }
     }
 
     private fun updateDebris(dt: Float) {
@@ -972,6 +1141,12 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
             if (dx < 60f || dx > 950f || dx > best) continue
             best = dx; tx = z.x; ty = z.y - z.type.h * 0.6f
         }
+        boss?.let { bb ->
+            val dx = bb.x - c.x
+            if (bb.alive && bb.engaged && dx > 60f && dx < 1100f && dx < best) {
+                best = dx; tx = bb.x; ty = bb.y - bb.h * 0.6f
+            }
+        }
         if (best == Float.MAX_VALUE) {
             for (o in obstacles) {
                 if (o.type == ObstacleType.WRECK && weapon == WeaponType.GUN) continue
@@ -1018,6 +1193,17 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
             if (s.y > terrain.heightAt(s.x)) {
                 s.alive = false
                 if (s.kind == WeaponType.CATAPULT) catapultBlast(s) else sparks(s.x, s.y)
+                continue
+            }
+            val bb = boss
+            if (bb != null && bb.alive && abs(s.x - bb.x) < bb.w / 2 && s.y > bb.y - bb.h && s.y < bb.y) {
+                s.alive = false
+                if (s.kind == WeaponType.CATAPULT) {
+                    catapultBlast(s)
+                } else {
+                    hurtBoss(bb, s.damage.toFloat())
+                    bleed(s.x, s.y, 3)
+                }
                 continue
             }
             if (s.kind == WeaponType.CATAPULT) {

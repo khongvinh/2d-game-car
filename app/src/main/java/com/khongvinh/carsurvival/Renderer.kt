@@ -157,8 +157,10 @@ class Renderer(private val g: Game) {
         for (o in g.obstacles) if (o.x in x0..x1) drawObstacle(c, o)
         for (it in g.items) if (it.x in x0..x1) drawItem(c, it)
         for (z in g.zombies) if (z.x in x0..x1) drawZombie(c, z)
+        g.boss?.let { b -> if (b.alive && b.x in x0 - 200f..x1 + 200f) drawBoss(c, b) }
         for (d in g.debris) if (d.x in x0..x1) drawDebris(c, d)
         drawShots(c)
+        for (rk in g.bossRocks) drawBossRock(c, rk)
         drawPlayerCar(c)
         for (p in g.particles) {
             val ratio = (p.life / p.maxLife).coerceIn(0f, 1f)
@@ -338,6 +340,21 @@ class Renderer(private val g: Game) {
         fill.color = 0xFF37474F.toInt()
         c.drawRect(x + 50f, gy - 290f, x + 120f, gy - 250f, fill)
         c.drawRect(x + 390f, gy - 290f, x + 460f, gy - 250f, fill)
+        g.boss?.let { b ->
+            if (b.alive) {
+                // closed barrier in front of the station while the boss lives
+                for (k in 0 until 4) {
+                    val by = gy - 40f - k * 45f
+                    for (s in 0 until 6) {
+                        fill.color = if ((s + k) % 2 == 0) 0xFFD32F2F.toInt() else Color.WHITE
+                        c.drawRect(x - 130f + s * 40f, by - 14f, x - 90f + s * 40f, by, fill)
+                    }
+                }
+                fill.color = 0xFF424242.toInt()
+                c.drawRect(x - 140f, gy - 190f, x - 125f, gy, fill)
+                c.drawRect(x + 105f, gy - 190f, x + 120f, gy, fill)
+            }
+        }
         fill.color = 0xFF2E7D32.toInt()
         c.drawRect(x + 110f, gy - 230f, x + 400f, gy - 170f, fill)
         text.textAlign = Paint.Align.CENTER
@@ -849,6 +866,155 @@ class Renderer(private val g: Game) {
         if (o.barT > 0f || o.ramHp < 1f) drawObstacleBar(c, o, t)
     }
 
+    private fun drawBoss(c: Canvas, b: Boss) {
+        val dir = if (g.car.x >= b.x) 1f else -1f
+        val w = b.w
+        val h = b.h
+        val stomp = if (b.slamAnim > 0f) sin(b.slamAnim / 0.5f * 3.14f) else 0f
+        val walk = sin(b.anim * 3f)
+        c.save()
+        c.translate(b.x, b.y)
+        fill.color = 0x55000000
+        c.drawOval(-w, -10f, w, 10f, fill)
+        c.translate(0f, -stomp * 30f)
+        val hit = b.flash > 0f
+        val skin = if (hit) 0xFFF1F8E9.toInt() else when (b.tier) {
+            1 -> 0xFF7CB342.toInt()
+            2 -> 0xFF8E7CC3.toInt()
+            3 -> 0xFFBF5B2C.toInt()
+            else -> 0xFF5C8A3A.toInt()
+        }
+        val skinDark = if (hit) 0xFFCFD8DC.toInt() else when (b.tier) {
+            1 -> 0xFF558B2F.toInt()
+            2 -> 0xFF5E4B8B.toInt()
+            3 -> 0xFF7A2E12.toInt()
+            else -> 0xFF33521E.toInt()
+        }
+        val outline = 0xFF1B1B1B.toInt()
+        // legs
+        for (side in intArrayOf(-1, 1)) {
+            val fx = side * w * 0.25f + walk * side * 10f
+            stroke.color = outline
+            stroke.strokeWidth = w * 0.32f + 6f
+            c.drawLine(side * w * 0.2f, -h * 0.42f, fx, -8f, stroke)
+            stroke.color = 0xFF3E2723.toInt()
+            stroke.strokeWidth = w * 0.32f
+            c.drawLine(side * w * 0.2f, -h * 0.42f, fx, -8f, stroke)
+            fill.color = outline
+            c.drawOval(fx - w * 0.22f + dir * 8f, -18f, fx + w * 0.22f + dir * 8f, 2f, fill)
+        }
+        // back arm
+        stroke.color = outline
+        stroke.strokeWidth = w * 0.26f + 6f
+        c.drawLine(-dir * w * 0.35f, -h * 0.8f, -dir * w * 0.55f, -h * 0.45f + walk * 8f, stroke)
+        stroke.color = skinDark
+        stroke.strokeWidth = w * 0.26f
+        c.drawLine(-dir * w * 0.35f, -h * 0.8f, -dir * w * 0.55f, -h * 0.45f + walk * 8f, stroke)
+        // torso
+        r.set(-w * 0.55f, -h * 0.9f, w * 0.55f, -h * 0.38f)
+        fill.color = outline
+        c.drawRoundRect(r.left - 4f, r.top - 4f, r.right + 4f, r.bottom + 4f, 30f, 30f, fill)
+        fill.color = skin
+        c.drawRoundRect(r, 28f, 28f, fill)
+        fill.color = skinDark
+        c.drawCircle(-w * 0.2f, -h * 0.72f, w * 0.18f, fill)
+        c.drawCircle(w * 0.2f, -h * 0.72f, w * 0.18f, fill)
+        fill.color = 0x40000000
+        c.drawRect(-w * 0.55f, -h * 0.5f, w * 0.55f, -h * 0.38f, fill)
+        // torn trousers / belt
+        fill.color = 0xFF4E342E.toInt()
+        c.drawRect(-w * 0.55f, -h * 0.46f, w * 0.55f, -h * 0.38f, fill)
+        when (b.tier) {
+            2 -> { // armour plates
+                fill.color = 0xFF78909C.toInt()
+                c.drawRoundRect(-w * 0.45f, -h * 0.86f, w * 0.45f, -h * 0.62f, 10f, 10f, fill)
+                fill.color = 0xFF455A64.toInt()
+                for (k in 0 until 4) c.drawCircle(-w * 0.35f + k * w * 0.23f, -h * 0.82f, 4f, fill)
+            }
+            3 -> { // glowing lava cracks
+                stroke.color = Color.argb((160 + 90 * sin(b.anim * 6f)).toInt(), 255, 171, 0)
+                stroke.strokeWidth = 5f
+                c.drawLine(-w * 0.3f, -h * 0.85f, -w * 0.05f, -h * 0.6f, stroke)
+                c.drawLine(-w * 0.05f, -h * 0.6f, w * 0.25f, -h * 0.7f, stroke)
+                c.drawLine(w * 0.1f, -h * 0.55f, w * 0.35f, -h * 0.45f, stroke)
+            }
+            4 -> { // chains
+                stroke.color = 0xFFB0BEC5.toInt()
+                stroke.strokeWidth = 4f
+                c.drawLine(-w * 0.5f, -h * 0.85f, w * 0.45f, -h * 0.5f, stroke)
+            }
+        }
+        // head
+        val hr = w * 0.3f
+        val hy = -h * 0.9f - hr * 0.7f
+        fill.color = outline
+        c.drawCircle(dir * 6f, hy, hr + 4f, fill)
+        fill.color = skin
+        c.drawCircle(dir * 6f, hy, hr, fill)
+        fill.color = skinDark
+        c.drawRect(dir * 6f - hr * 0.7f, hy - hr * 0.35f, dir * 6f + hr * 0.7f, hy - hr * 0.2f, fill)
+        val glow = 0.6f + 0.4f * sin(b.anim * 8f)
+        fill.color = Color.argb((120 * glow).toInt(), 255, 23, 68)
+        c.drawCircle(dir * (hr * 0.45f + 6f), hy - hr * 0.05f, 11f, fill)
+        c.drawCircle(dir * (hr * 0.05f + 6f), hy - hr * 0.05f, 9f, fill)
+        fill.color = 0xFFFF1744.toInt()
+        c.drawCircle(dir * (hr * 0.45f + 6f), hy - hr * 0.05f, 5f, fill)
+        c.drawCircle(dir * (hr * 0.05f + 6f), hy - hr * 0.05f, 4f, fill)
+        // jaw with teeth
+        fill.color = 0xFF3E0F0F.toInt()
+        val jx0 = dir * 6f - hr * 0.1f
+        c.drawRect(min(jx0, jx0 + dir * hr * 0.8f), hy + hr * 0.3f, max(jx0, jx0 + dir * hr * 0.8f), hy + hr * 0.62f, fill)
+        fill.color = 0xFFFFF8E1.toInt()
+        for (k in 0 until 4) {
+            val tx = jx0 + dir * (k * hr * 0.2f + 4f)
+            c.drawRect(min(tx, tx + dir * 8f), hy + hr * 0.3f, max(tx, tx + dir * 8f), hy + hr * 0.42f, fill)
+        }
+        if (b.tier == 4) { // crown
+            fill.color = 0xFFFFC107.toInt()
+            path.reset()
+            val cy = hy - hr * 0.85f
+            path.moveTo(dir * 6f - hr * 0.6f, cy + 16f)
+            path.lineTo(dir * 6f - hr * 0.6f, cy - 18f); path.lineTo(dir * 6f - hr * 0.3f, cy)
+            path.lineTo(dir * 6f, cy - 26f); path.lineTo(dir * 6f + hr * 0.3f, cy)
+            path.lineTo(dir * 6f + hr * 0.6f, cy - 18f); path.lineTo(dir * 6f + hr * 0.6f, cy + 16f)
+            path.close()
+            c.drawPath(path, fill)
+            fill.color = 0xFFE53935.toInt()
+            c.drawCircle(dir * 6f, cy - 4f, 6f, fill)
+        }
+        // front arm: raised with a boulder while throwing, reaching otherwise
+        val raise = (b.throwAnim / 0.45f).coerceIn(0f, 1f)
+        val hx = dir * (w * 0.75f - raise * w * 0.5f)
+        val hyArm = -h * (0.62f + raise * 0.5f) + walk * 6f
+        stroke.color = outline
+        stroke.strokeWidth = w * 0.28f + 6f
+        c.drawLine(dir * w * 0.4f, -h * 0.82f, hx, hyArm, stroke)
+        stroke.color = skin
+        stroke.strokeWidth = w * 0.28f
+        c.drawLine(dir * w * 0.4f, -h * 0.82f, hx, hyArm, stroke)
+        if (raise > 0.2f) {
+            fill.color = 0xFF6D4C41.toInt()
+            c.drawCircle(hx, hyArm - 26f, 30f, fill)
+        }
+        c.restore()
+    }
+
+    private fun drawBossRock(c: Canvas, rk: BossRock) {
+        c.save()
+        c.translate(rk.x, rk.y)
+        c.rotate(rk.rot * 57.3f)
+        fill.color = 0x55000000
+        c.drawCircle(4f, 6f, 30f, fill)
+        fill.color = 0xFF6D4C41.toInt()
+        c.drawCircle(0f, 0f, 30f, fill)
+        fill.color = 0xFF8D6E63.toInt()
+        c.drawCircle(-9f, -9f, 13f, fill)
+        stroke.color = 0xFF3E2723.toInt()
+        stroke.strokeWidth = 3f
+        c.drawLine(-12f, 6f, 10f, -4f, stroke)
+        c.restore()
+    }
+
     /** Durability bar in four 25% notches above an obstacle the car failed to smash. */
     private fun drawObstacleBar(c: Canvas, o: Obstacle, top: Float) {
         val f = o.barFrac
@@ -1103,14 +1269,37 @@ class Renderer(private val g: Game) {
             text.style = Paint.Style.STROKE
             text.strokeWidth = 8f
             text.color = 0xCC000000.toInt()
-            c.drawText(warn, W / 2, H * 0.3f, text)
+            c.drawText(warn, W / 2, H * 0.4f, text)
             text.style = Paint.Style.FILL
             text.color = Color.argb((180 + 75 * sin(g.anim * 8f)).toInt(), 255, 82, 82)
-            c.drawText(warn, W / 2, H * 0.3f, text)
+            c.drawText(warn, W / 2, H * 0.4f, text)
         }
         if (g.stormHurt > 0f) {
             fill.color = 0x40E040FB
             c.drawRect(0f, 0f, W, H, fill)
+        }
+        g.boss?.let { b ->
+            if (b.engaged && b.alive) {
+                val bw = min(620f, W * 0.42f)
+                val bl = W / 2 - bw / 2
+                val bt = 148f
+                glassPanel(c, bl - 16f, bt - 8f, bl + bw + 16f, bt + 58f, 16f)
+                text.textAlign = Paint.Align.CENTER
+                text.color = 0xFFFF8A80.toInt()
+                fitText(c, "👹 ${b.name}", W / 2, bt + 18f, 22f, bw)
+                r.set(bl, bt + 26f, bl + bw, bt + 46f)
+                fill.color = 0xCC1B1B1B.toInt()
+                c.drawRoundRect(r, 10f, 10f, fill)
+                val f = (b.hp / b.maxHp).coerceIn(0f, 1f)
+                if (f > 0f) {
+                    r.set(bl + 2f, bt + 28f, bl + 2f + (bw - 4f) * f, bt + 44f)
+                    fill.color = 0xFFD50000.toInt()
+                    c.drawRoundRect(r, 8f, 8f, fill)
+                    fill.color = 0x55FFFFFF
+                    r.set(r.left + 3f, r.top + 2f, max(r.left + 4f, r.right - 3f), r.top + 6f)
+                    c.drawRoundRect(r, 3f, 3f, fill)
+                }
+            }
         }
 
         // speedometer

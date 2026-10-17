@@ -40,6 +40,10 @@ hay thư viện ngoài, không cần file ảnh/âm thanh.
 - **Qua ải 5** → mở vật phẩm **👥 Nhân bản**: trong 10 giây bạn có thêm 1 mạng
   (bị phá hủy, lật xe hay dính bão sẽ hồi sinh ngay).
 
+### Trùm cuối
+Cuối các ải 5, 10, 15, 20 có trùm chắn trước trạm cứu hộ (Gã Khổng Lồ, Bạo Chúa, Quái Vật Dung Nham,
+Vua Zombie). Cổng trạm chỉ mở khi trùm gục.
+
 ### Vật phẩm trên đường
 `$` tiền · `⛽` xăng · `✚` sửa xe · `🛡` lá chắn 6 giây · `🎯` +15 đạn · `⏱` +5 giây & đẩy bão lùi · `👥` nhân bản
 
