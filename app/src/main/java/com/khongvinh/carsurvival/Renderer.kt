@@ -846,6 +846,41 @@ class Renderer(private val g: Game) {
             fill.color = 0x88FFFFFF.toInt()
             c.drawRect(l, t, l + w, t + h, fill)
         }
+        if (o.barT > 0f || o.ramHp < 1f) drawObstacleBar(c, o, t)
+    }
+
+    /** Durability bar in four 25% notches above an obstacle the car failed to smash. */
+    private fun drawObstacleBar(c: Canvas, o: Obstacle, top: Float) {
+        val f = o.barFrac
+        val bw = max(90f, o.type.w)
+        val bx = o.x - bw / 2
+        val by = top - 26f
+        r.set(bx - 3f, by - 3f, bx + bw + 3f, by + 17f)
+        fill.color = 0xCC1B1B1B.toInt()
+        c.drawRoundRect(r, 8f, 8f, fill)
+        if (f > 0f) {
+            fill.color = when {
+                f > 0.5f -> 0xFF43A047.toInt()
+                f > 0.25f -> 0xFFFFA000.toInt()
+                else -> 0xFFE53935.toInt()
+            }
+            r.set(bx, by, bx + bw * f, by + 14f)
+            c.drawRoundRect(r, 6f, 6f, fill)
+            fill.color = 0x44FFFFFF
+            r.set(bx + 2f, by + 2f, max(bx + 3f, bx + bw * f - 2f), by + 6f)
+            c.drawRoundRect(r, 3f, 3f, fill)
+        }
+        fill.color = 0xCC1B1B1B.toInt()
+        for (k in 1 until 4) c.drawRect(bx + bw * k / 4f - 1.5f, by, bx + bw * k / 4f + 1.5f, by + 14f, fill)
+        text.textAlign = Paint.Align.CENTER
+        text.textSize = 20f
+        text.style = Paint.Style.STROKE
+        text.strokeWidth = 4f
+        text.color = 0xCC000000.toInt()
+        c.drawText("${(f * 100).toInt()}%", o.x, by - 6f, text)
+        text.style = Paint.Style.FILL
+        text.color = Color.WHITE
+        c.drawText("${(f * 100).toInt()}%", o.x, by - 6f, text)
     }
 
     private fun drawItem(c: Canvas, it: Item) {

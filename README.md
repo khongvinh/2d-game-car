@@ -20,6 +20,8 @@ hay thư viện ngoài, không cần file ảnh/âm thanh.
   tiền nhặt được — rồi **nâng cấp** và chạy lại để đi xa hơn, cho tới khi về **TRẠM CỨU HỘ**.
 - Tông zombie ở tốc độ cao thì chúng văng đi; đi chậm thì chúng bám vào cào xe.
 - Thùng gỗ cần đủ tốc độ mới phá được, xác xe cần rất nhanh (hoặc tên lửa), thùng phuy phát nổ.
+- Không đủ tốc độ để phá ngay? Vật cản hiện **thanh độ bền**: lùi lại lấy đà và tông tiếp —
+  mỗi cú tông trừ **25%**, 4 cú là vật cản vỡ tung. Đạn cũng làm giảm thanh này.
 
 ### Vòng bo (cơn bão tím)
 | Giai đoạn | Thời gian | Tốc độ bão |

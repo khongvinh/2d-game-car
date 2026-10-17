@@ -1,5 +1,7 @@
 package com.khongvinh.carsurvival
 
+import kotlin.math.min
+
 enum class State { MENU, SHOP, GARAGE, PLAYING, PAUSED, RESULT, STAGE_DONE, VICTORY }
 
 /** Selectable cars (garage unlocks after clearing stage 1). */
@@ -88,6 +90,23 @@ class Obstacle(val type: ObstacleType, var x: Float, var y: Float) {
     var alive = true
     var flash = 0f
     var vy = 0f
+
+    /** Durability against ramming (1 = intact); each solid ram removes [RAM_HIT]. */
+    var ramHp = 1f
+    var ramCd = 0f
+
+    /** Seconds the durability bar stays visible after a failed attempt. */
+    var barT = 0f
+
+    /** Bar fraction: the weaker of ramming durability and weapon damage. */
+    val barFrac get() = min(ramHp, if (type.hp > 0) hp.toFloat() / type.hp else 1f).coerceIn(0f, 1f)
+
+    companion object {
+        const val RAM_HIT = 0.25f
+
+        /** Minimum speed into the obstacle (units/s) for a ram to count. */
+        const val RAM_SPEED = 150f
+    }
 }
 
 /** Something flying after being hit: a zombie, crate, wreck piece. */

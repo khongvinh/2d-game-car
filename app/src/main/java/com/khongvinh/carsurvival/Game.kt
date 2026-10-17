@@ -451,7 +451,7 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
         }
 
         updateZombies(dt)
-        updateObstacles()
+        updateObstacles(dt)
         updateDebris(dt)
         updateItems()
         updateWeapon(dt)
@@ -725,12 +725,14 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
         sfx.play(Sfx.S.SPLAT, 0.8f)
     }
 
-    private fun updateObstacles() {
+    private fun updateObstacles(dt: Float) {
         val c = car
         val fs = c.forwardSpeed
         for (o in obstacles) {
             if (!o.alive) continue
-            if (o.flash > 0f) o.flash -= 0.016f
+            if (o.flash > 0f) o.flash -= dt
+            if (o.ramCd > 0f) o.ramCd -= dt
+            if (o.barT > 0f) o.barT -= dt
             val dx = o.x - c.x
             if (o.type == ObstacleType.CRATE && dx < 1500f && dx > -800f) settleCrate(o)
             if (dx > 400f || dx < -400f) continue
@@ -761,10 +763,23 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
                     if (into > 0f) {
                         c.vx -= c.fwdX * fs * 1.25f
                         c.vy -= c.fwdY * fs * 1.25f
-                        if (into > 150f) {
+                        if (into > 60f) o.barT = 4f
+                        if (into > Obstacle.RAM_SPEED && o.ramCd <= 0f) {
+                            // a solid ram wears the obstacle down by 25%; four rams break it
+                            o.ramCd = 0.35f
+                            o.ramHp -= Obstacle.RAM_HIT
+                            o.flash = 0.12f
                             damageCar(into * 0.012f * (1f - armor))
-                            sfx.play(Sfx.S.LAND, 0.5f)
-                            o.flash = 0.1f
+                            shake = max(shake, 0.2f)
+                            sfx.play(Sfx.S.LAND, 0.7f)
+                            sfx.play(if (o.type == ObstacleType.CRATE) Sfx.S.WOOD else Sfx.S.HIT, 0.6f)
+                            sparks(o.x - dir * o.type.w / 2, o.y - o.type.h / 2)
+                            if (o.ramHp <= 0.001f) {
+                                breakObstacle(o, c.vx + c.fwdX * dir * 300f)
+                                texts.add(FloatText("PHÁ TAN!", o.x, o.y - o.type.h - 40f, 0xFFFFAB00.toInt()).also { it.size = 56f })
+                            } else {
+                                texts.add(FloatText("-25%", o.x, o.y - o.type.h - 40f, 0xFFFFD740.toInt()).also { it.size = 46f })
+                            }
                         }
                     }
                 }
@@ -1037,6 +1052,7 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
                     } else {
                         o.hp -= s.damage
                         o.flash = 0.08f
+                        o.barT = 3f
                         sparks(s.x, s.y)
                         if (o.hp <= 0) breakObstacle(o, s.vx * 0.2f)
                     }
