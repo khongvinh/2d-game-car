@@ -4,6 +4,7 @@ import android.content.Context
 import android.media.AudioAttributes
 import android.media.SoundPool
 import java.io.File
+import java.util.concurrent.CountDownLatch
 import java.io.FileOutputStream
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
@@ -20,7 +21,7 @@ class Sfx(context: Context) {
     enum class S { COIN, POWER, HIT, EXPLODE, SHOOT, BOW, CATAPULT, BOOM, BEEP, GO, WIN, STAGE, LOSE, STORM, CLONE, CLICK, SPLAT, WOOD, BOOST, LAND, ROAR }
 
     private val pool: SoundPool = SoundPool.Builder()
-        .setMaxStreams(10)
+        .setMaxStreams(16)
         .setAudioAttributes(
             AudioAttributes.Builder()
                 .setUsage(AudioAttributes.USAGE_GAME)
@@ -30,27 +31,74 @@ class Sfx(context: Context) {
         .build()
     private val ids = IntArray(S.entries.size)
 
+    /** A sample can only be played once SoundPool has finished decoding it. */
+    private val loaded = BooleanArray(S.entries.size)
+    private val lastPlay = LongArray(S.entries.size)
+    private val loadedIds = java.util.concurrent.ConcurrentHashMap.newKeySet<Int>()
+
     @Volatile
     var enabled = true
 
+    /** Released once every effect has been generated and handed to SoundPool. */
+    val ready = CountDownLatch(1)
+
     init {
         val dir = context.cacheDir
+        pool.setOnLoadCompleteListener { _, sampleId, status ->
+            if (status == 0) {
+                // may arrive before ids[] is filled in, so remember the sample id too
+                loadedIds.add(sampleId)
+                val i = ids.indexOf(sampleId)
+                if (i >= 0) loaded[i] = true
+            }
+        }
         Thread {
             for (s in S.entries) {
                 try {
-                    val f = File(dir, "sfx_${s.name.lowercase()}.wav")
-                    writeWav(f, synth(s))
+                    // generated once and kept in the cache, so later launches are instant
+                    val f = File(dir, "sfx_${VERSION}_${s.name.lowercase()}.wav")
+                    if (!f.exists() || f.length() < 64) writeWav(f, synth(s))
                     ids[s.ordinal] = pool.load(f.absolutePath, 1)
                 } catch (_: Exception) {
                 }
             }
-        }.start()
+            ready.countDown()
+        }.apply { priority = Thread.NORM_PRIORITY + 1 }.start()
     }
 
     fun play(s: S, volume: Float = 1f) {
         if (!enabled) return
-        val id = ids[s.ordinal]
-        if (id != 0) pool.play(id, volume, volume, 1, 0, 1f)
+        val i = s.ordinal
+        val id = ids[i]
+        if (id == 0) return
+        if (!loaded[i]) {
+            if (!loadedIds.contains(id)) return
+            loaded[i] = true
+        }
+        // rapid repeats of the same effect (gunfire, splats) are thinned out so they
+        // never occupy every stream and starve the other effects
+        val now = System.nanoTime()
+        if (now - lastPlay[i] < MIN_GAP_NS[i]) return
+        lastPlay[i] = now
+        pool.play(id, volume, volume, PRIORITY[i], 0, 1f)
+    }
+
+    private companion object {
+        const val VERSION = 3
+        val MIN_GAP_NS = LongArray(S.entries.size) { i ->
+            when (S.entries[i]) {
+                S.SHOOT -> 90_000_000L
+                S.SPLAT, S.COIN, S.WOOD, S.LAND -> 45_000_000L
+                else -> 25_000_000L
+            }
+        }
+        val PRIORITY = IntArray(S.entries.size) { i ->
+            when (S.entries[i]) {
+                S.SHOOT, S.LAND -> 0
+                S.BOOM, S.EXPLODE, S.HIT, S.ROAR, S.STAGE, S.LOSE, S.WIN, S.BEEP, S.STORM -> 2
+                else -> 1
+            }
+        }
     }
 
     fun release() = pool.release()

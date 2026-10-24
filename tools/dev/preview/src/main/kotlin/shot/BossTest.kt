@@ -6,13 +6,13 @@ import java.io.File
 
 fun bossMain(args: Array<String>) {
     out = File(args[0]).also { it.mkdirs() }
-    for (tier in listOf(1, 4)) {
+    for (tier in listOf(1, 2, 3, 4)) {
         val ctx = Context()
         val save = SaveData(ctx)
         save.bestStage = tier * 5 - 1
         save.stageSel = tier * 5
         save.upgrades[Upgrade.AMMO.ordinal] = 2
-        if (tier == 4) { for (u in Upgrade.entries) save.upgrades[u.ordinal] = 4; save.ownedWeapons = 7; save.weapon = 1 }
+        if (tier >= 2) { for (u in Upgrade.entries) save.upgrades[u.ordinal] = tier + 1; save.ownedWeapons = 7; save.weapon = 1 }
         val g = Game(save, Sfx(ctx), Music())
         g.resize(W.toFloat(), H.toFloat())
         tick(g, 1f)
@@ -29,7 +29,7 @@ fun bossMain(args: Array<String>) {
         while (t < 90f && g.state == State.PLAYING) {
             g.touchDown(1, gas.cx, gas.cy); tick(g, 1.6f); t += 1.6f
             val b = g.boss!!
-            if (b.engaged && n < 3 && (b.throwAnim > 0f || g.bossRocks.isNotEmpty() || b.hp < lastHp)) { shot(g, "boss${tier}_$n"); n++ }
+            if (b.engaged && n < 3 && (b.throwAnim > 0f || b.breathT > 0f || b.diveT > 0f || g.bossRocks.isNotEmpty() || b.hp < lastHp)) { shot(g, "boss${tier}_$n"); n++ }
             lastHp = b.hp
             g.touchUp(1)
             if (b.alive && kotlin.math.abs(g.car.x - b.x) < 500f) { g.touchDown(2, brake.cx, brake.cy); tick(g, 0.8f); t += 0.8f; g.touchUp(2) }

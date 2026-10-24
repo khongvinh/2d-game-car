@@ -11,7 +11,7 @@ import android.view.SurfaceView
 /** Hosts the game loop on a background thread and forwards (multi-)touches to [Game]. */
 class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback, Runnable {
     private val sfx = Sfx(context)
-    private val music = Music()
+    private val music = Music(context.cacheDir, sfx.ready)
     private val game = Game(SaveData(context), sfx, music)
 
     @Volatile

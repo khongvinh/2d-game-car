@@ -40,9 +40,14 @@ hay thư viện ngoài, không cần file ảnh/âm thanh.
 - **Qua ải 5** → mở vật phẩm **👥 Nhân bản**: trong 10 giây bạn có thêm 1 mạng
   (bị phá hủy, lật xe hay dính bão sẽ hồi sinh ngay).
 
+### Bản đồ
+Nút **🗺 ẢI** ở menu mở màn chọn bản đồ: 20 bản đồ trong 4 vùng — Sa mạc (ải 1–5), Núi lửa (6–10),
+Rừng đêm (11–15), Hành tinh lạ (16–20). Mỗi vùng có cảnh và quái riêng: zombie, thằn lằn lửa, dơi,
+người ngoài hành tinh và khối nhớt.
+
 ### Trùm cuối
-Cuối các ải 5, 10, 15, 20 có trùm chắn trước trạm cứu hộ (Gã Khổng Lồ, Bạo Chúa, Quái Vật Dung Nham,
-Vua Zombie). Cổng trạm chỉ mở khi trùm gục.
+Cuối các ải 5, 10, 15, 20 có trùm chắn trước trạm cứu hộ: Gã Khổng Lồ (zombie), Rồng Lửa, Dơi Hút Máu,
+Quái Vật Ngoài Hành Tinh. Cổng trạm chỉ mở khi trùm gục.
 
 ### Vật phẩm trên đường
 `$` tiền · `⛽` xăng · `✚` sửa xe · `🛡` lá chắn 6 giây · `🎯` +15 đạn · `⏱` +5 giây & đẩy bão lùi · `👥` nhân bản

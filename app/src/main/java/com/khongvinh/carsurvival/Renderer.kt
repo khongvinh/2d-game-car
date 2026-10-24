@@ -45,6 +45,7 @@ class Renderer(private val g: Game) {
         fill.shader = null
         when (g.state) {
             State.MENU -> drawMenu(c)
+            State.MAPS -> drawMaps(c)
             State.SHOP -> drawShop(c)
             State.GARAGE -> drawGarage(c)
             State.PLAYING, State.PAUSED -> {
@@ -60,44 +61,95 @@ class Renderer(private val g: Game) {
 
     private fun drawBackground(c: Canvas) {
         ensureShaders()
+        val th = g.theme
         val W = g.W
         val H = g.H
         fill.shader = skyShader
         c.drawRect(0f, 0f, W, H, fill)
+        if (th.stars) {
+            for (k in 0 until 70) {
+                val h = hash(k * 97 + th.stage)
+                val sx = (h % 1600) / 1600f * W
+                val sy = ((h / 1600) % 400) / 400f * H * 0.55f
+                val tw = 0.5f + 0.5f * sin(g.anim * (1f + k % 3) + k)
+                fill.color = Color.argb((90 + 150 * tw).toInt(), 255, 255, 240)
+                c.drawCircle(sx, sy, 1.2f + (k % 3) * 0.7f, fill)
+            }
+        }
         fill.shader = sunShader
-        c.drawRect(0f, 0f, W, H * 0.75f, fill)
+        c.drawRect(0f, 0f, W, H * 0.8f, fill)
         fill.shader = null
-        fill.color = 0xFFFFF6E0.toInt()
-        c.drawCircle(W * 0.78f, H * 0.26f, 54f, fill)
+        val sunX = W * 0.78f
+        val sunY = H * th.sunY
+        fill.color = th.sunColor
+        c.drawCircle(sunX, sunY, if (th.moon) 46f else 54f, fill)
+        if (th.moon) {
+            fill.color = 0x22000000
+            c.drawCircle(sunX - 14f, sunY - 8f, 10f, fill)
+            c.drawCircle(sunX + 12f, sunY + 14f, 7f, fill)
+            c.drawCircle(sunX + 6f, sunY - 18f, 5f, fill)
+        }
+        if (th.region == Region.ALIEN) {
+            // a ringed gas giant and a second moon
+            fill.color = 0xFF7E57C2.toInt()
+            c.drawCircle(W * 0.22f, H * 0.2f, 70f, fill)
+            fill.color = 0x55FFFFFF
+            c.drawOval(W * 0.22f - 70f, H * 0.2f - 30f, W * 0.22f + 10f, H * 0.2f - 5f, fill)
+            stroke.color = 0xAAE1BEE7.toInt()
+            stroke.strokeWidth = 5f
+            c.drawOval(W * 0.22f - 120f, H * 0.2f - 18f, W * 0.22f + 120f, H * 0.2f + 18f, stroke)
+            fill.color = 0xFFB2EBF2.toInt()
+            c.drawCircle(W * 0.6f, H * 0.12f, 18f, fill)
+        }
 
-        // drifting clouds
+        // drifting clouds (smoke over the volcano, mist at night)
         for (k in 0 until 6) {
             val span = W + 700f
             val raw = k * 431f + g.anim * (6f + k * 2.5f) - g.camX * Game.ZOOM * 0.02f
             val cx = ((raw % span) + span) % span - 350f
-            cloud(c, cx, 60f + (k * 47) % 140, 0.6f + (k % 3) * 0.25f)
+            cloud(c, cx, 60f + (k * 47) % 140, 0.6f + (k % 3) * 0.25f, th.cloud)
         }
-        // vultures circling
-        stroke.color = 0xAA3E2723.toInt()
-        stroke.strokeWidth = 3f
-        for (k in 0 until 3) {
-            val a = g.anim * 0.35f + k * 2.1f
-            val bx = W * 0.45f + cos(a) * (160f + k * 40f)
-            val by = 150f + sin(a) * 40f + k * 20f
-            val flap = sin(g.anim * 5f + k) * 7f
-            c.drawLine(bx - 16f, by - flap, bx, by, stroke)
-            c.drawLine(bx, by, bx + 16f, by - flap, stroke)
+        if (th.region == Region.DESERT || th.region == Region.NIGHT) {
+            stroke.color = if (th.region == Region.NIGHT) 0xAA0B0B12.toInt() else 0xAA3E2723.toInt()
+            stroke.strokeWidth = 3f
+            for (k in 0 until 3) {
+                val a = g.anim * 0.35f + k * 2.1f
+                val bx = W * 0.45f + cos(a) * (160f + k * 40f)
+                val by = 150f + sin(a) * 40f + k * 20f
+                val flap = sin(g.anim * (if (th.region == Region.NIGHT) 9f else 5f) + k) * 7f
+                c.drawLine(bx - 16f, by - flap, bx, by, stroke)
+                c.drawLine(bx, by, bx + 16f, by - flap, stroke)
+            }
         }
 
-        mesas(c, 0.05f, H * 0.6f, farShader, 1.0f, 180f)
-        // dusty haze between layers
-        fill.color = 0x33FBE3B0
+        mesas(c, 0.05f, H * 0.6f, farShader, 1.0f + th.stage * 0.37f, 180f, th.region)
+        fill.color = th.haze
         c.drawRect(0f, H * 0.45f, W, H, fill)
-        city(c, 0.12f, H * 0.68f)
-        mesas(c, 0.22f, H * 0.76f, midShader, 1.9f, 120f)
+        when (th.skyline) {
+            1 -> city(c, 0.12f, H * 0.68f)
+            2 -> volcanoes(c, 0.1f, H * 0.7f)
+            3 -> castleForest(c, 0.12f, H * 0.7f)
+            4 -> alienSpires(c, 0.12f, H * 0.7f)
+        }
+        mesas(c, 0.22f, H * 0.76f, midShader, 1.9f + th.stage * 0.21f, 120f, th.region)
+        // floating embers (volcano) or fireflies / spores
+        if (th.region != Region.DESERT) {
+            for (k in 0 until 24) {
+                val h = hash(k * 31 + 7)
+                val speed = 20f + (h % 40)
+                val px = ((h % 1700) + g.anim * (if (th.region == Region.VOLCANO) 15f else 8f) * (k % 3 + 1)) % (W + 40f)
+                val py = H - ((g.anim * speed + (h % 700)) % (H + 40f))
+                fill.color = when (th.region) {
+                    Region.VOLCANO -> Color.argb(180, 255, 140 + (h % 80), 40)
+                    Region.NIGHT -> Color.argb((120 + 120 * sin(g.anim * 3f + k)).toInt().coerceIn(0, 255), 200, 255, 120)
+                    else -> Color.argb(150, 120, 255, 230)
+                }
+                c.drawCircle(px, py, 2f + (k % 3), fill)
+            }
+        }
     }
 
-    private fun mesas(c: Canvas, par: Float, base: Float, shader: Shader?, seed: Float, amp: Float) {
+    private fun mesas(c: Canvas, par: Float, base: Float, shader: Shader?, seed: Float, amp: Float, region: Region) {
         val W = g.W
         path.reset()
         topPath.reset()
@@ -108,7 +160,12 @@ class Renderer(private val g: Game) {
         while (sx <= W + 24f) {
             val u = (sx + off) * 0.004f
             var h = amp * (0.55f + 0.45f * sin(u + seed) + 0.25f * sin(u * 2.3f + seed * 3f))
-            h = h.coerceIn(amp * 0.15f, amp * 0.85f) // flat mesa tops
+            h = when (region) {
+                Region.DESERT -> h.coerceIn(amp * 0.15f, amp * 0.85f) // flat mesa tops
+                Region.VOLCANO -> h + amp * 0.25f * kotlin.math.abs(sin(u * 3.1f)) // jagged ridges
+                Region.NIGHT -> h * 0.8f + amp * 0.08f * sin(u * 9f) // rolling, wooded
+                Region.ALIEN -> h + amp * 0.3f * (sin(u * 5.3f).let { it * it * it }) // spiky
+            }
             val y = base - h - lift
             path.lineTo(sx, y)
             if (sx == 0f) topPath.moveTo(sx, y) else topPath.lineTo(sx, y)
@@ -119,12 +176,12 @@ class Renderer(private val g: Game) {
         fill.shader = shader
         c.drawPath(path, fill)
         fill.shader = null
-        stroke.color = 0x40FFF3E0
+        stroke.color = if (region == Region.VOLCANO) 0x55FF7043 else 0x40FFF3E0
         stroke.strokeWidth = 3f
         c.drawPath(topPath, stroke)
     }
 
-    /** Silhouettes of a ruined city on the horizon. */
+    /** Distant volcanoes with glowing lava. */
 
     // --------------------------------------------------------------- world
 
@@ -157,7 +214,7 @@ class Renderer(private val g: Game) {
         for (o in g.obstacles) if (o.x in x0..x1) drawObstacle(c, o)
         for (it in g.items) if (it.x in x0..x1) drawItem(c, it)
         for (z in g.zombies) if (z.x in x0..x1) drawZombie(c, z)
-        g.boss?.let { b -> if (b.alive && b.x in x0 - 200f..x1 + 200f) drawBoss(c, b) }
+        g.boss?.let { b -> if (b.alive && b.x in x0 - 300f..x1 + 300f) drawBossAny(c, b) }
         for (d in g.debris) if (d.x in x0..x1) drawDebris(c, d)
         drawShots(c)
         for (rk in g.bossRocks) drawBossRock(c, rk)
@@ -184,7 +241,7 @@ class Renderer(private val g: Game) {
             c.drawText(t.text, t.x, t.y, text)
         }
         text.alpha = 255
-        if (g.state != State.MENU && g.state != State.SHOP && g.state != State.GARAGE) drawStorm(c)
+        if (g.state != State.MENU && g.state != State.MAPS && g.state != State.SHOP && g.state != State.GARAGE) drawStorm(c)
         c.restore()
     }
 
@@ -227,15 +284,16 @@ class Renderer(private val g: Game) {
             }
         }
         // road crust: dark edge, sandy top, bright rim
-        stroke.color = 0xFF4A2B17.toInt()
+        val th = g.theme
+        stroke.color = th.crust[0]
         stroke.strokeWidth = 20f
         topPath.offset(0f, 9f)
         c.drawPath(topPath, stroke)
-        stroke.color = 0xFFB27A47.toInt()
+        stroke.color = th.crust[1]
         stroke.strokeWidth = 9f
         topPath.offset(0f, -6f)
         c.drawPath(topPath, stroke)
-        stroke.color = 0xFFE9BC85.toInt()
+        stroke.color = th.crust[2]
         stroke.strokeWidth = 3f
         topPath.offset(0f, -4f)
         c.drawPath(topPath, stroke)
@@ -247,7 +305,7 @@ class Renderer(private val g: Game) {
             val h = hash(i * 7 + 3)
             when (h % 7) {
                 0, 1 -> {
-                    stroke.color = if (h % 2 == 0) 0xFFA1A33A.toInt() else 0xFF7F7A2A.toInt()
+                    stroke.color = if (h % 2 == 0) th.grass[0] else th.grass[1]
                     stroke.strokeWidth = 3f
                     val bx = x + (h % 30)
                     val sway = sin(g.anim * 2f + i) * 3f
@@ -274,6 +332,159 @@ class Renderer(private val g: Game) {
     }
 
     private fun drawDecor(c: Canvas, d: Decor) {
+        when (g.theme.region) {
+            Region.DESERT -> drawDesertDecor(c, d)
+            Region.VOLCANO -> drawVolcanoDecor(c, d)
+            Region.NIGHT -> drawNightDecor(c, d)
+            Region.ALIEN -> drawAlienDecor(c, d)
+        }
+    }
+
+    private fun drawVolcanoDecor(c: Canvas, d: Decor) {
+        val gy = g.terrain.heightAt(d.x)
+        val s = d.size
+        val pulse = 0.6f + 0.4f * sin(g.anim * 3f + d.x)
+        when (d.kind) {
+            0, 2 -> { // lava rock with glowing cracks
+                fill.color = 0xFF2B2422.toInt()
+                c.drawOval(d.x - 55 * s, gy - 50 * s, d.x + 50 * s, gy + 10f, fill)
+                stroke.color = Color.argb((220 * pulse).toInt(), 255, 112, 30)
+                stroke.strokeWidth = 3f
+                c.drawLine(d.x - 30 * s, gy - 30 * s, d.x, gy - 15 * s, stroke)
+                c.drawLine(d.x, gy - 15 * s, d.x + 25 * s, gy - 35 * s, stroke)
+            }
+            1 -> { // charred tree
+                stroke.color = 0xFF1A1414.toInt()
+                stroke.strokeWidth = 10f * s
+                c.drawLine(d.x, gy, d.x + 6f, gy - 130 * s, stroke)
+                stroke.strokeWidth = 5f * s
+                c.drawLine(d.x + 3f, gy - 80 * s, d.x - 36 * s, gy - 120 * s, stroke)
+                c.drawLine(d.x + 5f, gy - 100 * s, d.x + 40 * s, gy - 140 * s, stroke)
+                fill.color = Color.argb((180 * pulse).toInt(), 255, 87, 34)
+                c.drawCircle(d.x + 6f, gy - 130 * s, 5f, fill)
+            }
+            3 -> { // lava pool
+                fill.color = Color.argb(200, 255, (90 + 60 * pulse).toInt(), 20)
+                c.drawOval(d.x - 70 * s, gy - 6f, d.x + 70 * s, gy + 12f, fill)
+                fill.color = 0x88FFEB3B.toInt()
+                c.drawOval(d.x - 30 * s, gy - 3f, d.x + 20 * s, gy + 5f, fill)
+            }
+            else -> { // skull on a pike
+                stroke.color = 0xFF3E2723.toInt()
+                stroke.strokeWidth = 6f
+                c.drawLine(d.x, gy, d.x, gy - 110f, stroke)
+                fill.color = 0xFFE0D6C8.toInt()
+                c.drawCircle(d.x, gy - 120f, 16f, fill)
+                c.drawRect(d.x - 9f, gy - 112f, d.x + 9f, gy - 100f, fill)
+                fill.color = 0xFF1A1A1A.toInt()
+                c.drawCircle(d.x - 6f, gy - 122f, 4f, fill)
+                c.drawCircle(d.x + 6f, gy - 122f, 4f, fill)
+            }
+        }
+    }
+
+    private fun drawNightDecor(c: Canvas, d: Decor) {
+        val gy = g.terrain.heightAt(d.x)
+        val s = d.size
+        when (d.kind) {
+            0 -> { // tombstone
+                fill.color = 0xFF616A78.toInt()
+                c.drawRoundRect(d.x - 22 * s, gy - 60 * s, d.x + 22 * s, gy + 4f, 20 * s, 20 * s, fill)
+                fill.color = 0xFF3E4451.toInt()
+                c.drawRect(d.x - 3f, gy - 50 * s, d.x + 3f, gy - 22 * s, fill)
+                c.drawRect(d.x - 12 * s, gy - 42 * s, d.x + 12 * s, gy - 36 * s, fill)
+            }
+            1 -> { // twisted dead tree
+                stroke.color = 0xFF1B1B24.toInt()
+                stroke.strokeWidth = 11f * s
+                c.drawLine(d.x, gy, d.x - 10f, gy - 150 * s, stroke)
+                stroke.strokeWidth = 5f * s
+                c.drawLine(d.x - 6f, gy - 100 * s, d.x - 55 * s, gy - 140 * s, stroke)
+                c.drawLine(d.x - 8f, gy - 120 * s, d.x + 40 * s, gy - 170 * s, stroke)
+                c.drawLine(d.x - 30 * s, gy - 120 * s, d.x - 45 * s, gy - 165 * s, stroke)
+            }
+            2 -> { // jack-o'-lantern
+                fill.color = 0xFFEF6C00.toInt()
+                c.drawOval(d.x - 22f, gy - 34f, d.x + 22f, gy + 2f, fill)
+                fill.color = Color.argb((160 + 90 * sin(g.anim * 6f + d.x)).toInt().coerceIn(0, 255), 255, 235, 59)
+                c.drawRect(d.x - 12f, gy - 22f, d.x - 5f, gy - 15f, fill)
+                c.drawRect(d.x + 5f, gy - 22f, d.x + 12f, gy - 15f, fill)
+                c.drawRect(d.x - 10f, gy - 10f, d.x + 10f, gy - 6f, fill)
+                fill.color = 0xFF33691E.toInt()
+                c.drawRect(d.x - 3f, gy - 42f, d.x + 3f, gy - 32f, fill)
+            }
+            3 -> { // old street lamp
+                stroke.color = 0xFF263238.toInt()
+                stroke.strokeWidth = 7f
+                c.drawLine(d.x, gy, d.x, gy - 200f, stroke)
+                c.drawLine(d.x, gy - 200f, d.x + 30f, gy - 200f, stroke)
+                val on = (g.anim * 2f + d.x).toInt() % 7 != 0
+                fill.color = if (on) 0x55FFF59D else 0x11FFF59D
+                c.drawCircle(d.x + 30f, gy - 190f, 40f, fill)
+                fill.color = if (on) 0xFFFFF59D.toInt() else 0xFF8D8D6A.toInt()
+                c.drawCircle(d.x + 30f, gy - 190f, 9f, fill)
+            }
+            else -> { // broken fence
+                stroke.color = 0xFF4E3B30.toInt()
+                stroke.strokeWidth = 6f
+                for (k in 0 until 4) c.drawLine(d.x + k * 22f, gy, d.x + k * 22f + (k % 2) * 4f, gy - 50f - (k % 3) * 8f, stroke)
+                c.drawLine(d.x - 4f, gy - 30f, d.x + 70f, gy - 36f, stroke)
+            }
+        }
+    }
+
+    private fun drawAlienDecor(c: Canvas, d: Decor) {
+        val gy = g.terrain.heightAt(d.x)
+        val s = d.size
+        val glow = 0.6f + 0.4f * sin(g.anim * 2.5f + d.x * 0.01f)
+        when (d.kind) {
+            0, 2 -> { // crystal cluster
+                for (k in -1..1) {
+                    path.reset()
+                    val h = (60f + k * k * -20f + 30f) * s
+                    path.moveTo(d.x + k * 18f * s - 10f * s, gy)
+                    path.lineTo(d.x + k * 26f * s, gy - h)
+                    path.lineTo(d.x + k * 18f * s + 10f * s, gy)
+                    path.close()
+                    fill.color = Color.argb(230, 100, (200 + 55 * glow).toInt(), 230)
+                    c.drawPath(path, fill)
+                }
+                fill.color = Color.argb((90 * glow).toInt(), 100, 255, 218)
+                c.drawCircle(d.x, gy - 30f * s, 45f * s, fill)
+            }
+            1 -> { // alien bulb plant
+                stroke.color = 0xFF4A148C.toInt()
+                stroke.strokeWidth = 6f * s
+                c.drawLine(d.x, gy, d.x + sin(g.anim + d.x) * 8f, gy - 110f * s, stroke)
+                fill.color = Color.argb(255, (180 + 60 * glow).toInt(), 80, 220)
+                c.drawCircle(d.x + sin(g.anim + d.x) * 8f, gy - 118f * s, 18f * s, fill)
+                fill.color = 0x88FFFFFF.toInt()
+                c.drawCircle(d.x + sin(g.anim + d.x) * 8f - 5f, gy - 124f * s, 5f * s, fill)
+            }
+            3 -> { // beacon antenna
+                stroke.color = 0xFF90A4AE.toInt()
+                stroke.strokeWidth = 5f
+                c.drawLine(d.x, gy, d.x, gy - 180f, stroke)
+                c.drawLine(d.x - 30f, gy, d.x, gy - 120f, stroke)
+                c.drawLine(d.x + 30f, gy, d.x, gy - 120f, stroke)
+                val on = (g.anim * 2f).toInt() % 2 == 0
+                fill.color = if (on) 0xFFFF1744.toInt() else 0x55FF1744
+                c.drawCircle(d.x, gy - 185f, 8f, fill)
+            }
+            else -> { // crashed saucer
+                fill.color = 0xFF78909C.toInt()
+                c.drawOval(d.x - 70f * s, gy - 30f * s, d.x + 70f * s, gy + 6f, fill)
+                fill.color = Color.argb(200, 128, 222, 234)
+                c.drawOval(d.x - 30f * s, gy - 52f * s, d.x + 30f * s, gy - 18f * s, fill)
+                fill.color = Color.argb((200 * glow).toInt(), 178, 255, 89)
+                for (k in -2..2) c.drawCircle(d.x + k * 24f * s, gy - 10f * s, 4f, fill)
+                fill.color = 0x55424242
+                c.drawCircle(d.x + 50f * s, gy - 40f * s, 18f * s, fill)
+            }
+        }
+    }
+
+    private fun drawDesertDecor(c: Canvas, d: Decor) {
         val gy = g.terrain.heightAt(d.x)
         val s = d.size
         when (d.kind) {
@@ -713,14 +924,28 @@ class Renderer(private val g: Game) {
         val dir = sign(g.car.x - z.x).let { if (it == 0f) -1f else it }
         c.save()
         c.translate(z.x, z.y)
-        zombieFigure(c, z.type.w, z.type.h, z.shirt, sin(z.phase), dir, z.type == ZombieType.FAT)
+        when (z.type) {
+            ZombieType.WALKER, ZombieType.RUNNER, ZombieType.FAT ->
+                zombieFigure(c, z.type.w, z.type.h, z.shirt, sin(z.phase), dir, z.type == ZombieType.FAT)
+            else -> creatureFigure(c, z.type, sin(z.phase), dir, z.phase)
+        }
         c.restore()
     }
 
-    /** Zombie with the origin at its feet. */
+    /** Regional monsters, origin at the feet (bats: bottom of the body). */
+
     private fun zombieFigure(c: Canvas, w: Float, h: Float, shirt: Int, swing: Float, dir: Float, fat: Boolean) {
-        val skin = 0xFF8BC34A.toInt()
-        val skinDark = 0xFF689F38.toInt()
+        // charred in the volcano, pale ghouls at night
+        val skin = when (g.theme.region) {
+            Region.VOLCANO -> 0xFF8D6E63.toInt()
+            Region.NIGHT -> 0xFFB0BEC5.toInt()
+            else -> 0xFF8BC34A.toInt()
+        }
+        val skinDark = when (g.theme.region) {
+            Region.VOLCANO -> 0xFF4E342E.toInt()
+            Region.NIGHT -> 0xFF78909C.toInt()
+            else -> 0xFF689F38.toInt()
+        }
         val outline = 0xFF1B1B1B.toInt()
         val legW = if (fat) 14f else 9f
         val armW = if (fat) 10f else 7f
@@ -788,14 +1013,20 @@ class Renderer(private val g: Game) {
         c.save()
         c.translate(d.x, d.y)
         c.rotate(d.rot * 180f / PI.toFloat())
-        when (d.kind) {
-            Debris.ZOMBIE, Debris.FAT_ZOMBIE -> {
+        when {
+            d.kind == Debris.ZOMBIE || d.kind == Debris.FAT_ZOMBIE -> {
                 c.saveLayerAlpha(null, a)
                 c.translate(0f, d.h / 2)
                 zombieFigure(c, d.w, d.h, d.color, 0.8f, 1f, d.kind == Debris.FAT_ZOMBIE)
                 c.restore()
             }
-            Debris.PLANK -> {
+            d.kind >= Debris.CREATURE -> {
+                c.saveLayerAlpha(null, a)
+                c.translate(0f, d.h / 2)
+                creatureFigure(c, ZombieType.entries[d.kind - Debris.CREATURE], 0.8f, 1f, 0f)
+                c.restore()
+            }
+            d.kind == Debris.PLANK -> {
                 fill.color = d.color
                 fill.alpha = a
                 c.drawRect(-d.w / 2, -d.h / 2, d.w / 2, d.h / 2, fill)
@@ -1000,22 +1231,42 @@ class Renderer(private val g: Game) {
     }
 
     private fun drawBossRock(c: Canvas, rk: BossRock) {
-        c.save()
-        c.translate(rk.x, rk.y)
-        c.rotate(rk.rot * 57.3f)
-        fill.color = 0x55000000
-        c.drawCircle(4f, 6f, 30f, fill)
-        fill.color = 0xFF6D4C41.toInt()
-        c.drawCircle(0f, 0f, 30f, fill)
-        fill.color = 0xFF8D6E63.toInt()
-        c.drawCircle(-9f, -9f, 13f, fill)
-        stroke.color = 0xFF3E2723.toInt()
-        stroke.strokeWidth = 3f
-        c.drawLine(-12f, 6f, 10f, -4f, stroke)
-        c.restore()
+        when (rk.kind) {
+            1 -> {
+                fill.color = 0x66FF6D00
+                c.drawCircle(rk.x, rk.y, 34f, fill)
+                fill.color = 0xFFFF6D00.toInt()
+                c.drawCircle(rk.x, rk.y, 22f, fill)
+                fill.color = 0xFFFFEB3B.toInt()
+                c.drawCircle(rk.x - 4f, rk.y - 4f, 11f, fill)
+            }
+            2 -> {
+                val p = 0.6f + 0.4f * sin(g.anim * 20f)
+                fill.color = Color.argb((90 * p).toInt(), 100, 255, 218)
+                c.drawCircle(rk.x, rk.y, 30f, fill)
+                fill.color = 0xFF64FFDA.toInt()
+                c.drawCircle(rk.x, rk.y, 15f, fill)
+                fill.color = Color.WHITE
+                c.drawCircle(rk.x, rk.y, 6f, fill)
+            }
+            else -> {
+                c.save()
+                c.translate(rk.x, rk.y)
+                c.rotate(rk.rot * 57.3f)
+                fill.color = 0x55000000
+                c.drawCircle(4f, 6f, 30f, fill)
+                fill.color = 0xFF6D4C41.toInt()
+                c.drawCircle(0f, 0f, 30f, fill)
+                fill.color = 0xFF8D6E63.toInt()
+                c.drawCircle(-9f, -9f, 13f, fill)
+                stroke.color = 0xFF3E2723.toInt()
+                stroke.strokeWidth = 3f
+                c.drawLine(-12f, 6f, 10f, -4f, stroke)
+                c.restore()
+            }
+        }
     }
 
-    /** Durability bar in four 25% notches above an obstacle the car failed to smash. */
     private fun drawObstacleBar(c: Canvas, o: Obstacle, top: Float) {
         val f = o.barFrac
         val bw = max(90f, o.type.w)
@@ -1480,15 +1731,102 @@ class Renderer(private val g: Game) {
         for (ch in chips) cx += chip(c, ch, cx, 330f, 26f, 0xAA1B1B1B.toInt(), 0xFFFFE082.toInt()) + 14f
 
         // stage selector
-        val sx = W * 0.74f
-        text.textSize = 46f
-        text.color = Color.WHITE
-        title(c, "ẢI ${s.stageSel}", sx, 172f, Color.WHITE, 50f)
-        text.textAlign = Paint.Align.CENTER
-        text.textSize = 22f
-        text.color = 0xFFFFF3E0.toInt()
-        c.drawText("${g.stageGoalM(s.stageSel).toInt()}m • kỷ lục ${s.best[s.stageSel]}m", sx, 204f, text)
         drawMenuButtons(c)
+        val sx = W * 0.74f
+        text.textAlign = Paint.Align.CENTER
+        text.color = 0xFFFFF3E0.toInt()
+        fitText(c, "${Themes.of(s.stageSel).region.title} • ${g.stageGoalM(s.stageSel).toInt()}m • kỷ lục ${s.best[s.stageSel]}m", sx, 240f, 22f, 460f)
+
+    }
+
+    private fun drawMaps(c: Canvas) {
+        val W = g.W
+        val s = g.save
+        dim(c, 0xC8)
+        title(c, "CHỌN MAP", W / 2, 70f, 0xFFFFD740.toInt(), 56f)
+        for (i in 0 until Game.STAGES) {
+            val th = Themes.all[i]
+            val rc = g.mapCard(i)
+            val l = rc[0]
+            val t = rc[1]
+            val w = rc[2] - rc[0]
+            val h = rc[3] - rc[1]
+            val unlocked = i + 1 <= g.maxStartStage()
+            c.save()
+            r.set(l, t, rc[2], rc[3])
+            path.reset()
+            path.addRoundRect(r, 16f, 16f, Path.Direction.CW)
+            c.clipPath(path)
+            // mini scene: sky bands, sun/moon, mountains, ground
+            val bands = 6
+            for (k in 0 until bands) {
+                val f = k / (bands - 1f)
+                fill.color = if (f < 0.5f) blend(th.sky[0], th.sky[1], f * 2f) else blend(th.sky[1], th.sky[2], (f - 0.5f) * 2f)
+                c.drawRect(l, t + h * 0.65f * k / bands, rc[2], t + h * 0.65f * (k + 1) / bands + 1f, fill)
+            }
+            fill.color = th.sunColor
+            c.drawCircle(l + w * 0.78f, t + h * 0.22f, 10f, fill)
+            path.reset()
+            path.moveTo(l, t + h * 0.7f)
+            var px = 0f
+            while (px <= w) {
+                val hh = 18f + 14f * sin(px * 0.05f + i) + 8f * sin(px * 0.13f + i * 2)
+                path.lineTo(l + px, t + h * 0.62f - hh)
+                px += 8f
+            }
+            path.lineTo(rc[2], t + h * 0.7f)
+            path.close()
+            fill.color = th.mid[0]
+            c.drawPath(path, fill)
+            fill.color = th.ground[0]
+            c.drawRect(l, t + h * 0.62f, rc[2], rc[3], fill)
+            fill.color = th.crust[2]
+            c.drawRect(l, t + h * 0.62f, rc[2], t + h * 0.62f + 3f, fill)
+            // label strip
+            fill.color = 0xAA000000.toInt()
+            c.drawRect(l, rc[3] - 44f, rc[2], rc[3], fill)
+            text.textAlign = Paint.Align.LEFT
+            text.color = Color.WHITE
+            fitText(c, "${i + 1}. ${th.name}", l + 10f, rc[3] - 24f, 20f, w - 20f)
+            text.color = 0xFFFFE082.toInt()
+            fitText(c, if (s.best[i + 1] > 0) "kỷ lục ${s.best[i + 1]}m" else "${g.stageGoalM(i + 1).toInt()}m", l + 10f, rc[3] - 6f, 16f, w - 20f)
+            if ((i + 1) % 5 == 0) {
+                text.textAlign = Paint.Align.RIGHT
+                text.textSize = 26f
+                c.drawText("👹", rc[2] - 8f, t + 30f, text)
+            }
+            if (i + 1 <= s.bestStage) {
+                text.textAlign = Paint.Align.LEFT
+                text.textSize = 22f
+                text.color = 0xFF69F0AE.toInt()
+                c.drawText("✔", l + 10f, t + 28f, text)
+            }
+            if (!unlocked) {
+                fill.color = 0xB0000000.toInt()
+                c.drawRect(l, t, rc[2], rc[3], fill)
+                text.textAlign = Paint.Align.CENTER
+                text.textSize = 34f
+                text.color = Color.WHITE
+                c.drawText("🔒", l + w / 2, t + h / 2 + 4f, text)
+            }
+            c.restore()
+            r.set(l, t, rc[2], rc[3])
+            stroke.color = if (s.stageSel == i + 1) 0xFF69F0AE.toInt() else 0x55FFFFFF
+            stroke.strokeWidth = if (s.stageSel == i + 1) 5f else 2f
+            c.drawRoundRect(r, 16f, 16f, stroke)
+        }
+        text.textAlign = Paint.Align.CENTER
+        drawMenuButtons(c)
+    }
+
+    private fun blend(a: Int, b: Int, t: Float): Int {
+        val u = 1f - t
+        return Color.argb(
+            255,
+            (((a shr 16) and 255) * u + ((b shr 16) and 255) * t).toInt(),
+            (((a shr 8) and 255) * u + ((b shr 8) and 255) * t).toInt(),
+            ((a and 255) * u + (b and 255) * t).toInt(),
+        )
     }
 
     private fun card(c: Canvas, rc: FloatArray, selected: Boolean) {
@@ -1657,34 +1995,32 @@ class Renderer(private val g: Game) {
     private var hurtShader: Shader? = null
 
 
-    private val groundShader = LinearGradient(
-        0f, Terrain.BASE_Y - 260f, 0f, Terrain.BASE_Y + 560f,
-        intArrayOf(0xFFC99059.toInt(), 0xFF9C653B.toInt(), 0xFF5A361E.toInt()),
-        floatArrayOf(0f, 0.35f, 1f), Shader.TileMode.CLAMP,
-    )
-
-
     private val topPath = Path()
 
 
     private fun ensureShaders() {
-        if (bgW == g.W && bgH == g.H) return
+        val th = g.theme
+        if (bgW == g.W && bgH == g.H && shaderStage == th.stage) return
         bgW = g.W
         bgH = g.H
+        shaderStage = th.stage
         val W = g.W
         val H = g.H
         skyShader = LinearGradient(
-            0f, 0f, 0f, H * 0.85f,
-            intArrayOf(0xFF8E3B46.toInt(), 0xFFD9714A.toInt(), 0xFFF6B26B.toInt(), 0xFFFBE3B0.toInt()),
-            floatArrayOf(0f, 0.35f, 0.7f, 1f), Shader.TileMode.CLAMP,
+            0f, 0f, 0f, H * 0.85f, th.sky, floatArrayOf(0f, 0.55f, 1f), Shader.TileMode.CLAMP,
         )
+        val sc = th.sunColor and 0xFFFFFF
         sunShader = RadialGradient(
-            W * 0.78f, H * 0.26f, 260f,
-            intArrayOf(0xFFFFF4D6.toInt(), 0x88FFD59E.toInt(), 0x00FFD59E),
+            W * 0.78f, H * th.sunY, if (th.moon) 200f else 260f,
+            intArrayOf(0xAA000000.toInt() or sc, 0x55000000 or sc, sc),
             floatArrayOf(0f, 0.3f, 1f), Shader.TileMode.CLAMP,
         )
-        farShader = LinearGradient(0f, H * 0.3f, 0f, H * 0.7f, 0xFFC98F7A.toInt(), 0xFFE7B892.toInt(), Shader.TileMode.CLAMP)
-        midShader = LinearGradient(0f, H * 0.45f, 0f, H * 0.85f, 0xFFA35E3F.toInt(), 0xFFC4855A.toInt(), Shader.TileMode.CLAMP)
+        farShader = LinearGradient(0f, H * 0.3f, 0f, H * 0.7f, th.far[0], th.far[1], Shader.TileMode.CLAMP)
+        midShader = LinearGradient(0f, H * 0.45f, 0f, H * 0.85f, th.mid[0], th.mid[1], Shader.TileMode.CLAMP)
+        groundShader = LinearGradient(
+            0f, Terrain.BASE_Y - 260f, 0f, Terrain.BASE_Y + 560f, th.ground,
+            floatArrayOf(0f, 0.35f, 1f), Shader.TileMode.CLAMP,
+        )
         vignette = RadialGradient(
             W / 2, H / 2, max(W, H) * 0.72f,
             intArrayOf(0x00000000, 0x00000000, 0x66000000),
@@ -1697,21 +2033,19 @@ class Renderer(private val g: Game) {
         )
     }
 
-
     private fun hash(k: Int): Int = ((k * 73856093) xor ((k shr 2) * 19349663) xor 0x5bd1e995) and 0x7fffffff
 
 
-    private fun cloud(c: Canvas, x: Float, y: Float, s: Float) {
+    private fun cloud(c: Canvas, x: Float, y: Float, s: Float, color: Int) {
         fill.color = 0x22000000
         c.drawOval(x - 80f * s, y - 6f * s, x + 90f * s, y + 30f * s, fill)
-        fill.color = 0xCCFFF1DC.toInt()
+        fill.color = color
         c.drawOval(x - 90f * s, y - 20f * s, x + 90f * s, y + 22f * s, fill)
         c.drawCircle(x - 30f * s, y - 22f * s, 32f * s, fill)
         c.drawCircle(x + 25f * s, y - 30f * s, 40f * s, fill)
-        fill.color = 0x66FFFFFF
+        fill.color = 0x44FFFFFF
         c.drawCircle(x + 15f * s, y - 40f * s, 22f * s, fill)
     }
-
 
     private fun city(c: Canvas, par: Float, base: Float) {
         val off = g.camX * Game.ZOOM * par
@@ -1882,6 +2216,486 @@ class Renderer(private val g: Game) {
             }
         }
         drawMenuButtons(c)
+    }
+
+
+    private var shaderStage = -1
+
+
+    private var groundShader: Shader? = null
+
+
+    private fun volcanoes(c: Canvas, par: Float, base: Float) {
+        val off = g.camX * Game.ZOOM * par
+        val slot = 520f
+        var k = floor(off / slot).toInt() - 1
+        val end = floor((off + g.W) / slot).toInt() + 1
+        while (k <= end) {
+            val h = hash(k + 11)
+            val x = k * slot - off + (h % 120)
+            val vh = 170f + (h % 5) * 30f
+            val vw = 260f + (h % 3) * 50f
+            path.reset()
+            path.moveTo(x - vw / 2, base + 40f)
+            path.lineTo(x - 40f, base - vh)
+            path.lineTo(x + 40f, base - vh)
+            path.lineTo(x + vw / 2, base + 40f)
+            path.close()
+            fill.color = 0xFF2B1A18.toInt()
+            c.drawPath(path, fill)
+            // lava streaks and glowing crater
+            val pulse = 0.6f + 0.4f * sin(g.anim * 2f + k)
+            stroke.color = Color.argb((200 * pulse).toInt(), 255, 112, 30)
+            stroke.strokeWidth = 5f
+            c.drawLine(x - 10f, base - vh + 4f, x - 40f, base - vh * 0.5f, stroke)
+            c.drawLine(x + 12f, base - vh + 4f, x + 30f, base - vh * 0.4f, stroke)
+            fill.color = Color.argb((220 * pulse).toInt(), 255, 150, 40)
+            c.drawOval(x - 38f, base - vh - 8f, x + 38f, base - vh + 8f, fill)
+            // smoke column
+            for (s in 0 until 4) {
+                fill.color = Color.argb(90 - s * 18, 60, 50, 50)
+                val sy = base - vh - 40f - s * 50f - ((g.anim * 20f) % 50f)
+                c.drawCircle(x + s * 14f, sy, 30f + s * 12f, fill)
+            }
+            k++
+        }
+    }
+
+    /** Dead forest with a gothic castle on a hill. */
+
+
+    private fun castleForest(c: Canvas, par: Float, base: Float) {
+        val off = g.camX * Game.ZOOM * par
+        fill.color = 0xFF0E1222.toInt()
+        // tree line
+        var sx = -40f
+        while (sx < g.W + 40f) {
+            val h = hash(((sx + off) / 30f).toInt())
+            val th = 40f + (h % 60)
+            val tx = sx - (off % 30f)
+            path.reset()
+            path.moveTo(tx - 16f, base + 30f)
+            path.lineTo(tx, base - th)
+            path.lineTo(tx + 16f, base + 30f)
+            path.close()
+            c.drawPath(path, fill)
+            sx += 30f
+        }
+        // castle every ~1400 px of parallax
+        val slot = 1400f
+        var k = floor(off / slot).toInt() - 1
+        val end = floor((off + g.W) / slot).toInt() + 1
+        while (k <= end) {
+            val x = k * slot - off + 500f
+            fill.color = 0xFF0B0E1A.toInt()
+            c.drawRect(x, base - 150f, x + 200f, base + 30f, fill)
+            for (t in 0 until 3) {
+                val tx = x - 20f + t * 100f
+                c.drawRect(tx, base - 230f + (t % 2) * 40f, tx + 40f, base, fill)
+                path.reset()
+                path.moveTo(tx - 6f, base - 230f + (t % 2) * 40f)
+                path.lineTo(tx + 20f, base - 290f + (t % 2) * 40f)
+                path.lineTo(tx + 46f, base - 230f + (t % 2) * 40f)
+                path.close()
+                c.drawPath(path, fill)
+            }
+            fill.color = Color.argb((160 + 80 * sin(g.anim * 3f + k)).toInt().coerceIn(0, 255), 255, 213, 79)
+            c.drawRect(x + 40f, base - 110f, x + 52f, base - 94f, fill)
+            c.drawRect(x + 130f, base - 90f, x + 142f, base - 74f, fill)
+            c.drawRect(x + 80f, base - 190f, x + 92f, base - 174f, fill)
+            k++
+        }
+    }
+
+    /** Crystal spires and domes of an alien world. */
+
+
+    private fun alienSpires(c: Canvas, par: Float, base: Float) {
+        val off = g.camX * Game.ZOOM * par
+        val slot = 160f
+        var k = floor(off / slot).toInt() - 1
+        val end = floor((off + g.W) / slot).toInt() + 1
+        while (k <= end) {
+            val h = hash(k * 5 + 3)
+            val x = k * slot - off
+            if (h % 3 == 0) {
+                fill.color = 0xFF2A1F4F.toInt()
+                c.drawOval(x - 70f, base - 70f, x + 70f, base + 70f, fill)
+                fill.color = Color.argb((140 + 100 * sin(g.anim * 2f + k)).toInt().coerceIn(0, 255), 100, 255, 218)
+                c.drawCircle(x, base - 40f, 6f, fill)
+            } else {
+                val sh = 120f + (h % 6) * 30f
+                path.reset()
+                path.moveTo(x - 18f, base + 30f)
+                path.lineTo(x - 6f, base - sh)
+                path.lineTo(x + 6f, base - sh - 20f)
+                path.lineTo(x + 18f, base + 30f)
+                path.close()
+                fill.color = 0xFF34265E.toInt()
+                c.drawPath(path, fill)
+                stroke.color = 0x8864FFDA.toInt()
+                stroke.strokeWidth = 2f
+                c.drawLine(x, base - sh, x, base, stroke)
+            }
+            k++
+        }
+    }
+
+
+    private fun creatureFigure(c: Canvas, type: ZombieType, swing: Float, dir: Float, phase: Float) {
+        val w = type.w
+        val h = type.h
+        val outline = 0xFF1B1B1B.toInt()
+        when (type) {
+            ZombieType.LIZARD -> {
+                // tail
+                stroke.color = outline
+                stroke.strokeWidth = 12f
+                c.drawLine(-dir * w * 0.3f, -h * 0.5f, -dir * w * 0.75f, -h * 0.3f + swing * 6f, stroke)
+                stroke.color = 0xFFD84315.toInt()
+                stroke.strokeWidth = 8f
+                c.drawLine(-dir * w * 0.3f, -h * 0.5f, -dir * w * 0.75f, -h * 0.3f + swing * 6f, stroke)
+                // legs
+                stroke.color = 0xFF8D2B0B.toInt()
+                stroke.strokeWidth = 6f
+                for (k in intArrayOf(-1, 1)) {
+                    c.drawLine(k * w * 0.2f, -h * 0.4f, k * w * 0.25f + swing * 8f * k, 0f, stroke)
+                }
+                // body
+                fill.color = outline
+                c.drawOval(-w * 0.42f, -h * 0.85f, w * 0.42f, -h * 0.2f, fill)
+                fill.color = 0xFFE64A19.toInt()
+                c.drawOval(-w * 0.4f, -h * 0.82f, w * 0.4f, -h * 0.24f, fill)
+                fill.color = 0xFFFFB74D.toInt()
+                c.drawOval(-w * 0.3f, -h * 0.45f, w * 0.3f, -h * 0.26f, fill)
+                fill.color = 0xFF6D1B00.toInt()
+                c.drawCircle(-w * 0.1f, -h * 0.7f, 4f, fill)
+                c.drawCircle(w * 0.12f, -h * 0.66f, 3f, fill)
+                // head
+                fill.color = 0xFFE64A19.toInt()
+                c.drawOval(dir * w * 0.3f - 14f, -h * 0.9f, dir * w * 0.3f + 18f * dir.coerceAtLeast(0f) + 14f, -h * 0.45f, fill)
+                fill.color = 0xFFFFEB3B.toInt()
+                c.drawCircle(dir * w * 0.38f, -h * 0.75f, 4f, fill)
+                // flickering flame tongue
+                if ((phase * 2f).toInt() % 3 == 0) {
+                    fill.color = 0xCCFF9100.toInt()
+                    c.drawCircle(dir * (w * 0.55f), -h * 0.6f, 6f, fill)
+                    c.drawCircle(dir * (w * 0.65f), -h * 0.62f, 4f, fill)
+                }
+            }
+            ZombieType.BAT -> {
+                val flap = sin(phase * 2f)
+                fill.color = 0xFF2A1238.toInt()
+                path.reset()
+                path.moveTo(0f, -h * 0.6f)
+                path.lineTo(-w * 0.55f, -h * 0.6f - flap * 22f)
+                path.lineTo(-w * 0.4f, -h * 0.35f)
+                path.lineTo(-w * 0.2f, -h * 0.45f)
+                path.close()
+                c.drawPath(path, fill)
+                path.reset()
+                path.moveTo(0f, -h * 0.6f)
+                path.lineTo(w * 0.55f, -h * 0.6f - flap * 22f)
+                path.lineTo(w * 0.4f, -h * 0.35f)
+                path.lineTo(w * 0.2f, -h * 0.45f)
+                path.close()
+                c.drawPath(path, fill)
+                fill.color = 0xFF3E1A52.toInt()
+                c.drawOval(-w * 0.18f, -h * 0.95f, w * 0.18f, -h * 0.2f, fill)
+                path.reset()
+                path.moveTo(-w * 0.14f, -h * 0.85f); path.lineTo(-w * 0.1f, -h * 1.15f); path.lineTo(-w * 0.02f, -h * 0.88f)
+                path.moveTo(w * 0.14f, -h * 0.85f); path.lineTo(w * 0.1f, -h * 1.15f); path.lineTo(w * 0.02f, -h * 0.88f)
+                c.drawPath(path, fill)
+                fill.color = 0xFFFF1744.toInt()
+                c.drawCircle(-w * 0.06f, -h * 0.7f, 2.5f, fill)
+                c.drawCircle(w * 0.06f, -h * 0.7f, 2.5f, fill)
+            }
+            ZombieType.ALIEN -> {
+                stroke.color = 0xFF546E7A.toInt()
+                stroke.strokeWidth = 6f
+                c.drawLine(0f, -h * 0.45f, swing * 10f, 0f, stroke)
+                c.drawLine(0f, -h * 0.45f, -swing * 10f, 0f, stroke)
+                stroke.strokeWidth = 5f
+                c.drawLine(0f, -h * 0.68f, dir * w * 0.8f, -h * 0.55f + swing * 4f, stroke)
+                fill.color = outline
+                c.drawRoundRect(-w * 0.32f, -h * 0.72f, w * 0.32f, -h * 0.42f, 8f, 8f, fill)
+                fill.color = 0xFF90A4AE.toInt()
+                c.drawRoundRect(-w * 0.28f, -h * 0.7f, w * 0.28f, -h * 0.44f, 6f, 6f, fill)
+                fill.color = Color.argb((160 + 90 * sin(phase * 2f)).toInt().coerceIn(0, 255), 100, 255, 218)
+                c.drawCircle(0f, -h * 0.58f, 4f, fill)
+                // big head and eyes
+                fill.color = outline
+                c.drawOval(-w * 0.62f, -h * 1.12f, w * 0.62f, -h * 0.68f, fill)
+                fill.color = 0xFFB0BEC5.toInt()
+                c.drawOval(-w * 0.58f, -h * 1.1f, w * 0.58f, -h * 0.7f, fill)
+                fill.color = 0xFF111111.toInt()
+                c.drawOval(dir * w * 0.05f - 10f, -h * 0.95f, dir * w * 0.05f + 2f, -h * 0.82f, fill)
+                c.drawOval(dir * w * 0.32f - 9f, -h * 0.95f, dir * w * 0.32f + 3f, -h * 0.82f, fill)
+                stroke.color = 0xFF90A4AE.toInt()
+                stroke.strokeWidth = 2f
+                c.drawLine(0f, -h * 1.1f, -dir * 8f, -h * 1.25f, stroke)
+                fill.color = 0xFF64FFDA.toInt()
+                c.drawCircle(-dir * 8f, -h * 1.25f, 3.5f, fill)
+            }
+            else -> { // BLOB
+                val squish = 1f + 0.08f * sin(phase * 1.5f)
+                fill.color = 0xAA00897B.toInt()
+                c.drawOval(-w * 0.5f * squish, -h / squish, w * 0.5f * squish, 2f, fill)
+                fill.color = 0x8864FFDA.toInt()
+                c.drawOval(-w * 0.35f, -h * 0.85f / squish, w * 0.05f, -h * 0.55f / squish, fill)
+                fill.color = 0x55FFFFFF
+                c.drawCircle(-w * 0.15f, -h * 0.3f, 5f, fill)
+                c.drawCircle(w * 0.2f, -h * 0.5f, 3f, fill)
+                fill.color = 0xFF111111.toInt()
+                c.drawCircle(dir * w * 0.12f, -h * 0.65f / squish, 5f, fill)
+                c.drawCircle(dir * w * 0.3f, -h * 0.62f / squish, 5f, fill)
+                fill.color = 0xFFFFFFFF.toInt()
+                c.drawCircle(dir * w * 0.12f + 1.5f, -h * 0.67f / squish, 1.6f, fill)
+                c.drawCircle(dir * w * 0.3f + 1.5f, -h * 0.64f / squish, 1.6f, fill)
+            }
+        }
+    }
+
+
+    private fun drawBossAny(c: Canvas, b: Boss) {
+        when (b.tier) {
+            2 -> drawDragon(c, b)
+            3 -> drawBatBoss(c, b)
+            4 -> drawAlienBoss(c, b)
+            else -> drawBoss(c, b)
+        }
+    }
+
+
+    private fun drawDragon(c: Canvas, b: Boss) {
+        val dir = if (g.car.x >= b.x) 1f else -1f
+        val w = b.w
+        val h = b.h
+        val hit = b.flash > 0f
+        val body = if (hit) 0xFFFFCDD2.toInt() else 0xFFC62828.toInt()
+        val dark = if (hit) 0xFFEF9A9A.toInt() else 0xFF7F0000.toInt()
+        val flap = sin(b.anim * 5f)
+        // shadow on the ground
+        fill.color = Color.argb((90 * (1f - (b.lift / 400f).coerceIn(0f, 0.8f))).toInt(), 0, 0, 0)
+        c.drawOval(b.x - w * 0.5f, b.y - 10f, b.x + w * 0.5f, b.y + 10f, fill)
+        c.save()
+        c.translate(b.x, b.cy)
+        // far wing
+        fill.color = 0xFF5D0B0B.toInt()
+        path.reset()
+        path.moveTo(-dir * 10f, -h * 0.2f)
+        path.lineTo(-dir * w * 0.15f, -h * 0.2f - h * 1.1f * (0.6f + 0.4f * flap))
+        path.lineTo(-dir * w * 0.45f, -h * 0.4f - h * 0.5f * flap)
+        path.lineTo(-dir * w * 0.3f, -h * 0.1f)
+        path.close()
+        c.drawPath(path, fill)
+        // tail
+        stroke.color = dark
+        stroke.strokeWidth = 18f
+        val tailY = sin(b.anim * 2f) * 20f
+        c.drawLine(-dir * w * 0.3f, 0f, -dir * w * 0.55f, h * 0.15f + tailY, stroke)
+        stroke.strokeWidth = 10f
+        c.drawLine(-dir * w * 0.55f, h * 0.15f + tailY, -dir * w * 0.75f, h * 0.05f + tailY * 1.5f, stroke)
+        fill.color = dark
+        path.reset()
+        path.moveTo(-dir * w * 0.75f, h * 0.05f + tailY * 1.5f - 12f)
+        path.lineTo(-dir * w * 0.88f, h * 0.05f + tailY * 1.5f)
+        path.lineTo(-dir * w * 0.75f, h * 0.05f + tailY * 1.5f + 12f)
+        path.close()
+        c.drawPath(path, fill)
+        // legs
+        stroke.color = dark
+        stroke.strokeWidth = 14f
+        c.drawLine(-dir * w * 0.12f, h * 0.2f, -dir * w * 0.14f, h * 0.5f, stroke)
+        c.drawLine(dir * w * 0.12f, h * 0.2f, dir * w * 0.16f, h * 0.5f, stroke)
+        // body
+        fill.color = 0xFF1B1B1B.toInt()
+        c.drawOval(-w * 0.34f, -h * 0.34f, w * 0.34f, h * 0.36f, fill)
+        fill.color = body
+        c.drawOval(-w * 0.32f, -h * 0.32f, w * 0.32f, h * 0.33f, fill)
+        fill.color = 0xFFFFB74D.toInt()
+        c.drawOval(-w * 0.22f, h * 0.02f, w * 0.22f, h * 0.3f, fill)
+        // back spikes
+        fill.color = dark
+        for (k in -2..2) {
+            path.reset()
+            val sx = k * w * 0.1f
+            path.moveTo(sx - 10f, -h * 0.28f)
+            path.lineTo(sx, -h * 0.48f)
+            path.lineTo(sx + 10f, -h * 0.28f)
+            path.close()
+            c.drawPath(path, fill)
+        }
+        // neck and head
+        val nx = dir * w * 0.42f
+        val ny = -h * 0.4f
+        stroke.color = body
+        stroke.strokeWidth = 30f
+        c.drawLine(dir * w * 0.2f, -h * 0.05f, nx, ny, stroke)
+        fill.color = body
+        c.drawOval(nx - 34f, ny - 26f, nx + 34f, ny + 22f, fill)
+        c.drawOval(nx + dir * 18f - 26f, ny - 12f, nx + dir * 18f + 26f, ny + 14f, fill)
+        fill.color = 0xFF3E2723.toInt()
+        path.reset()
+        path.moveTo(nx - dir * 14f, ny - 20f)
+        path.lineTo(nx - dir * 40f, ny - 52f)
+        path.lineTo(nx - dir * 4f, ny - 24f)
+        path.close()
+        c.drawPath(path, fill)
+        val open = if (b.breathT > 0f) 1f else 0f
+        if (open > 0f) {
+            fill.color = 0xFF3E0000.toInt()
+            c.drawOval(nx + dir * 20f - 22f, ny + 4f, nx + dir * 20f + 22f, ny + 26f, fill)
+            fill.color = 0xFFFFC400.toInt()
+            c.drawCircle(nx + dir * 40f, ny + 10f, 10f, fill)
+        }
+        fill.color = 0xFFFFEB3B.toInt()
+        c.drawCircle(nx + dir * 6f, ny - 10f, 7f, fill)
+        fill.color = 0xFF111111.toInt()
+        c.drawCircle(nx + dir * 8f, ny - 10f, 3f, fill)
+        // near wing
+        fill.color = 0xFF9E1B1B.toInt()
+        path.reset()
+        path.moveTo(dir * 10f, -h * 0.15f)
+        path.lineTo(dir * w * 0.05f, -h * 0.2f - h * 1.2f * (0.6f + 0.4f * flap))
+        path.lineTo(-dir * w * 0.3f, -h * 0.35f - h * 0.6f * flap)
+        path.lineTo(-dir * w * 0.15f, h * 0.05f)
+        path.close()
+        c.drawPath(path, fill)
+        stroke.color = 0xFF5D0B0B.toInt()
+        stroke.strokeWidth = 4f
+        c.drawLine(dir * 10f, -h * 0.15f, dir * w * 0.05f, -h * 0.2f - h * 1.2f * (0.6f + 0.4f * flap), stroke)
+        c.restore()
+    }
+
+
+    private fun drawBatBoss(c: Canvas, b: Boss) {
+        val dir = if (g.car.x >= b.x) 1f else -1f
+        val w = b.w
+        val h = b.h
+        val hit = b.flash > 0f
+        val body = if (hit) 0xFFE1BEE7.toInt() else 0xFF311B42.toInt()
+        val wing = if (hit) 0xFFCE93D8.toInt() else 0xFF4A148C.toInt()
+        val flap = sin(b.anim * (if (b.diveT > 0f) 12f else 6f))
+        fill.color = Color.argb((80 * (1f - (b.lift / 400f).coerceIn(0f, 0.8f))).toInt(), 0, 0, 0)
+        c.drawOval(b.x - w * 0.4f, b.y - 8f, b.x + w * 0.4f, b.y + 8f, fill)
+        c.save()
+        c.translate(b.x, b.cy)
+        for (side in intArrayOf(-1, 1)) {
+            path.reset()
+            path.moveTo(side * w * 0.08f, -h * 0.2f)
+            path.lineTo(side * w * 0.35f, -h * 0.55f - flap * h * 0.5f)
+            path.lineTo(side * w * 0.62f, -h * 0.3f - flap * h * 0.6f)
+            path.lineTo(side * w * 0.52f, h * 0.05f - flap * h * 0.3f)
+            path.lineTo(side * w * 0.4f, -h * 0.05f - flap * h * 0.25f)
+            path.lineTo(side * w * 0.3f, h * 0.15f - flap * h * 0.15f)
+            path.lineTo(side * w * 0.12f, h * 0.1f)
+            path.close()
+            fill.color = wing
+            c.drawPath(path, fill)
+            stroke.color = 0xFF1A0526.toInt()
+            stroke.strokeWidth = 4f
+            c.drawLine(side * w * 0.08f, -h * 0.2f, side * w * 0.62f, -h * 0.3f - flap * h * 0.6f, stroke)
+        }
+        fill.color = 0xFF120318.toInt()
+        c.drawOval(-w * 0.17f, -h * 0.47f, w * 0.17f, h * 0.42f, fill)
+        fill.color = body
+        c.drawOval(-w * 0.15f, -h * 0.45f, w * 0.15f, h * 0.4f, fill)
+        // ears
+        path.reset()
+        path.moveTo(-w * 0.12f, -h * 0.35f); path.lineTo(-w * 0.1f, -h * 0.8f); path.lineTo(-w * 0.02f, -h * 0.4f)
+        path.moveTo(w * 0.12f, -h * 0.35f); path.lineTo(w * 0.1f, -h * 0.8f); path.lineTo(w * 0.02f, -h * 0.4f)
+        c.drawPath(path, fill)
+        // glowing eyes and fangs
+        val glow = 0.6f + 0.4f * sin(b.anim * 8f)
+        fill.color = Color.argb((140 * glow).toInt(), 255, 23, 68)
+        c.drawCircle(-w * 0.06f + dir * 4f, -h * 0.2f, 12f, fill)
+        c.drawCircle(w * 0.06f + dir * 4f, -h * 0.2f, 12f, fill)
+        fill.color = 0xFFFF1744.toInt()
+        c.drawCircle(-w * 0.06f + dir * 4f, -h * 0.2f, 5f, fill)
+        c.drawCircle(w * 0.06f + dir * 4f, -h * 0.2f, 5f, fill)
+        fill.color = Color.WHITE
+        path.reset()
+        path.moveTo(-10f, h * 0.02f); path.lineTo(-6f, h * 0.2f); path.lineTo(-2f, h * 0.02f)
+        path.moveTo(2f, h * 0.02f); path.lineTo(6f, h * 0.2f); path.lineTo(10f, h * 0.02f)
+        c.drawPath(path, fill)
+        c.restore()
+    }
+
+
+    private fun drawAlienBoss(c: Canvas, b: Boss) {
+        val dir = if (g.car.x >= b.x) 1f else -1f
+        val w = b.w
+        val h = b.h
+        val hit = b.flash > 0f
+        val skin = if (hit) 0xFFF1F8E9.toInt() else 0xFF8FA9A4.toInt()
+        val dark = if (hit) 0xFFCFD8DC.toInt() else 0xFF52706B.toInt()
+        val stomp = if (b.slamAnim > 0f) sin(b.slamAnim / 0.5f * 3.14f) else 0f
+        c.save()
+        c.translate(b.x, b.y)
+        fill.color = 0x55000000
+        c.drawOval(-w, -10f, w, 10f, fill)
+        c.translate(0f, -stomp * 30f)
+        // four tentacle legs
+        for (k in 0 until 4) {
+            val bx = -w * 0.3f + k * w * 0.2f
+            val wave = sin(b.anim * 3f + k * 1.3f) * 14f
+            stroke.color = 0xFF1B1B1B.toInt()
+            stroke.strokeWidth = 18f
+            c.drawLine(bx, -h * 0.4f, bx + wave, -h * 0.15f, stroke)
+            c.drawLine(bx + wave, -h * 0.15f, bx * 1.4f - wave, -4f, stroke)
+            stroke.color = dark
+            stroke.strokeWidth = 12f
+            c.drawLine(bx, -h * 0.4f, bx + wave, -h * 0.15f, stroke)
+            c.drawLine(bx + wave, -h * 0.15f, bx * 1.4f - wave, -4f, stroke)
+        }
+        // torso
+        fill.color = 0xFF1B1B1B.toInt()
+        c.drawRoundRect(-w * 0.32f, -h * 0.72f, w * 0.32f, -h * 0.36f, 30f, 30f, fill)
+        fill.color = skin
+        c.drawRoundRect(-w * 0.29f, -h * 0.7f, w * 0.29f, -h * 0.38f, 26f, 26f, fill)
+        val pulse = 0.5f + 0.5f * sin(b.anim * 5f)
+        fill.color = Color.argb((120 + 120 * pulse).toInt(), 100, 255, 218)
+        c.drawCircle(0f, -h * 0.55f, 18f + 6f * pulse, fill)
+        fill.color = Color.WHITE
+        c.drawCircle(0f, -h * 0.55f, 7f, fill)
+        // arms: raised when firing plasma
+        val raise = (b.throwAnim / 0.45f).coerceIn(0f, 1f)
+        stroke.color = dark
+        stroke.strokeWidth = 12f
+        c.drawLine(dir * w * 0.25f, -h * 0.66f, dir * w * (0.6f - 0.15f * raise), -h * (0.55f + 0.25f * raise), stroke)
+        c.drawLine(-dir * w * 0.25f, -h * 0.66f, -dir * w * 0.5f, -h * 0.45f, stroke)
+        if (raise > 0f) {
+            fill.color = Color.argb((200 * raise).toInt(), 100, 255, 218)
+            c.drawCircle(dir * w * 0.45f, -h * 0.8f, 16f, fill)
+        }
+        // huge head with black eyes
+        fill.color = 0xFF1B1B1B.toInt()
+        c.drawOval(-w * 0.52f, -h * 1.08f, w * 0.52f, -h * 0.66f, fill)
+        fill.color = skin
+        c.drawOval(-w * 0.49f, -h * 1.06f, w * 0.49f, -h * 0.68f, fill)
+        fill.color = 0xFF050505.toInt()
+        c.save()
+        c.translate(dir * w * 0.06f - w * 0.2f, -h * 0.86f)
+        c.rotate(dir * 20f)
+        c.drawOval(-26f, -14f, 26f, 14f, fill)
+        c.restore()
+        c.save()
+        c.translate(dir * w * 0.06f + w * 0.2f, -h * 0.86f)
+        c.rotate(-dir * 20f)
+        c.drawOval(-26f, -14f, 26f, 14f, fill)
+        c.restore()
+        fill.color = 0x88FFFFFF.toInt()
+        c.drawCircle(dir * w * 0.06f - w * 0.2f - 8f, -h * 0.88f, 5f, fill)
+        c.drawCircle(dir * w * 0.06f + w * 0.2f - 8f, -h * 0.88f, 5f, fill)
+        stroke.color = dark
+        stroke.strokeWidth = 4f
+        c.drawLine(-w * 0.15f, -h * 1.04f, -w * 0.25f, -h * 1.18f, stroke)
+        c.drawLine(w * 0.15f, -h * 1.04f, w * 0.25f, -h * 1.18f, stroke)
+        fill.color = Color.argb((160 + 90 * sin(b.anim * 6f)).toInt().coerceIn(0, 255), 178, 255, 89)
+        c.drawCircle(-w * 0.25f, -h * 1.18f, 7f, fill)
+        c.drawCircle(w * 0.25f, -h * 1.18f, 7f, fill)
+        c.restore()
     }
 
 }

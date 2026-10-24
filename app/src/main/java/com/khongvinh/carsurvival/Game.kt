@@ -150,6 +150,10 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
 
     fun stageGoalM(s: Int) = 700f + (s - 1) * 100f
 
+    /** Map (look, region, monsters) of the stage being played or previewed. */
+    val theme get() = Themes.of(stage)
+    val region get() = theme.region
+
     /** Builds the stage's terrain (used by the menu background too). */
     private fun loadStage(s: Int) {
         stage = s
@@ -240,16 +244,35 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
                 val roll = rnd.nextFloat()
                 if (roll >= obstacleShare) {
                     val tRoll = rnd.nextFloat()
-                    val type = when {
-                        stage >= 2 && tRoll < 0.15f -> ZombieType.FAT
-                        tRoll < 0.4f -> ZombieType.RUNNER
-                        else -> ZombieType.WALKER
+                    // each region has its own monsters
+                    val type = when (region) {
+                        Region.DESERT -> when {
+                            stage >= 2 && tRoll < 0.15f -> ZombieType.FAT
+                            tRoll < 0.4f -> ZombieType.RUNNER
+                            else -> ZombieType.WALKER
+                        }
+                        Region.VOLCANO -> when {
+                            tRoll < 0.15f -> ZombieType.FAT
+                            tRoll < 0.5f -> ZombieType.LIZARD
+                            else -> ZombieType.WALKER
+                        }
+                        Region.NIGHT -> when {
+                            tRoll < 0.12f -> ZombieType.FAT
+                            tRoll < 0.5f -> ZombieType.BAT
+                            else -> ZombieType.WALKER
+                        }
+                        Region.ALIEN -> if (tRoll < 0.2f) ZombieType.BLOB else ZombieType.ALIEN
                     }
                     zombies.add(Zombie(type, x, terrain.heightAt(x)))
-                    // zombies like company
+                    // monsters like company
                     if (rnd.nextFloat() < 0.35f) {
                         val x2 = x + 50f + rnd.nextFloat() * 60f
-                        zombies.add(Zombie(ZombieType.WALKER, x2, terrain.heightAt(x2)))
+                        val buddy = when (type) {
+                            ZombieType.FAT -> ZombieType.WALKER
+                            ZombieType.BLOB -> ZombieType.ALIEN
+                            else -> type
+                        }
+                        zombies.add(Zombie(buddy, x2, terrain.heightAt(x2)))
                     }
                 } else {
                     val oRoll = rnd.nextFloat()
@@ -393,7 +416,7 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
         if (hurtFlash > 0f) hurtFlash -= dt
         music.enabled = save.music
         when (state) {
-            State.MENU, State.SHOP, State.GARAGE -> music.play(Music.Track.CHILL, 1f)
+            State.MENU, State.MAPS, State.SHOP, State.GARAGE -> music.play(Music.Track.CHILL, 1f)
             State.PLAYING -> music.play(if (intense) Music.Track.INTENSE else Music.Track.CHILL, 1f)
             State.PAUSED -> music.play(if (intense) Music.Track.INTENSE else Music.Track.CHILL, 0.3f)
             State.RESULT -> music.play(Music.Track.CHILL, 0.6f)
@@ -718,14 +741,30 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
             if (!z.alive) continue
             val dx = c.x - z.x
             if (dx > 1600f || dx < -1600f) continue
-            z.phase += dt * (if (z.type == ZombieType.RUNNER) 9f else 4f)
+            z.phase += dt * (when (z.type) {
+                ZombieType.RUNNER, ZombieType.LIZARD -> 9f
+                ZombieType.BAT -> 14f
+                else -> 4f
+            })
             if (abs(dx) < 1300f) {
                 z.x += sign(dx) * z.type.speed * dt
             }
-            z.y = terrain.heightAt(z.x)
+            val ground = terrain.heightAt(z.x)
+            if (z.type.flying) {
+                // hover, then swoop down at the car when close
+                val target = if (abs(dx) < 320f) max(10f, ground - c.y - 10f) else 150f + 35f * sin(z.phase * 0.3f)
+                z.fly += (target - z.fly) * min(1f, dt * 3f)
+                z.y = ground - z.fly
+            } else {
+                z.y = ground
+            }
             toLocal(z.x, z.y - z.type.h / 2, loc)
             if (abs(loc[0]) < Car.HALF_LEN + z.type.w / 2 && abs(loc[1]) < Car.HALF_H + 14f + z.type.h / 2) {
-                if (speed > 120f || c.shieldT > 0f) {
+                if (z.type.flying) {
+                    // bats burst on impact but bite first
+                    smashZombie(z, c.vx * 0.8f + rnd(-80f, 80f), -200f)
+                    damageCar(4f * (1f - armor))
+                } else if (speed > 120f || c.shieldT > 0f) {
                     smashZombie(z, c.vx * 1.1f + rnd(-80f, 80f), -250f - abs(c.vx) * 0.35f - rnd(0f, 200f))
                     val keep = 1f - z.type.mass * 0.7f * (1f - armor * 0.5f)
                     c.vx *= keep
@@ -746,7 +785,11 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
     private fun smashZombie(z: Zombie, vx: Float, vy: Float) {
         z.alive = false
         kills++
-        val kind = if (z.type == ZombieType.FAT) Debris.FAT_ZOMBIE else Debris.ZOMBIE
+        val kind = when (z.type) {
+            ZombieType.FAT -> Debris.FAT_ZOMBIE
+            ZombieType.WALKER, ZombieType.RUNNER -> Debris.ZOMBIE
+            else -> Debris.CREATURE + z.type.ordinal
+        }
         debris.add(Debris(kind, z.x, z.y - z.type.h / 2, vx, vy, 0f, rnd(-12f, 12f), z.type.w, z.type.h, z.shirt))
         bleed(z.x, z.y - z.type.h / 2, 14)
         addMoney(z.type.reward, z.x, z.y - z.type.h - 20f)
@@ -874,7 +917,7 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
     /** Damages / kills everything in a radius (barrels, catapult). */
     private fun blastArea(cx: Float, cy: Float, r: Float, dmg: Int) {
         boss?.let { bb ->
-            if (bb.alive && abs(bb.x - cx) < r + bb.w / 2 && cy > bb.y - bb.h - r) hurtBoss(bb, dmg * 2f)
+            if (bb.alive && abs(bb.x - cx) < r + bb.w / 2 && abs(bb.cy - cy) < r + bb.h / 2) hurtBoss(bb, dmg * 2f)
         }
         for (z in zombies) {
             if (!z.alive) continue
@@ -926,45 +969,126 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
             return
         }
         val dir = if (dx >= 0f) 1f else -1f
-        // lumber towards the car, but guard the station
-        if (abs(dx) > 330f) b.x += dir * b.speed * dt
-        b.x = b.x.coerceIn(goalX - 1150f, goalX - 260f)
+        val tier = b.tier
+        if (b.diveT > 0f) b.diveT -= dt
+        if (b.breathT > 0f) b.breathT -= dt
 
-        // boulder throw
+        // movement: walk/fly towards the car but guard the station
+        val chase = if (tier == 3 && b.diveT > 0f) b.speed * 5f else b.speed
+        if (abs(dx) > (if (tier == 3 && b.diveT > 0f) 20f else 330f)) b.x += dir * chase * dt
+        b.x = b.x.coerceIn(goalX - 1150f, goalX - 260f)
+        if (b.flying) {
+            val carLift = (terrain.heightAt(b.x) - c.y).coerceAtLeast(0f)
+            val target = when {
+                b.diveT > 0f && tier == 3 -> max(20f, carLift - b.h * 0.3f) // bat swoops at the car
+                b.diveT > 0f -> 30f // dragon lands for a moment
+                else -> (if (tier == 2) 230f else 260f) + 35f * sin(b.anim * 1.6f)
+            }
+            b.lift += (target - b.lift) * min(1f, dt * (if (b.diveT > 0f) 4f else 2f))
+        }
+        val mouthX = b.x + dir * b.w * 0.45f
+        val mouthY = b.cy - (if (tier == 2) b.h * 0.3f else b.h * 0.4f)
+
+        // ranged attacks
         b.throwCd -= dt
-        if (b.throwCd <= 0f && abs(dx) in 280f..1400f) {
-            b.throwCd = max(1.4f, 3f - 0.35f * b.tier) * (0.8f + Random.nextFloat() * 0.4f)
+        if (b.throwCd <= 0f && abs(dx) in 280f..1400f && b.diveT <= 0f && tier != 3) {
+            b.throwCd = max(1.4f, 3f - 0.35f * tier) * (0.8f + Random.nextFloat() * 0.4f)
             b.throwAnim = 0.45f
-            val x0 = b.x + dir * b.w * 0.3f
-            val y0 = b.y - b.h * 1.02f
-            val t = (abs(dx) / 750f).coerceIn(0.6f, 1.5f)
-            val tx = c.x + c.vx * t * 0.6f
-            val ty = c.y - 10f
-            bossRocks.add(BossRock(x0, y0, (tx - x0) / t, (ty - y0) / t - 0.5f * G * t))
-            sfx.play(Sfx.S.CATAPULT, 0.9f)
-        }
-        // ground slam when the car gets close
-        b.slamCd -= dt
-        if (b.slamCd <= 0f && abs(dx) < 300f) {
-            b.slamCd = max(1.6f, 2.8f - 0.25f * b.tier)
-            b.slamAnim = 0.5f
-            shake = max(shake, 0.45f)
-            sfx.play(Sfx.S.BOOM, 0.9f)
-            repeat(26) {
-                val a = Random.nextFloat() * 3.1416f
-                particles.add(Particle(b.x + rnd(-80f, 80f), b.y - 5f, cos(a) * rnd(150f, 450f), -sin(a) * rnd(100f, 320f), 0.7f, 0.7f, rnd(8f, 16f), 0xFFC9A27E.toInt(), 300f, 1.2f))
-            }
-            if (c.grounded[0] || c.grounded[1] || c.y > terrain.heightAt(c.x) - 160f) {
-                damageCar((10f + 4f * b.tier) * (1f - armor))
-                c.vx = dir * (420f + 60f * b.tier)
-                c.vy = -420f
-                c.spin += dir * 1.5f
+            when (tier) {
+                4 -> { // three plasma orbs fanned at the car
+                    val ox = b.x + dir * b.w * 0.4f
+                    val oy = b.y - b.h * 0.75f
+                    val a = atan2(c.y - oy, c.x - ox)
+                    for (k in -1..1) {
+                        val aa = a + k * 0.2f
+                        bossRocks.add(BossRock(ox, oy, cos(aa) * 620f, sin(aa) * 620f, 2))
+                    }
+                    sfx.play(Sfx.S.BOOST, 0.6f)
+                }
+                else -> { // boulder (giant) or fireball (dragon), lobbed ahead of the car
+                    val x0 = if (tier == 2) mouthX else b.x + dir * b.w * 0.3f
+                    val y0 = if (tier == 2) mouthY else b.y - b.h * 1.02f
+                    val t = (abs(c.x - x0) / 750f).coerceIn(0.6f, 1.5f)
+                    val tx = c.x + c.vx * t * 0.6f
+                    bossRocks.add(BossRock(x0, y0, (tx - x0) / t, (c.y - 10f - y0) / t - 0.5f * G * t, if (tier == 2) 1 else 0))
+                    sfx.play(Sfx.S.CATAPULT, 0.9f)
+                }
             }
         }
-        // body contact: the car is stopped; a hard ram hurts the boss
+        when (tier) {
+            2 -> { // dragon: fire breath and landing
+                b.breathCd -= dt
+                if (b.breathCd <= 0f && abs(dx) < 750f && b.diveT <= 0f) {
+                    b.breathCd = 6f
+                    b.breathT = 1.6f
+                    sfx.play(Sfx.S.BOOST, 1f)
+                }
+                if (b.breathT > 0f) {
+                    val a = atan2(c.y - mouthY, c.x - mouthX)
+                    repeat(3) {
+                        val aa = a + rnd(-0.18f, 0.18f)
+                        val sp = rnd(500f, 800f)
+                        particles.add(Particle(mouthX, mouthY, cos(aa) * sp, sin(aa) * sp, 0.6f, 0.6f, rnd(8f, 16f), if (Random.nextBoolean()) 0xFFFF6D00.toInt() else 0xFFFFC400.toInt(), 0f, 1.4f))
+                    }
+                    if (abs(dx) < 550f) damageCar(14f * (1f - armor) * dt, instant = false)
+                }
+                b.slamCd -= dt
+                if (b.slamCd <= 0f && b.breathT <= 0f) {
+                    b.slamCd = 7f
+                    b.diveT = 2.4f
+                }
+            }
+            3 -> { // vampire bat: swoop-bite and summon bats
+                b.slamCd -= dt
+                if (b.slamCd <= 0f && abs(dx) < 1000f) {
+                    b.slamCd = max(3f, 4.5f)
+                    b.diveT = 1.8f
+                    sfx.play(Sfx.S.ROAR, 0.5f)
+                }
+                b.summonCd -= dt
+                if (b.summonCd <= 0f) {
+                    b.summonCd = 8f
+                    repeat(2) {
+                        zombies.add(Zombie(ZombieType.BAT, b.x + rnd(-80f, 80f), terrain.heightAt(b.x)).also { z -> z.fly = b.lift + rnd(-30f, 30f) })
+                    }
+                }
+                if (b.diveT > 0f && b.ramCd <= 0f && abs(c.x - b.x) < b.w * 0.45f + Car.HALF_LEN && abs(c.y - b.cy) < b.h) {
+                    // bite: drains the car and heals the bat
+                    damageCar((10f + 3f * tier) * (1f - armor))
+                    b.hp = min(b.maxHp, b.hp + 6f)
+                    texts.add(FloatText("+6", b.x, b.cy - b.h, 0xFF69F0AE.toInt()))
+                    bleed(c.x, c.y - 20f, 12)
+                    c.vx -= dir * -260f
+                    b.diveT = min(b.diveT, 0.25f)
+                    b.ramCd = 0.8f
+                }
+            }
+            else -> { // giant zombie / alien: ground slam when close
+                b.slamCd -= dt
+                if (b.slamCd <= 0f && abs(dx) < 300f) {
+                    b.slamCd = max(1.6f, 2.8f - 0.25f * tier)
+                    b.slamAnim = 0.5f
+                    shake = max(shake, 0.45f)
+                    sfx.play(Sfx.S.BOOM, 0.9f)
+                    repeat(26) {
+                        val a = Random.nextFloat() * 3.1416f
+                        particles.add(Particle(b.x + rnd(-80f, 80f), b.y - 5f, cos(a) * rnd(150f, 450f), -sin(a) * rnd(100f, 320f), 0.7f, 0.7f, rnd(8f, 16f), if (tier == 4) 0xFF80DEEA.toInt() else 0xFFC9A27E.toInt(), 300f, 1.2f))
+                    }
+                    if (c.grounded[0] || c.grounded[1] || c.y > terrain.heightAt(c.x) - 160f) {
+                        damageCar((10f + 4f * tier) * (1f - armor))
+                        c.vx = dir * (420f + 60f * tier)
+                        c.vy = -420f
+                        c.spin += dir * 1.5f
+                    }
+                }
+            }
+        }
+
+        // body contact (flying bosses only when they come low): rams hurt the boss
         val ox = Car.HALF_LEN + b.w / 2
-        if (abs(dx) < ox && c.y > b.y - b.h - 30f) {
-            val toward = -dir // direction from car to boss
+        val low = !b.flying || b.lift < 140f
+        if (low && abs(dx) < ox && abs(c.y - b.cy) < b.h / 2 + 60f) {
+            val toward = -dir
             val fs = c.forwardSpeed
             val into = fs * toward * sign(c.fwdX)
             c.x = b.x + dir * ox
@@ -973,10 +1097,10 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
                     b.ramCd = 0.45f
                     val dmg = into / 35f * (if (c.boosting) 1.5f else 1f)
                     hurtBoss(b, dmg)
-                    damageCar((5f + 2f * b.tier) * (1f - armor))
+                    damageCar((5f + 2f * tier) * (1f - armor))
                     shake = max(shake, 0.3f)
                     sfx.play(Sfx.S.HIT, 0.9f)
-                    bleed(b.x - dir * b.w / 2, b.y - b.h * 0.5f, 10)
+                    bleed(b.x - dir * b.w / 2, b.cy, 10)
                 }
                 c.vx -= c.fwdX * fs * 1.3f
                 c.vy -= c.fwdY * fs * 1.3f
@@ -995,12 +1119,24 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
             b.alive = false
             bossKilled = true
             kills++
-            explode(b.x, b.y - b.h * 0.5f, 0xFF7CB342.toInt(), 90)
-            explode(b.x, b.y - b.h * 0.8f, 0xFFFF6D00.toInt(), 60)
-            bleed(b.x, b.y - b.h * 0.5f, 40)
-            debris.add(Debris(Debris.FAT_ZOMBIE, b.x, b.y - b.h / 2, car.vx * 0.3f + 250f, -650f, 0f, 3f, b.w, b.h, 0xFF4E342E.toInt()).also { it.life = 8f })
-            addMoney(300 * b.tier, b.x, b.y - b.h - 60f)
-            texts.add(FloatText("${b.name} ĐÃ GỤC!", b.x, b.y - b.h * 0.55f, 0xFFFFD740.toInt()).also { it.size = 60f; it.life = 2.5f })
+            val main = when (b.tier) {
+                2 -> 0xFFC62828.toInt()
+                3 -> 0xFF4A148C.toInt()
+                4 -> 0xFF80DEEA.toInt()
+                else -> 0xFF7CB342.toInt()
+            }
+            explode(b.x, b.cy, main, 90)
+            explode(b.x, b.cy - b.h * 0.3f, 0xFFFF6D00.toInt(), 60)
+            bleed(b.x, b.cy, 40)
+            if (b.tier == 1) {
+                debris.add(Debris(Debris.FAT_ZOMBIE, b.x, b.y - b.h / 2, car.vx * 0.3f + 250f, -650f, 0f, 3f, b.w, b.h, 0xFF4E342E.toInt()).also { it.life = 8f })
+            } else {
+                repeat(8) {
+                    debris.add(Debris(Debris.METAL, b.x + rnd(-60f, 60f), b.cy, rnd(-400f, 400f), -rnd(300f, 800f), 0f, rnd(-12f, 12f), rnd(30f, 60f), rnd(14f, 26f), main))
+                }
+            }
+            addMoney(300 * b.tier, b.x, b.cy - b.h / 2 - 60f)
+            texts.add(FloatText("${b.name} ĐÃ GỤC!", b.x, b.cy, 0xFFFFD740.toInt()).also { it.size = 60f; it.life = 2.5f })
             shake = 1f
             sfx.play(Sfx.S.ROAR, 0.7f)
             sfx.play(Sfx.S.BOOM)
@@ -1009,7 +1145,7 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
 
     private fun flushBossDamage(b: Boss) {
         if (b.pendingDmg >= 1f) {
-            texts.add(FloatText("-${b.pendingDmg.toInt()}", b.x + rnd(-40f, 40f), b.y - b.h - 30f, 0xFFFFEA00.toInt()).also { it.size = 46f })
+            texts.add(FloatText("-${b.pendingDmg.toInt()}", b.x + rnd(-40f, 40f), b.cy - b.h / 2 - 30f, 0xFFFFEA00.toInt()).also { it.size = 46f })
         }
         b.pendingDmg = 0f
         b.dmgT = 0f
@@ -1017,23 +1153,28 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
 
     private fun updateBossRocks(dt: Float) {
         val c = car
+        val tier = boss?.tier ?: 1
         for (r in bossRocks) {
             if (!r.alive) continue
-            r.vy += G * dt
+            if (r.kind != 2) r.vy += G * dt
             r.x += r.vx * dt
             r.y += r.vy * dt
             r.rot += dt * 6f
+            r.life -= dt
+            if (r.kind == 1 && Random.nextFloat() < 0.6f) {
+                particles.add(Particle(r.x, r.y, rnd(-40f, 40f), rnd(-60f, 0f), 0.35f, 0.35f, rnd(6f, 12f), if (Random.nextBoolean()) 0xFFFF6D00.toInt() else 0xFFFFC400.toInt(), 0f, 1f))
+            }
             if (hypot(r.x - c.x, r.y - c.y) < 75f) {
                 r.alive = false
-                damageCar((14f + 3f * (boss?.tier ?: 1)) * (1f - armor))
+                damageCar(((if (r.kind == 0) 14f else 10f) + (if (r.kind == 2) 2f else 3f) * tier) * (1f - armor))
                 c.vx -= 200f
                 c.vy -= 150f
-                explode(r.x, r.y, 0xFF795548.toInt(), 24)
+                explode(r.x, r.y, when (r.kind) { 1 -> 0xFFFF6D00.toInt(); 2 -> 0xFF64FFDA.toInt(); else -> 0xFF795548.toInt() }, 24)
                 shake = max(shake, 0.35f)
                 sfx.play(Sfx.S.EXPLODE, 0.8f)
-            } else if (r.y > terrain.heightAt(r.x)) {
+            } else if (r.y > terrain.heightAt(r.x) || r.life <= 0f) {
                 r.alive = false
-                explode(r.x, r.y, 0xFF8D6E63.toInt(), 14)
+                explode(r.x, r.y, when (r.kind) { 1 -> 0xFFFF9100.toInt(); 2 -> 0xFF64FFDA.toInt(); else -> 0xFF8D6E63.toInt() }, 14)
                 sfx.play(Sfx.S.LAND, 0.6f)
             }
         }
@@ -1143,8 +1284,9 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
         }
         boss?.let { bb ->
             val dx = bb.x - c.x
-            if (bb.alive && bb.engaged && dx > 60f && dx < 1100f && dx < best) {
-                best = dx; tx = bb.x; ty = bb.y - bb.h * 0.6f
+            // the turret swings round: the boss is the priority target, in front or behind
+            if (bb.alive && bb.engaged && abs(dx) < 1100f) {
+                best = abs(dx); tx = bb.x; ty = bb.cy
             }
         }
         if (best == Float.MAX_VALUE) {
@@ -1196,7 +1338,7 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
                 continue
             }
             val bb = boss
-            if (bb != null && bb.alive && abs(s.x - bb.x) < bb.w / 2 && s.y > bb.y - bb.h && s.y < bb.y) {
+            if (bb != null && bb.alive && abs(s.x - bb.x) < bb.w / 2 && abs(s.y - bb.cy) < bb.h / 2 + (if (bb.flying) 40f else 10f)) {
                 s.alive = false
                 if (s.kind == WeaponType.CATAPULT) {
                     catapultBlast(s)
@@ -1339,14 +1481,14 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
             Button(id, label, x - w / 2, y, x + w / 2, y + 86f, color, enabled)
         return when (state) {
             State.MENU -> listOf(
-                Button("stPrev", "◀", cx - 230f, 130f, cx - 140f, 216f, grey, save.stageSel > 1),
-                Button("stNext", "▶", cx + 140f, 130f, cx + 230f, 216f, grey, save.stageSel < maxStartStage()),
-                b("play", "CHẠY!", cx, 250f, 460f, green),
-                b("shop", "NÂNG CẤP", cx, 356f, 460f, blue),
-                b("garage", if (save.garageUnlocked) "GARA" else "GARA 🔒 (qua ải 1)", cx, 462f, 460f, purple, save.garageUnlocked),
+                Button("maps", "🗺  ẢI ${save.stageSel}: ${Themes.of(save.stageSel).name.uppercase()}", cx - 230f, 128f, cx + 230f, 214f, 0xFF6D4C41.toInt()),
+                b("play", "CHẠY!", cx, 266f, 460f, green),
+                b("shop", "NÂNG CẤP", cx, 366f, 460f, blue),
+                b("garage", if (save.garageUnlocked) "GARA" else "GARA 🔒 (qua ải 1)", cx, 466f, 460f, purple, save.garageUnlocked),
                 Button("sound", if (save.sound) "🔊" else "🔇", W - 100f, 20f, W - 24f, 96f, 0x66000000),
                 Button("music", "🎵", W - 190f, 20f, W - 114f, 96f, if (save.music) 0x66000000 else 0x66B71C1C),
             )
+            State.MAPS -> listOf(b("menu", "QUAY LẠI", W / 2, H - 84f, 360f, grey))
             State.SHOP, State.GARAGE -> listOf(
                 b("menu", "MENU", W / 2 - 250f, H - 100f, 300f, grey),
                 b("play", "CHẠY!", W / 2 + 250f, H - 100f, 300f, green),
@@ -1389,6 +1531,16 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
         return floatArrayOf(l, t, l + cw, t + 215f)
     }
 
+    /** Map cards: 5 per row, one row per region. */
+    fun mapCard(i: Int): FloatArray {
+        val cw = (W - 80f - 4 * 16f) / 5f
+        val col = i % 5
+        val row = i / 5
+        val l = 40f + col * (cw + 16f)
+        val t = 92f + row * 134f
+        return floatArrayOf(l, t, l + cw, t + 122f)
+    }
+
     fun carCard(i: Int): FloatArray {
         val cw = (W - 130f) / 4f
         val l = 40f + i * (cw + 16f)
@@ -1421,6 +1573,18 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
                 buyUpgrade(Upgrade.entries[i]); return
             }
         }
+        if (state == State.MAPS) {
+            for (i in 0 until STAGES) if (inRect(mapCard(i), x, y)) {
+                if (i + 1 <= maxStartStage()) {
+                    sfx.play(Sfx.S.CLICK)
+                    save.stageSel = i + 1
+                    save.save()
+                    loadStage(save.stageSel)
+                    setState(State.MENU)
+                }
+                return
+            }
+        }
         if (state == State.GARAGE) {
             for (i in CarType.entries.indices) if (inRect(carCard(i), x, y)) {
                 pickCar(i); return
@@ -1439,6 +1603,7 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
             "menu" -> goMenu()
             "resume" -> setState(State.PLAYING)
             "quit" -> endRun("Bỏ cuộc")
+            "maps" -> setState(State.MAPS)
             "stPrev" -> {
                 save.stageSel = max(1, save.stageSel - 1); loadStage(save.stageSel)
             }

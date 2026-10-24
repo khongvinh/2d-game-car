@@ -3,6 +3,11 @@ package com.khongvinh.carsurvival
 import android.media.AudioAttributes
 import android.media.AudioFormat
 import android.media.AudioTrack
+import java.io.File
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.exp
@@ -18,7 +23,7 @@ import kotlin.random.Random
  * part, and a victory fanfare that flows into a cheering loop. Each track is a static
  * [AudioTrack] with loop points; switching tracks cross-fades.
  */
-class Music {
+class Music(private val cacheDir: File? = null, private val startAfter: CountDownLatch? = null) {
     enum class Track { CHILL, INTENSE, VICTORY }
 
     @Volatile
@@ -39,12 +44,10 @@ class Music {
     init {
         Thread {
             try {
+                // sound effects first: composing music must not delay them
+                startAfter?.await(15, TimeUnit.SECONDS)
                 for (t in Track.entries) {
-                    val (pcm, loopStart) = when (t) {
-                        Track.CHILL -> chill()
-                        Track.INTENSE -> intense()
-                        Track.VICTORY -> victory()
-                    }
+                    val (pcm, loopStart) = loadOrCompose(t)
                     tracks[t.ordinal] = makeTrack(pcm, loopStart)
                 }
                 ready = true
@@ -120,6 +123,35 @@ class Music {
             t?.release()
         } catch (_: Exception) {
         }
+    }
+
+    /** Composed music is cached as raw PCM so it is ready instantly on later launches. */
+    private fun loadOrCompose(t: Track): Pair<ShortArray, Int> {
+        val f = cacheDir?.let { File(it, "music_v1_${t.name.lowercase()}.pcm") }
+        if (f != null && f.exists() && f.length() > 8) {
+            try {
+                val bb = ByteBuffer.wrap(f.readBytes()).order(ByteOrder.LITTLE_ENDIAN)
+                val loop = bb.int
+                val pcm = ShortArray(bb.remaining() / 2) { bb.short }
+                if (pcm.isNotEmpty()) return pcm to loop
+            } catch (_: Exception) {
+            }
+        }
+        val res = when (t) {
+            Track.CHILL -> chill()
+            Track.INTENSE -> intense()
+            Track.VICTORY -> victory()
+        }
+        if (f != null) {
+            try {
+                val bb = ByteBuffer.allocate(4 + res.first.size * 2).order(ByteOrder.LITTLE_ENDIAN)
+                bb.putInt(res.second)
+                for (v in res.first) bb.putShort(v)
+                f.writeBytes(bb.array())
+            } catch (_: Exception) {
+            }
+        }
+        return res
     }
 
     private fun makeTrack(pcm: ShortArray, loopStart: Int): AudioTrack {

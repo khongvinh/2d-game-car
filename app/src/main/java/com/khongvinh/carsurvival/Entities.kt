@@ -2,7 +2,7 @@ package com.khongvinh.carsurvival
 
 import kotlin.math.min
 
-enum class State { MENU, SHOP, GARAGE, PLAYING, PAUSED, RESULT, STAGE_DONE, VICTORY }
+enum class State { MENU, MAPS, SHOP, GARAGE, PLAYING, PAUSED, RESULT, STAGE_DONE, VICTORY }
 
 /** Selectable cars (garage unlocks after clearing stage 1). */
 enum class CarType(
@@ -59,14 +59,37 @@ class Item(val type: ItemType, val x: Float, val y: Float) {
     var alive = true
 }
 
-enum class ZombieType(val w: Float, val h: Float, val mass: Float, val hp: Int, val speed: Float, val reward: Int) {
+enum class ZombieType(
+    val w: Float,
+    val h: Float,
+    val mass: Float,
+    val hp: Int,
+    val speed: Float,
+    val reward: Int,
+    val flying: Boolean = false,
+) {
     WALKER(34f, 92f, 0.07f, 2, 35f, 5),
     RUNNER(30f, 88f, 0.06f, 1, 110f, 6),
     FAT(58f, 98f, 0.2f, 5, 22f, 12),
+
+    /** Volcano: low, fast fire lizard. */
+    LIZARD(74f, 40f, 0.08f, 2, 140f, 7),
+
+    /** Night forest: bat that swoops at the car. */
+    BAT(48f, 30f, 0.03f, 1, 170f, 6, true),
+
+    /** Alien world: little grey invader. */
+    ALIEN(32f, 80f, 0.06f, 2, 75f, 7),
+
+    /** Alien world: heavy slime blob. */
+    BLOB(72f, 62f, 0.18f, 5, 25f, 12),
 }
 
 class Zombie(val type: ZombieType, var x: Float, var y: Float) {
     var hp = type.hp
+
+    /** Height above the ground for flying monsters. */
+    var fly = if (type.flying) 150f + (x % 60f) else 0f
     var alive = true
     var phase = (x * 0.37f) % 6.28f
     val shirt = SHIRTS[(x.toInt() / 7 and 0x7fffffff) % SHIRTS.size]
@@ -130,6 +153,9 @@ class Debris(
         const val PLANK = 1
         const val METAL = 2
         const val FAT_ZOMBIE = 3
+
+        /** CREATURE + ZombieType.ordinal for the regional monsters. */
+        const val CREATURE = 100
     }
 }
 
@@ -213,14 +239,28 @@ class Car {
     }
 }
 
-/** End-of-stage boss on every 5th stage; [tier] 1..4. */
+/**
+ * End-of-stage boss on every 5th stage. [tier] 1 = giant zombie (stage 5),
+ * 2 = fire dragon (10), 3 = vampire bat (15), 4 = alien (20).
+ */
 class Boss(val tier: Int, var x: Float, var y: Float) {
     val name = NAMES[(tier - 1).coerceIn(0, NAMES.size - 1)]
     val maxHp = HP[(tier - 1).coerceIn(0, HP.size - 1)]
     var hp = maxHp
-    val w = 90f + tier * 10f
-    val h = 250f + tier * 20f
+    val w = floatArrayOf(100f, 260f, 240f, 150f)[(tier - 1).coerceIn(0, 3)]
+    val h = floatArrayOf(270f, 130f, 110f, 320f)[(tier - 1).coerceIn(0, 3)]
     val speed = 45f + tier * 12f
+    val flying = tier == 2 || tier == 3
+
+    /** Current height above the ground (flying bosses). */
+    var lift = if (flying) 240f else 0f
+    var diveT = 0f
+    var breathT = 0f
+    var breathCd = 3f
+    var summonCd = 6f
+
+    /** Centre of the body in world coordinates. */
+    val cy get() = y - lift - h / 2
     var alive = true
     var engaged = false
     var throwCd = 2f
@@ -236,13 +276,14 @@ class Boss(val tier: Int, var x: Float, var y: Float) {
     var dmgT = 0f
 
     companion object {
-        val NAMES = arrayOf("GÃ KHỔNG LỒ", "BẠO CHÚA", "QUÁI VẬT DUNG NHAM", "VUA ZOMBIE")
-        val HP = floatArrayOf(50f, 90f, 140f, 200f)
+        val NAMES = arrayOf("GÃ KHỔNG LỒ", "RỒNG LỬA", "DƠI HÚT MÁU", "QUÁI VẬT NGOÀI HÀNH TINH")
+        val HP = floatArrayOf(50f, 100f, 140f, 170f)
     }
 }
 
-/** Boulder thrown by a boss. */
-class BossRock(var x: Float, var y: Float, var vx: Float, var vy: Float) {
+/** Boss projectile: [kind] 0 = boulder, 1 = fireball, 2 = plasma orb (flies straight). */
+class BossRock(var x: Float, var y: Float, var vx: Float, var vy: Float, val kind: Int = 0) {
     var alive = true
     var rot = 0f
+    var life = 4f
 }

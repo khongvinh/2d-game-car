@@ -15,7 +15,10 @@ class SoundPool {
         fun setAudioAttributes(@Suppress("UNUSED_PARAMETER") a: AudioAttributes) = this
         fun build() = SoundPool()
     }
-    fun load(@Suppress("UNUSED_PARAMETER") p: String, @Suppress("UNUSED_PARAMETER") pr: Int) = 1
+    fun load(@Suppress("UNUSED_PARAMETER") p: String, @Suppress("UNUSED_PARAMETER") pr: Int): Int { val id = next++; listener?.invoke(this, id, 0); return id }
     fun play(id: Int, l: Float, r: Float, p: Int, loop: Int, rate: Float) = id + (l + r + p + loop + rate).toInt() * 0
     fun release() {}
+    fun setOnLoadCompleteListener(l: (SoundPool, Int, Int) -> Unit) { listener = l }
+    private var listener: ((SoundPool, Int, Int) -> Unit)? = null
+    private var next = 1
 }

@@ -1,6 +1,6 @@
 # TỔNG HỢP TIẾN TRÌNH DỰ ÁN "ĐUA XE SINH TỒN"
 
-Tài liệu bàn giao để tiếp tục làm việc ở phiên chat mới mà không bị thiếu sót. Cập nhật đến phiên bản v4.2 (ngày 17/10/2026).
+Tài liệu bàn giao để tiếp tục làm việc ở phiên chat mới mà không bị thiếu sót. Cập nhật đến phiên bản v4.3 (ngày 24/10/2026).
 
 ## 1. Thông tin chung
 
@@ -12,8 +12,8 @@ Tài liệu bàn giao để tiếp tục làm việc ở phiên chat mới mà k
 | Ngôn ngữ / công nghệ | Kotlin + Canvas (SurfaceView), không engine, không thư viện ngoài, không file ảnh/âm thanh |
 | Repo GitHub | khongvinh/2d-game-car |
 | Nhánh làm việc | claude/2d-driving-game-f0kpjk (chưa có Pull Request, chưa merge) |
-| Commit mới nhất | xem git log nhánh làm việc (v4.2: trùm cuối mỗi 5 ải) |
-| Phiên bản hiện tại | v4.2 (versionCode 6) |
+| Commit mới nhất | xem git log nhánh làm việc (v4.3: 20 bản đồ, quái theo vùng, 4 trùm, sửa âm thanh) |
+| Phiên bản hiện tại | v4.3 (versionCode 7) |
 | Build tự động | GitHub Actions "Build APK" (.github/workflows/android.yml) — đang xanh, xuất artifact DuaXeSinhTon-apk |
 | Khóa ký | app/debug.keystore (cố định, mật khẩu android) nên các bản cài đè lên nhau được |
 
@@ -57,9 +57,9 @@ Tài liệu bàn giao để tiếp tục làm việc ở phiên chat mới mà k
 - Đạn bắn vào vật cản cũng làm tụt thanh này. Đủ tốc độ thì vẫn phá ngay như cũ.
 - Người dùng xác nhận "Ok rồi đó".
 
-### v4.2 — Trùm cuối mỗi 5 ải (hiện tại)
+### v4.2 — Trùm cuối mỗi 5 ải
 - Yêu cầu: thêm trùm cuối vào cuối mỗi 5 ải; vật phẩm gần chặng cuối nhiều để đủ sức bắn trùm; KHÔNG nhắc nhở/hướng dẫn, để người chơi tự khám phá.
-- Trùm ở ải 5, 10, 15, 20: Gã Khổng Lồ (máu 50), Bạo Chúa bọc giáp (90), Quái Vật Dung Nham (140), Vua Zombie đội vương miện (200).
+- Trùm ở ải 5, 10, 15, 20 (bản v4.2 ban đầu là 4 zombie khổng lồ; v4.3 đã thay bằng 4 loài khác nhau, xem dưới).
 - Trùm đứng trong đấu trường trước trạm (từ goalX-1150 đến goalX-260), đi chậm về phía xe, ném tảng đá (sát thương 14 + 3 x cấp), đập đất khi xe ở gần dưới 300 (sát thương 10 + 4 x cấp, hất văng xe).
 - Cách hạ: vũ khí tự bắn vào trùm; tông có đà (sát thương = tốc độ vào / 35, x1,5 khi bật tên lửa, mỗi cú cách 0,45 giây, xe mất 5 + 2 x cấp máu); nổ (máy ném đá, thùng phuy) gây gấp đôi.
 - Cổng trạm đóng (thanh chắn đỏ trắng) cho đến khi trùm gục; xe không qua được vạch goalX-140.
@@ -68,7 +68,26 @@ Tài liệu bàn giao để tiếp tục làm việc ở phiên chat mới mà k
 - Thanh máu trùm hiện ở giữa trên màn hình khi trùm "thức dậy" (xe cách 1500 đơn vị); tiếng gầm (Sfx ROAR); nhạc chuyển sang kịch tính.
 - Mô phỏng: ải 5 xe gốc + 2 cấp đạn hạ trùm trong khoảng 20 giây; ải 20 xe nâng cấp cấp 4 + nỏ hạ Vua Zombie và về đích còn 21 máu.
 
-## 3. Luật chơi hiện tại (v4.1)
+### v4.3 — Sửa âm thanh trễ, chọn bản đồ, 20 bản đồ, quái vật theo vùng, 4 trùm mới (hiện tại)
+- Yêu cầu: (1) âm thanh trong game đôi khi chậm/mất cho tới khi nhạc nền chạy một lúc; (2) giao diện chọn map, mỗi ải một map với background riêng; (3) mỗi ải quái khác nhau: ải 5 zombie, ải 10 rồng phun lửa, ải 15 dơi hút máu, ải 20 quái vật ngoài hành tinh.
+- Sửa âm thanh (Sfx.kt, Music.kt): nguyên nhân là tạo hiệu ứng, soạn nhạc và nạp SoundPool cùng lúc khi khởi động. Nay tạo hiệu ứng trước (luồng ưu tiên cao), nhạc chờ hiệu ứng xong (CountDownLatch `sfx.ready`, tối đa 15 giây) mới soạn; cả hai lưu cache ra file (`sfx_3_<tên>.wav`, `music_v1_<bài>.pcm`) nên lần mở sau không phải tạo lại; chỉ phát mẫu đã nạp xong (OnLoadCompleteListener); 16 luồng phát; ưu tiên (nổ/trúng/gầm/thắng/thua = 2, bắn/tiếp đất = 0); giãn cách tối thiểu mỗi âm (bắn 90ms, văng/xu/gỗ/tiếp đất 45ms, còn lại 25ms) để không nghẽn.
+- Bản đồ (Themes.kt mới): 4 vùng x 5 map, mỗi map tên + bảng màu trời/núi/đất riêng.
+  - Sa mạc (ải 1–5): Sa Mạc Bình Minh, Hẻm Núi Đỏ, Thị Trấn Hoang, Đồi Cát Hoàng Hôn, Nghĩa Địa Sa Mạc (bình minh → trưa → chiều → hoàng hôn → chạng vạng; chim kền kền, thành phố đổ nát).
+  - Núi lửa (6–10): Chân Núi Lửa, Sông Dung Nham, Hẻm Tro Tàn, Miệng Núi Lửa, Hang Rồng (núi lửa phun dung nham, tàn lửa bay, cây cháy, đá nứt lửa).
+  - Rừng đêm (11–15): Rừng Sương Mù, Đầm Lầy Ma, Làng Bỏ Hoang, Nghĩa Trang Trăng Máu, Lâu Đài Ma Cà Rồng (trăng, lâu đài + rừng thông, đom đóm, bí ngô, bia mộ, đèn đường; trăng đỏ ở 2 map cuối).
+  - Hành tinh lạ (16–20): Vùng Thiên Thạch, Rừng Pha Lê, Căn Cứ Thất Thủ, Thung Lũng Tím, Tàu Mẹ Ngoài Hành Tinh (hành tinh có vành, tháp nhọn, pha lê phát sáng, nấm, đĩa bay, bào tử).
+- Màn hình chọn bản đồ (State.MAPS): nút "🗺 ẢI n: TÊN MAP" ở menu (thay nút ◀ ▶), mở lưới 5 x 4 thẻ có cảnh thu nhỏ; 👹 = ải trùm, ✔ = đã vượt, 🔒 = chưa mở; chạm thẻ đã mở để chọn và về menu. Dòng phụ menu: vùng • độ dài • kỷ lục.
+- Quái theo vùng (Entities.kt ZombieType): Sa mạc = zombie (thường, chạy nhanh, béo từ ải 2); Núi lửa = zombie cháy + THẰN LẰN LỬA (35%); Rừng đêm = zombie ma + DƠI (38%, bay lượn ở độ cao ~150 rồi lao xuống xe trong 320, chạm là nổ, trừ 4 máu x (1 - giáp)); Hành tinh lạ = NGƯỜI NGOÀI HÀNH TINH + KHỐI NHỚT (20%, to, chậm, nặng).
+- 4 trùm mới (máu 50 / 100 / 140 / 170):
+  - Ải 5 GÃ KHỔNG LỒ (zombie): ném tảng đá, đập đất.
+  - Ải 10 RỒNG LỬA: bay, phun cầu lửa từ miệng; cứ 6 giây phun lửa 1,6 giây khi xe trong tầm 750 (14 máu/giây x (1 - giáp) trong 550); cứ 7 giây hạ cánh 2,4 giây (lúc đó tông được).
+  - Ải 15 DƠI HÚT MÁU: bay, cứ 4,5 giây bổ nhào cắn (10 + 3 x cấp, hồi cho trùm 6 máu, cách nhau 0,8 giây); cứ 8 giây gọi 2 dơi con.
+  - Ải 20 QUÁI VẬT NGOÀI HÀNH TINH: bắn quạt 3 cầu plasma (không rơi, tốc độ 620), đập đất.
+  - Trùm bay chỉ bị tông khi hạ thấp; súng tự nhắm trùm theo mọi hướng (kể cả khi trùm ở sau/ trên xe); đạn trúng trùm bay trong phạm vi h/2 + 40.
+- Mô phỏng (tools/dev/preview `gradle boss`, máu thử 400): ải 5 thắng 17,6 giây (còn 372); ải 10 thắng 15,2 giây (334); ải 15 thắng 29,6 giây (292); ải 20 thắng 40,8 giây (114) và tới VICTORY.
+- Công cụ preview: thêm task `themes` (ảnh menu, màn chọn map, các ải 1/4/7/9/12/14/17/20) và `boss` (đánh 4 trùm).
+
+## 3. Luật chơi hiện tại (v4.3)
 
 ### Điều khiển
 | Nút | Tác dụng |
@@ -149,9 +168,10 @@ Tài liệu bàn giao để tiếp tục làm việc ở phiên chat mới mà k
 | Game.kt | Luật chơi: trạng thái, ải/màn, sinh zombie/vật cản/vật phẩm, va chạm, vũ khí, bão, tiền, điểm, thành tích, nhạc theo trạng thái, nút bấm |
 | CarPhysics.kt | Vật lý xe thuần Kotlin: 2 bánh lò xo, bám đường, nghiêng, tên lửa, tự cân bằng khi bay, va chạm thân xe với đất |
 | Terrain.kt | Sinh địa hình: đồi nhiều tầng, đá, ổ gà, ván giặt, dốc nhảy, giới hạn dốc 38°, bo thung lũng, cảnh vật |
-| Renderer.kt | Vẽ toàn bộ: nền trời/núi/thành phố, địa hình, xe, zombie, trùm + đá ném + cổng trạm, vật cản + thanh độ bền, bão, HUD (cả thanh máu trùm), menu, cửa hàng, gara, bảng tổng kết |
+| Themes.kt | 4 vùng (Region) và 20 bản đồ (MapTheme): tên, màu trời/núi/đất/cỏ, kiểu đường chân trời |
+| Renderer.kt | Vẽ toàn bộ: nền theo bản đồ (trời/núi/thành phố/núi lửa/lâu đài/tháp ngoài hành tinh), màn chọn bản đồ, quái theo vùng, 4 kiểu trùm, địa hình, xe, zombie, trùm + đá ném + cổng trạm, vật cản + thanh độ bền, bão, HUD (cả thanh máu trùm), menu, cửa hàng, gara, bảng tổng kết |
 | Entities.kt | Kiểu dữ liệu: State, CarType, WeaponType, Upgrade, ItemType, Zombie, Obstacle, Boss, BossRock, Debris, Projectile, Particle, FloatText, Car... |
-| Sfx.kt | 20 hiệu ứng âm thanh tổng hợp ra WAV trong cache, phát bằng SoundPool |
+| Sfx.kt | Hiệu ứng âm thanh tổng hợp ra WAV (cache theo phiên bản), phát bằng SoundPool khi đã nạp xong, có ưu tiên và giãn cách |
 | Music.kt | 3 bài nhạc tổng hợp (chill 90 BPM La thứ, kịch tính 140 BPM Rê thứ, chiến thắng Đô trưởng), phát bằng AudioTrack có vòng lặp, chuyển bài mượt |
 | SaveData.kt | SharedPreferences "car_survival_v3": tiền, ngày, ải đã vượt, ải chọn, kỷ lục từng ải, nâng cấp, xe/vũ khí sở hữu, âm thanh, nhạc, điểm cao nhất |
 
@@ -205,14 +225,15 @@ cd tools/dev/preview && gradle boss      # thử đánh trùm ải 5 và ải 20
 ## 9. Việc có thể làm tiếp / câu hỏi còn mở
 - Người dùng chưa phản hồi về: độ khó đường mới, nhạc nền, cảm giác điều khiển trên điện thoại thật.
 - Danh sách người dùng đã đồng ý làm dần: chỉnh độ khó sau khi chơi thử; bão gắt hơn từ đầu; thêm loại zombie mới (nhảy, mặc giáp); bản đồ mới (thành phố, rừng, tuyết); thêm xe/vũ khí (súng phun lửa, lưỡi cưa); chuẩn bị đưa lên Google Play (khóa ký release, icon, ảnh giới thiệu).
-- Đã xong từ danh sách này: trùm cuối mỗi 5 ải (v4.2).
+- Đã xong từ danh sách này: trùm cuối mỗi 5 ải (v4.2); bản đồ mới theo vùng + quái theo vùng (v4.3).
+- Chờ người dùng chơi thử v4.3: âm thanh còn trễ không, độ khó 4 trùm, màu các map.
 - Chưa tạo Pull Request; khi người dùng muốn gộp vào nhánh chính thì tạo PR từ claude/2d-driving-game-f0kpjk.
 
 ## 10. Các phiên chat
 
 | Phiên | Tiêu đề | Phạm vi |
 |---|---|---|
-| #1 | Đua Xe Sinh Tồn #1 — v1.0→v4.2: tạo game, kiểu Earn to Die, bão 3 bo, nhạc, độ bền vật cản, trùm cuối | Từ đầu đến v4.2 + tài liệu bàn giao, công cụ tools/dev, quy tắc CLAUDE.md |
+| #1 | Đua Xe Sinh Tồn #1 — v1.0→v4.3: tạo game, kiểu Earn to Die, bão 3 bo, nhạc, độ bền vật cản, trùm cuối, 20 bản đồ, 4 trùm | Từ đầu đến v4.3 + tài liệu bàn giao, công cụ tools/dev, quy tắc CLAUDE.md |
 
 - Quy tắc làm việc (đặt tiêu đề phiên, tự lưu tiến trình khi ngữ cảnh ≥ 90% rồi nhắc mở chat mới) nằm trong CLAUDE.md ở gốc repo.
 

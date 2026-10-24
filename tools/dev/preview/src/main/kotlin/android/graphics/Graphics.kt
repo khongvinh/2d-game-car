@@ -64,7 +64,9 @@ class RectF {
 }
 
 class Path {
+    enum class Direction { CW, CCW }
     val p = Path2D.Float()
+    fun addRoundRect(r: RectF, rx: Float, ry: Float, @Suppress("UNUSED_PARAMETER") d: Direction) = p.append(RoundRectangle2D.Float(r.left, r.top, r.width(), r.height(), rx * 2, ry * 2), false)
     fun reset() = p.reset()
     fun moveTo(x: Float, y: Float) = p.moveTo(x, y)
     fun lineTo(x: Float, y: Float) { if (p.currentPoint == null) p.moveTo(x, y) else p.lineTo(x, y) }
