@@ -8,6 +8,8 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
 
@@ -36,3 +38,19 @@ jobs:
         with:
           name: DuaXeSinhTon-apk
           path: app/build/outputs/apk/debug/app-debug.apk
+
+      # Publish the APK as a GitHub Release (tag v<versionName>) so it can be
+      # downloaded directly on a phone, without logging in or unzipping.
+      - name: Publish release
+        if: github.event_name != 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VER=$(sed -n 's/.*versionName = "\(.*\)".*/\1/p' app/build.gradle.kts)
+          cp app/build/outputs/apk/debug/app-debug.apk DuaXeSinhTon.apk
+          if gh release view "v$VER" > /dev/null 2>&1; then
+            gh release upload "v$VER" DuaXeSinhTon.apk --clobber
+          else
+            gh release create "v$VER" DuaXeSinhTon.apk --target "$GITHUB_SHA" \
+              --title "Đua Xe Sinh Tồn v$VER" --notes "Bản build tự động từ commit $GITHUB_SHA." --latest
+          fi

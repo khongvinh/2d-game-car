@@ -89,6 +89,10 @@ gồ ghề. Mặt dốc lên tối đa ~38° để luôn leo được nếu đ�
 
 ## Cài đặt trên điện thoại
 
+**Cách nhanh (trên điện thoại):** mở https://github.com/khongvinh/2d-game-car/releases/latest/download/DuaXeSinhTon.apk
+để tải thẳng file APK mới nhất (hoặc vào mục **Releases** của repo).
+
+**Cách khác:**
 1. Vào tab **Actions** của repo → lần chạy **Build APK** mới nhất → tải artifact **DuaXeSinhTon-apk**.
 2. Giải nén lấy `app-debug.apk`, chép vào điện thoại và mở để cài (cho phép "Cài ứng dụng không rõ nguồn gốc").
 

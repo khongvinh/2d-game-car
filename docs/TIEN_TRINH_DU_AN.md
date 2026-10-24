@@ -179,6 +179,7 @@ Hằng số quan trọng trong Game.kt: METER = 30 đơn vị/mét, G = 900, ZOO
 
 ## 5. Cách lấy APK
 
+- Cách 0 (dễ nhất, tải thẳng trên điện thoại, không cần đăng nhập): https://github.com/khongvinh/2d-game-car/releases/latest/download/DuaXeSinhTon.apk — mỗi lần push, workflow tự tạo/cập nhật Release tag v<versionName> kèm file DuaXeSinhTon.apk.
 - Cách 1: GitHub → tab Actions → lần chạy "Build APK" mới nhất → tải artifact DuaXeSinhTon-apk → giải nén lấy app-debug.apk.
 - Cách 2: build offline trong container (mục 6), file ra ở tools/dev/out/DuaXeSinhTon.apk.
 - Mọi bản dùng cùng khóa ký nên cài đè được. Lưu ý: bản offline nhắm targetSdk 34, bản GitHub nhắm 35.
