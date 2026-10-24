@@ -53,21 +53,17 @@ Quái Vật Ngoài Hành Tinh. Cổng trạm chỉ mở khi trùm gục.
 `$` tiền · `⛽` xăng · `✚` sửa xe · `🛡` lá chắn 6 giây · `🎯` +15 đạn · `⏱` +5 giây & đẩy bão lùi · `👥` nhân bản
 
 ### Nâng cấp
-Động cơ · Bình xăng · Tên lửa đẩy · Giáp & máu · Đạn dược · Lốp xe — mỗi loại 5 cấp.
+Động cơ · Bình xăng · Tên lửa đẩy · Giáp & máu · Đạn dược · Lốp xe — mỗi loại 5 cấp, cấp sau đắt hơn nhiều.
 
-### Gara
-| Xe | Máu | Tốc độ | Giáp | Giá |
-|---|---|---|---|---|
-| Bán tải cũ | x1.0 | x1.0 | 0% | có sẵn |
-| Xe cơ bắp | x0.9 | x1.18 | 0% | 1500 |
-| Xe tải thùng | x1.5 | x0.95 | 10%, bình xăng lớn | 3000 |
-| Xe bọc thép | x2.0 | x1.05 | 30%, động cơ khỏe | 6000 |
+### Gara (mở sau ải 1)
+**5 dòng xe, mỗi dòng 5 phiên bản** (25 xe): Xe máy (có sẵn) → Xe hơi (qua ải 5) → Bán tải (qua ải 10)
+→ Bọc thép (qua ải 15) → Xe tăng (qua ải 20). Phiên bản sau khỏe hơn, giá cao hơn (600$ → 58.500$).
 
-| Vũ khí | Đặc điểm | Giá |
-|---|---|---|
-| 🔫 Súng máy | Bắn nhanh | có sẵn |
-| 🏹 Nỏ | Sát thương 3, xuyên 3 mục tiêu | 1200 |
-| ☄ Máy ném đá | Đá bay vòng cung, nổ diện rộng | 2500 |
+**10 vũ khí, mỗi loại nâng 5 cấp:** Súng lục, Dao chém (không tốn đạn), Súng máy, Nỏ, Súng hoa cải,
+Máy ném đá, Súng phun lửa, Tên lửa tự dẫn, Súng laser, Súng nòng xoay. Mỗi vũ khí có sát thương,
+tốc bắn, tầm bắn, xuyên giáp và bán kính nổ riêng.
+
+Tiền đến chủ yếu từ việc hạ quái và phá vật cản; ải càng cao quái càng nhiều tiền — phải cày!
 
 ### Địa hình
 Đồi dốc nhiều tầng, đá nhô, ổ gà, đoạn "ván giặt" rung lắc và dốc nhảy — càng lên ải cao càng

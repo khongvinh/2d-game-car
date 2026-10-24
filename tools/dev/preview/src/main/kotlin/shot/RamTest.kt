@@ -15,7 +15,7 @@ fun ramMain(args: Array<String>) {
     g.obstacles.clear(); g.zombies.clear()
     val wx = 900f
     g.obstacles.add(Obstacle(ObstacleType.WRECK, wx, g.terrain.heightAt(wx)))
-    g.car.ammo = 0
+    g.car.ammo = 0f
     val gas = g.controls().first { it.id == "gas" }
     val brake = g.controls().first { it.id == "brake" }
     var t = 0f; var shots = 0; var last = 1f

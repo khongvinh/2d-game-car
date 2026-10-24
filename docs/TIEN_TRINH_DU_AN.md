@@ -1,6 +1,6 @@
 # TỔNG HỢP TIẾN TRÌNH DỰ ÁN "ĐUA XE SINH TỒN"
 
-Tài liệu bàn giao để tiếp tục làm việc ở phiên chat mới mà không bị thiếu sót. Cập nhật đến phiên bản v4.3 (ngày 24/10/2026).
+Tài liệu bàn giao để tiếp tục làm việc ở phiên chat mới mà không bị thiếu sót. Cập nhật đến phiên bản v4.4 (ngày 24/10/2026).
 
 ## 1. Thông tin chung
 
@@ -12,8 +12,8 @@ Tài liệu bàn giao để tiếp tục làm việc ở phiên chat mới mà k
 | Ngôn ngữ / công nghệ | Kotlin + Canvas (SurfaceView), không engine, không thư viện ngoài, không file ảnh/âm thanh |
 | Repo GitHub | khongvinh/2d-game-car |
 | Nhánh làm việc | claude/2d-driving-game-f0kpjk (chưa có Pull Request, chưa merge) |
-| Commit mới nhất | xem git log nhánh làm việc (v4.3: 20 bản đồ, quái theo vùng, 4 trùm, sửa âm thanh) |
-| Phiên bản hiện tại | v4.3 (versionCode 7) |
+| Commit mới nhất | xem git log nhánh làm việc (v4.4: gara 25 xe + 10 vũ khí có cấp, cày tiền, xe mượt) |
+| Phiên bản hiện tại | v4.4 (versionCode 8) |
 | Build tự động | GitHub Actions "Build APK" (.github/workflows/android.yml) — đang xanh, xuất artifact DuaXeSinhTon-apk |
 | Khóa ký | app/debug.keystore (cố định, mật khẩu android) nên các bản cài đè lên nhau được |
 
@@ -68,7 +68,7 @@ Tài liệu bàn giao để tiếp tục làm việc ở phiên chat mới mà k
 - Thanh máu trùm hiện ở giữa trên màn hình khi trùm "thức dậy" (xe cách 1500 đơn vị); tiếng gầm (Sfx ROAR); nhạc chuyển sang kịch tính.
 - Mô phỏng: ải 5 xe gốc + 2 cấp đạn hạ trùm trong khoảng 20 giây; ải 20 xe nâng cấp cấp 4 + nỏ hạ Vua Zombie và về đích còn 21 máu.
 
-### v4.3 — Sửa âm thanh trễ, chọn bản đồ, 20 bản đồ, quái vật theo vùng, 4 trùm mới (hiện tại)
+### v4.3 — Sửa âm thanh trễ, chọn bản đồ, 20 bản đồ, quái vật theo vùng, 4 trùm mới
 - Yêu cầu: (1) âm thanh trong game đôi khi chậm/mất cho tới khi nhạc nền chạy một lúc; (2) giao diện chọn map, mỗi ải một map với background riêng; (3) mỗi ải quái khác nhau: ải 5 zombie, ải 10 rồng phun lửa, ải 15 dơi hút máu, ải 20 quái vật ngoài hành tinh.
 - Sửa âm thanh (Sfx.kt, Music.kt): nguyên nhân là tạo hiệu ứng, soạn nhạc và nạp SoundPool cùng lúc khi khởi động. Nay tạo hiệu ứng trước (luồng ưu tiên cao), nhạc chờ hiệu ứng xong (CountDownLatch `sfx.ready`, tối đa 15 giây) mới soạn; cả hai lưu cache ra file (`sfx_3_<tên>.wav`, `music_v1_<bài>.pcm`) nên lần mở sau không phải tạo lại; chỉ phát mẫu đã nạp xong (OnLoadCompleteListener); 16 luồng phát; ưu tiên (nổ/trúng/gầm/thắng/thua = 2, bắn/tiếp đất = 0); giãn cách tối thiểu mỗi âm (bắn 90ms, văng/xu/gỗ/tiếp đất 45ms, còn lại 25ms) để không nghẽn.
 - Bản đồ (Themes.kt mới): 4 vùng x 5 map, mỗi map tên + bảng màu trời/núi/đất riêng.
@@ -87,7 +87,20 @@ Tài liệu bàn giao để tiếp tục làm việc ở phiên chat mới mà k
 - Mô phỏng (tools/dev/preview `gradle boss`, máu thử 400): ải 5 thắng 17,6 giây (còn 372); ải 10 thắng 15,2 giây (334); ải 15 thắng 29,6 giây (292); ải 20 thắng 40,8 giây (114) và tới VICTORY.
 - Công cụ preview: thêm task `themes` (ảnh menu, màn chọn map, các ải 1/4/7/9/12/14/17/20) và `boss` (đánh 4 trùm).
 
-## 3. Luật chơi hiện tại (v4.3)
+### v4.4 — Gara lớn: 25 xe, 10 vũ khí có cấp, cày tiền, xe chạy mượt (hiện tại)
+- Yêu cầu: xe ban đầu là xe máy; qua ải 5 mở xe hơi, ải 10 bán tải, ải 20 xe tăng + bọc thép; giá xe +30%; thêm súng, dao, tên lửa… nhiều thuộc tính; phải cày (farm quái mới có tiền), mỗi loại xe 5 phiên bản; đồ họa xe đẹp hầm hố; xe chạy mượt, hết cứng nhắc. Người dùng xác nhận nhạc v4.3 đã khớp.
+- Diễn giải: "qua ải 20 xe tăng, xe bọc thép" → Bọc thép mở ở ải 15 (lấp khoảng trống 5-10-15-20), Xe tăng mở khi qua ải 20 (thưởng sau khi phá đảo, dùng để cày lại). Có thể đổi dễ trong Garage.kt (VehicleClass.unlockStage).
+- Code: Garage.kt mới (VehicleClass, Vehicle, Vehicles, WeaponType + stats theo cấp, PRICE_MUL = 1.3); CarArt.kt mới (vẽ 25 xe: xe máy có người lái + 5 kiểu, xe hơi rỉ sét/cơ bắp/rally/gai/tử thần, bán tải, bọc thép chở tiền/SWAT/lội nước/xe ủi/pháo đài, xe tăng có xích chạy, tháp pháo, rằn ri; 10 vũ khí; dao chém gắn mũi xe); bỏ CarType.
+- Gara 2 tab: XE (5 dòng bên trái, ô xem lớn + 7 thanh chỉ số có vạch trắng so với xe đang dùng, xanh = tốt hơn, cam = kém hơn; 5 phiên bản bên dưới; nút MUA/CHỌN XE) và VŨ KHÍ (lưới 10 vũ khí; bảng chi tiết, 5 nấc cấp, chỉ số hiện tại → cấp sau; nút MUA/TRANG BỊ và NÂNG CẤP).
+- Kinh tế cày: tiền quãng đường 0,4 → 0,25 $/m; thưởng vượt ải 200 → 120 x ải; tiền quái/vật cản x (1 + 0,12 x (ải - 1)) nên ải cao farm lời hơn; giá nâng cấp xe x1,5 + 100 x cấp²; máu trùm 50/120/180/240.
+- Lưu dữ liệu: khóa mới ownedVeh, veh, ownedWpn, wpn, wl0..wl9, garageV = 2. Bản cũ được hoàn tiền xe đã mua (1500/3000/6000), Súng máy/Nỏ/Máy ném đá cũ giữ nguyên.
+- Mượt hơn: ga/phanh và nghiêng tăng dần (ga lên ~0,12 giây, nhả ~0,07 giây, nghiêng ~0,1 giây) thay vì bật/tắt; nhún mềm hơn (SPRING 120 → 105, DAMP 10 → 9,5); bánh xe vẽ theo đúng độ nén nhún (tối đa 16); thân xe chúi/ngóc theo ga/phanh (squat, chỉ để vẽ).
+- Vũ khí mới trong trận: đạn có tầm thật (hết tầm thì biến mất), shotgun chùm 5 viên, phun lửa đốt cháy, tên lửa tự dẫn + khói, laser tia tức thì, dao chém trước mũi; HUD đạn hiện ∞ với dao.
+- Bảng vượt ải hiện chip mở khóa dòng xe/vũ khí mới.
+- Mô phỏng (gradle boss, máu thử 400): Cào Cào + Súng lục cấp 2 đánh trùm ải 5 còn thiếu 3 máu sau 83 giây (phải nâng cấp); Mô Tô Chiến Binh + Súng máy cấp 2 thắng 12,8 giây; Siêu Xe Gai + Nỏ cấp 3 thắng rồng 15 giây; Bán Tải Lưới Thép + Phun lửa cấp 4 thắng dơi 20 giây; Bọc Thép Lội Nước + Tên lửa cấp 5 thắng ải 20 sau 16 giây. Vật lý: không lật ở mọi ải. Xe máy qua ải 1 trong 40 giây, nhận 658$.
+- Công cụ: task preview `garage` (ảnh g_lineup 25 xe, màn gara ở 1600 và 1280 px, ảnh từng vũ khí trong trận).
+
+## 3. Luật chơi hiện tại (v4.4)
 
 ### Điều khiển
 | Nút | Tác dụng |
@@ -101,7 +114,7 @@ Tài liệu bàn giao để tiếp tục làm việc ở phiên chat mới mà k
 
 ### Vòng chơi
 - Mỗi lần chạy là một ngày. Ván kết thúc khi: hết xăng và đứng yên 2 giây, xe bị phá hủy (nổ), lật/kẹt quá 3 giây, rơi khỏi đường, bị bão nuốt, hoặc bỏ cuộc.
-- Tiền nhận: 0,4$ mỗi mét + tiền thưởng (zombie, vật cản, tiền nhặt, qua mốc màn, bay xa trên 1,2 giây). Tới trạm cứu hộ thêm 200$ x số ải.
+- Tiền nhận: 0,25$ mỗi mét + tiền thưởng (zombie/quái và vật cản x (1 + 0,12 x (ải - 1)), tiền nhặt, qua mốc màn, bay xa trên 1,2 giây). Tới trạm cứu hộ thêm 120$ x số ải.
 - Điểm = mét x 10 + zombie x 100 + vật cản x 50 (+ 5000 x số ải nếu tới trạm).
 - Đường mỗi ải dài 700 + (ải-1) x 100 mét (ải 1 = 700m, ải 20 = 2600m), chia 5 màn bằng cột mốc; qua mốc thưởng 10 x ải x số màn.
 
@@ -130,7 +143,7 @@ Tài liệu bàn giao để tiếp tục làm việc ở phiên chat mới mà k
 | Xác xe | Phá ngay nếu tốc độ trên 720; sát thương 18; máu với đạn 8 |
 | Vật phẩm | $ tiền (5 + ải), ⛽ +25% xăng, ✚ +30% máu, 🛡 lá chắn 6 giây, 🎯 +15 đạn, ⏱ +5 giây & đẩy bão, 👥 nhân bản (hồi sinh 1 lần trong 10 giây, mở sau ải 5) |
 
-### Nâng cấp (mỗi loại 5 cấp, giá = base x (cấp+1) + 50 x cấp²)
+### Nâng cấp (mỗi loại 5 cấp, giá = base x (cấp+1) x 1,5 + 100 x cấp², từ v4.4)
 | Nâng cấp | Base | Tác dụng |
 |---|---|---|
 | Động cơ | 150 | Tốc độ tối đa 700 + 110/cấp; lực kéo 520 + 80/cấp |
@@ -140,19 +153,34 @@ Tài liệu bàn giao để tiếp tục làm việc ở phiên chat mới mà k
 | Đạn dược | 100 | 20 + 20 viên/cấp |
 | Lốp xe | 110 | Độ bám 1,0 + 0,15/cấp |
 
-### Gara (mở sau ải 1)
-| Xe | Máu | Tốc độ | Lực kéo | Giáp | Xăng | Giá |
-|---|---|---|---|---|---|---|
-| Bán tải cũ | x1.0 | x1.0 | x1.0 | 0% | x1.0 | có sẵn |
-| Xe cơ bắp | x0.9 | x1.18 | x1.15 | 0% | x0.95 | 1500 |
-| Xe tải thùng | x1.5 | x0.95 | x1.1 | 10% | x1.4 | 3000 |
-| Xe bọc thép | x2.0 | x1.05 | x1.35 | 30% | x1.2 | 6000 |
+### Gara (mở sau ải 1) — 5 dòng xe x 5 phiên bản, giá đã +30%
+- Dòng xe mở khóa theo ải đã vượt: Xe máy (có sẵn), Xe hơi (qua ải 5), Bán tải (qua ải 10), Bọc thép (qua ải 15), Xe tăng (qua ải 20).
+- Chỉ số gốc của dòng (máu / tốc độ / lực kéo / giáp / xăng / bám / sức húc): Xe máy 0,75/1,04/0,95/0%/0,85/1,05/0,6; Xe hơi 1,0/1,10/1,05/5%/1,0/1,0/0,9; Bán tải 1,3/1,02/1,15/10%/1,2/1,08/1,15; Bọc thép 1,8/1,0/1,3/22%/1,3/1,1/1,45; Xe tăng 2,4/0,96/1,5/32%/1,45/1,25/2,0.
+- Phiên bản k (0..4): máu +10%·k, tốc độ +3%·k, lực kéo +5%·k, giáp +2,5%·k, xăng +6%·k, bám +3%·k, sức húc +10%·k.
+- Sức húc: chia ngưỡng phá vật cản (chỉ khi > 1, xe nhẹ giữ ngưỡng cũ), ≥ 1,4 thì mỗi cú húc trừ 50% độ bền; nhân sát thương tông trùm.
 
-| Vũ khí | Đặc điểm | Giá |
+| Dòng | Phiên bản 1 → 5 | Giá ($, đã +30%) |
 |---|---|---|
-| Súng máy | Bắn nhanh (0,16 giây), sát thương 1 | có sẵn |
-| Nỏ | 0,45 giây, sát thương 3, xuyên 3 mục tiêu | 1200 |
-| Máy ném đá | 0,8 giây, đá bay vòng cung, nổ bán kính 160 | 2500 |
+| Xe máy | Xe Cub Cũ, Cào Cào Địa Hình, Mô Tô Phân Khối Lớn, Chopper Đinh Tán, Mô Tô Chiến Binh | 0, 780, 1560, 2600, 4160 |
+| Xe hơi | Xe Con Gỉ Sét, Xe Cơ Bắp, Xe Đua Rally, Siêu Xe Gai Nhọn, Chiến Xa Tử Thần | 2600, 3900, 5460, 7280, 9750 |
+| Bán tải | Bán Tải Cũ, Bán Tải Săn Zombie, Bán Tải Lưới Thép, Bán Tải Off-road, Bán Tải Quái Thú | 6500, 8450, 11050, 14300, 18200 |
+| Bọc thép | Xe Chở Tiền, Xe Đặc Nhiệm SWAT, Xe Bọc Thép Lội Nước, Xe Ủi Thép, Pháo Đài Di Động | 13000, 16900, 21450, 26650, 32500 |
+| Xe tăng | Tăng Hạng Nhẹ, Tăng Sa Mạc, Tăng Rằn Ri, Tăng Hạng Nặng, Tăng Hủy Diệt | 23400, 29900, 37700, 46800, 58500 |
+
+Vũ khí (10 loại, mỗi loại nâng 5 cấp: +18% sát thương, -6% thời gian nạp, +5% tầm, +6% bán kính nổ mỗi cấp; giá cấp = (giá gốc hoặc 400) x 0,35 x (cấp+1) + 150 x cấp², x1,3):
+
+| Vũ khí | Mở ở ải | Giá | Sát thương | Nạp (giây) | Tầm | Đặc biệt |
+|---|---|---|---|---|---|---|
+| Súng lục | có sẵn | 0 | 1 | 0,34 | 760 | — |
+| Dao chém | 1 | 650 | 2 | 0,3 | 190 trước mũi | Không tốn đạn, chém cả vật cản/trùm |
+| Súng máy | 1 | 1950 | 1 | 0,14 | 900 | — |
+| Nỏ | 2 | 3120 | 3 | 0,45 | 950 | Xuyên 3 (+1 mỗi 2 cấp) |
+| Súng hoa cải | 3 | 4160 | 1,2 x 5 viên | 0,7 | 560 | Chùm 5 viên |
+| Máy ném đá | 5 | 5850 | 4 | 0,8 | 900 | Nổ bán kính 160 |
+| Súng phun lửa | 7 | 9100 | 0,55 | 0,07 | 400 | Xuyên mọi thứ, đốt cháy 2 giây (1,2 máu/giây), 0,3 đạn/lần |
+| Tên lửa | 10 | 14300 | 7 | 1,3 | 1100 | Tự dẫn, nổ bán kính 210 |
+| Súng laser | 13 | 20800 | 2,4 | 0,5 | 1150 | Tia tức thì xuyên tất cả |
+| Súng nòng xoay | 16 | 28600 | 1,1 | 0,055 | 1000 | 0,5 đạn/lần |
 
 ### Thành tích 🏆 (hiện trong bảng tổng kết)
 - Tới trạm cứu hộ; Không trầy xước (tới trạm với máu ≥ 90%); Kỷ lục quãng đường; Điểm cao nhất mới.
@@ -170,7 +198,9 @@ Tài liệu bàn giao để tiếp tục làm việc ở phiên chat mới mà k
 | Terrain.kt | Sinh địa hình: đồi nhiều tầng, đá, ổ gà, ván giặt, dốc nhảy, giới hạn dốc 38°, bo thung lũng, cảnh vật |
 | Themes.kt | 4 vùng (Region) và 20 bản đồ (MapTheme): tên, màu trời/núi/đất/cỏ, kiểu đường chân trời |
 | Renderer.kt | Vẽ toàn bộ: nền theo bản đồ (trời/núi/thành phố/núi lửa/lâu đài/tháp ngoài hành tinh), màn chọn bản đồ, quái theo vùng, 4 kiểu trùm, địa hình, xe, zombie, trùm + đá ném + cổng trạm, vật cản + thanh độ bền, bão, HUD (cả thanh máu trùm), menu, cửa hàng, gara, bảng tổng kết |
-| Entities.kt | Kiểu dữ liệu: State, CarType, WeaponType, Upgrade, ItemType, Zombie, Obstacle, Boss, BossRock, Debris, Projectile, Particle, FloatText, Car... |
+| Garage.kt | 5 dòng xe x 5 phiên bản (Vehicles), 10 vũ khí (WeaponType) + chỉ số theo cấp, giá +30% |
+| CarArt.kt | Vẽ 25 xe (có người lái xe máy, xích xe tăng) và 10 vũ khí, dùng cho trận đấu và gara |
+| Entities.kt | Kiểu dữ liệu: State, Upgrade, ItemType, Zombie, Obstacle, Boss, BossRock, Debris, Projectile, Particle, FloatText, Car... |
 | Sfx.kt | Hiệu ứng âm thanh tổng hợp ra WAV (cache theo phiên bản), phát bằng SoundPool khi đã nạp xong, có ưu tiên và giãn cách |
 | Music.kt | 3 bài nhạc tổng hợp (chill 90 BPM La thứ, kịch tính 140 BPM Rê thứ, chiến thắng Đô trưởng), phát bằng AudioTrack có vòng lặp, chuyển bài mượt |
 | SaveData.kt | SharedPreferences "car_survival_v3": tiền, ngày, ải đã vượt, ải chọn, kỷ lục từng ải, nâng cấp, xe/vũ khí sở hữu, âm thanh, nhạc, điểm cao nhất |
@@ -227,14 +257,15 @@ cd tools/dev/preview && gradle boss      # thử đánh trùm ải 5 và ải 20
 - Người dùng chưa phản hồi về: độ khó đường mới, nhạc nền, cảm giác điều khiển trên điện thoại thật.
 - Danh sách người dùng đã đồng ý làm dần: chỉnh độ khó sau khi chơi thử; bão gắt hơn từ đầu; thêm loại zombie mới (nhảy, mặc giáp); bản đồ mới (thành phố, rừng, tuyết); thêm xe/vũ khí (súng phun lửa, lưỡi cưa); chuẩn bị đưa lên Google Play (khóa ký release, icon, ảnh giới thiệu).
 - Đã xong từ danh sách này: trùm cuối mỗi 5 ải (v4.2); bản đồ mới theo vùng + quái theo vùng (v4.3).
-- Chờ người dùng chơi thử v4.3: âm thanh còn trễ không, độ khó 4 trùm, màu các map.
+- v4.3: người dùng xác nhận nhạc đã khớp.
+- Chờ người dùng chơi thử v4.4: tốc độ cày tiền, giá xe/vũ khí, cảm giác lái mới, độ khó trùm (máu 50/120/180/240).
 - Chưa tạo Pull Request; khi người dùng muốn gộp vào nhánh chính thì tạo PR từ claude/2d-driving-game-f0kpjk.
 
 ## 10. Các phiên chat
 
 | Phiên | Tiêu đề | Phạm vi |
 |---|---|---|
-| #1 | Đua Xe Sinh Tồn #1 — v1.0→v4.3: tạo game, kiểu Earn to Die, bão 3 bo, nhạc, độ bền vật cản, trùm cuối, 20 bản đồ, 4 trùm | Từ đầu đến v4.3 + tài liệu bàn giao, công cụ tools/dev, quy tắc CLAUDE.md |
+| #1 | Đua Xe Sinh Tồn #1 — v1.0→v4.4: tạo game, kiểu Earn to Die, bão 3 bo, nhạc, độ bền vật cản, trùm cuối, 20 bản đồ, 4 trùm, gara 25 xe | Từ đầu đến v4.4 + tài liệu bàn giao, công cụ tools/dev, quy tắc CLAUDE.md |
 
 - Quy tắc làm việc (đặt tiêu đề phiên, tự lưu tiến trình khi ngữ cảnh ≥ 90% rồi nhắc mở chat mới) nằm trong CLAUDE.md ở gốc repo.
 

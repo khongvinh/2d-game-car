@@ -4,30 +4,6 @@ import kotlin.math.min
 
 enum class State { MENU, MAPS, SHOP, GARAGE, PLAYING, PAUSED, RESULT, STAGE_DONE, VICTORY }
 
-/** Selectable cars (garage unlocks after clearing stage 1). */
-enum class CarType(
-    val title: String,
-    val color: Int,
-    val hpMul: Float,
-    val speedMul: Float,
-    val powerMul: Float,
-    val armor: Float,
-    val fuelMul: Float,
-    val cost: Int,
-) {
-    PICKUP("Bán tải cũ", 0xFFD84315.toInt(), 1.0f, 1.0f, 1.0f, 0f, 1.0f, 0),
-    MUSCLE("Xe cơ bắp", 0xFF1565C0.toInt(), 0.9f, 1.18f, 1.15f, 0f, 0.95f, 1500),
-    VAN("Xe tải thùng", 0xFFECEFF1.toInt(), 1.5f, 0.95f, 1.1f, 0.1f, 1.4f, 3000),
-    TANK("Xe bọc thép", 0xFF4E5B31.toInt(), 2.0f, 1.05f, 1.35f, 0.3f, 1.2f, 6000),
-}
-
-/** Roof-mounted weapon; fires automatically at zombies and obstacles ahead. */
-enum class WeaponType(val title: String, val icon: String, val desc: String, val cost: Int, val interval: Float) {
-    GUN("Súng máy", "🔫", "Bắn nhanh", 0, 0.16f),
-    CROSSBOW("Nỏ", "🏹", "Xuyên 3 mục tiêu", 1200, 0.45f),
-    CATAPULT("Máy ném đá", "☄", "Nổ diện rộng", 2500, 0.8f),
-}
-
 enum class Upgrade(val title: String, val desc: String, val base: Int) {
     ENGINE("Động cơ", "+tốc độ & lực kéo", 150),
     FUEL("Bình xăng", "+25% xăng", 120),
@@ -36,7 +12,8 @@ enum class Upgrade(val title: String, val desc: String, val base: Int) {
     AMMO("Đạn dược", "+20 viên mỗi cấp", 100),
     GRIP("Lốp xe", "+bám đường", 110);
 
-    fun cost(level: Int) = base * (level + 1) + 50 * level * level
+    /** Upgrades are a long grind: each level costs much more than the last. */
+    fun cost(level: Int) = (base * (level + 1) * 1.5f).toInt() + 100 * level * level
 
     companion object {
         const val MAX_LEVEL = 5
@@ -86,7 +63,10 @@ enum class ZombieType(
 }
 
 class Zombie(val type: ZombieType, var x: Float, var y: Float) {
-    var hp = type.hp
+    var hp = type.hp.toFloat()
+
+    /** Seconds left burning (flamethrower). */
+    var burnT = 0f
 
     /** Height above the ground for flying monsters. */
     var fly = if (type.flying) 150f + (x % 60f) else 0f
@@ -109,7 +89,7 @@ enum class ObstacleType(val w: Float, val h: Float, val mass: Float, val breakSp
 }
 
 class Obstacle(val type: ObstacleType, var x: Float, var y: Float) {
-    var hp = type.hp
+    var hp = type.hp.toFloat()
     var alive = true
     var flash = 0f
     var vy = 0f
@@ -122,7 +102,7 @@ class Obstacle(val type: ObstacleType, var x: Float, var y: Float) {
     var barT = 0f
 
     /** Bar fraction: the weaker of ramming durability and weapon damage. */
-    val barFrac get() = min(ramHp, if (type.hp > 0) hp.toFloat() / type.hp else 1f).coerceIn(0f, 1f)
+    val barFrac get() = min(ramHp, if (type.hp > 0) hp / type.hp else 1f).coerceIn(0f, 1f)
 
     companion object {
         const val RAM_HIT = 0.25f
@@ -159,16 +139,25 @@ class Debris(
     }
 }
 
-class Projectile(val kind: WeaponType, var x: Float, var y: Float, var vx: Float, var vy: Float) {
+class Projectile(
+    val kind: WeaponType,
+    var x: Float,
+    var y: Float,
+    var vx: Float,
+    var vy: Float,
+    val damage: Float,
+    var pierce: Int,
+    val splash: Float,
+) {
     var alive = true
-    var pierce = if (kind == WeaponType.CROSSBOW) 3 else 1
     var life = 1.4f
-    val damage = when (kind) {
-        WeaponType.GUN -> 1
-        WeaponType.CROSSBOW -> 3
-        WeaponType.CATAPULT -> 4
-    }
+    var age = 0f
     val hit = HashSet<Any>()
+}
+
+/** Laser beam drawn for a moment after it fires. */
+class Beam(val x1: Float, val y1: Float, val x2: Float, val y2: Float) {
+    var life = 0.18f
 }
 
 class Particle(
@@ -216,7 +205,7 @@ class Car {
     var maxFuel = 1f
     var boost = 1f
     var maxBoost = 1f
-    var ammo = 0
+    var ammo = 0f
     var shieldT = 0f
     var cloneT = 0f
     var hurtT = 0f
@@ -225,6 +214,16 @@ class Car {
     var fireCd = 0f
     var aim = 0f
     var boosting = false
+
+    /** Smoothed throttle (-1 brake .. 1 gas) and lean, so inputs ramp instead of snapping. */
+    var throttle = 0f
+    var leanIn = 0f
+
+    /** Visual-only body pitch from acceleration (squat under gas, dive under brakes). */
+    var squat = 0f
+
+    /** Knife swing animation timer. */
+    var slashT = 0f
 
     val fwdX get() = kotlin.math.cos(angle)
     val fwdY get() = kotlin.math.sin(angle)
@@ -277,7 +276,7 @@ class Boss(val tier: Int, var x: Float, var y: Float) {
 
     companion object {
         val NAMES = arrayOf("GÃ KHỔNG LỒ", "RỒNG LỬA", "DƠI HÚT MÁU", "QUÁI VẬT NGOÀI HÀNH TINH")
-        val HP = floatArrayOf(50f, 100f, 140f, 170f)
+        val HP = floatArrayOf(50f, 120f, 180f, 240f)
     }
 }
 

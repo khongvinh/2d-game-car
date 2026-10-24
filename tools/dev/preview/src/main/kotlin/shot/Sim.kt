@@ -17,7 +17,7 @@ fun run(stage: Int, seconds: Float, gas: Boolean, lean: Float = 0f, top: Float =
         val air0 = !c.grounded[0] && !c.grounded[1]
         val want = kotlin.math.atan(t.slopeAt(c.x + 60f))
         val l = if (lean != 0f) lean else if (air0 || cos(c.angle) < 0.7f) ((want - c.angle) * 3f).coerceIn(-1f, 1f) else 0f
-        if (p.step(t, c, h, gas, false, l, top, acc, 1f)) landings++
+        if (p.step(t, c, h, if (gas) 1f else 0f, l, top, acc, 1f)) landings++
         time += h
         val flip = cos(c.angle) < -0.3f
         if (flip && !wasFlip) flips++

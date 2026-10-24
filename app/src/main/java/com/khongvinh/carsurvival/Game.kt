@@ -1,6 +1,7 @@
 package com.khongvinh.carsurvival
 
 import android.graphics.Canvas
+import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.atan2
 import kotlin.math.ceil
@@ -57,6 +58,7 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
     val debris = ArrayList<Debris>()
     val items = ArrayList<Item>()
     val shots = ArrayList<Projectile>()
+    val beams = ArrayList<Beam>()
     val particles = ArrayList<Particle>()
     val texts = ArrayList<FloatText>()
 
@@ -108,8 +110,22 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
     private var engineAcc = 520f
     private var mu = 1f
     private var armor = 0f
-    var weapon = WeaponType.GUN
+    var weapon = WeaponType.PISTOL
         private set
+    var wstats = WeaponType.PISTOL.stats(0)
+        private set
+    var vehicle = Vehicles.of(0)
+        private set
+    private var ramMul = 1f
+
+    /** Money from monsters grows with the stage, so farming later stages pays more. */
+    private val rewardMul get() = 1f + 0.12f * (stage - 1)
+
+    // garage browsing
+    var garageTab = 0
+    var garageClass = VehicleClass.MOTO
+    var garageVariant = 0
+    var garageWeapon = WeaponType.PISTOL
 
     // controls
     private val pointers = HashMap<Int, String>()
@@ -168,28 +184,32 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
 
     fun startRun() {
         loadStage(save.stageSel.coerceIn(1, maxStartStage()))
-        val ct = save.carType
+        val ct = save.vehicleType
+        vehicle = ct
         val lv = { u: Upgrade -> save.level(u) }
         topSpeed = (700f + 110f * lv(Upgrade.ENGINE)) * ct.speedMul
         engineAcc = (520f + 80f * lv(Upgrade.ENGINE)) * ct.powerMul
-        mu = 1.0f + 0.15f * lv(Upgrade.GRIP)
+        mu = (1.0f + 0.15f * lv(Upgrade.GRIP)) * ct.grip
         armor = min(0.7f, ct.armor + 0.06f * lv(Upgrade.ARMOR))
+        ramMul = ct.ram
         weapon = save.weaponType
+        wstats = weapon.stats(save.weaponLevel(weapon))
 
         val c = car
         c.vx = 0f; c.vy = 0f; c.spin = 0f; c.angle = 0f
+        c.throttle = 0f; c.leanIn = 0f; c.squat = 0f; c.slashT = 0f
         c.maxHp = (100f + 30f * lv(Upgrade.ARMOR)) * ct.hpMul
         c.hp = c.maxHp
         c.maxFuel = (22f + 6f * lv(Upgrade.FUEL)) * ct.fuelMul
         c.fuel = c.maxFuel
         c.maxBoost = 1.5f + 1.2f * lv(Upgrade.BOOST)
         c.boost = c.maxBoost
-        c.ammo = 20 + 20 * lv(Upgrade.AMMO)
+        c.ammo = 20f + 20f * lv(Upgrade.AMMO)
         c.shieldT = 0f; c.cloneT = 0f; c.hurtT = 0f; c.flipT = 0f; c.stuckT = 0f; c.fireCd = 0f
         c.aim = 0f
 
         zombies.clear(); obstacles.clear(); debris.clear(); items.clear()
-        shots.clear(); particles.clear(); texts.clear()
+        shots.clear(); particles.clear(); texts.clear(); beams.clear()
         bossRocks.clear()
         bossKilled = false
         boss = if (stage % 5 == 0) Boss(stage / 5, goalX - 520f, terrain.heightAt(goalX - 520f)) else null
@@ -330,7 +350,7 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
         if (state != State.PLAYING && state != State.PAUSED) return
         endReason = reason
         val m = maxDist.toInt()
-        distMoney = (m * 0.4f).toInt()
+        distMoney = (m * 0.25f).toInt()
         save.money += distMoney + runMoney
         if (m > save.best[stage]) {
             newRecord = save.best[stage] > 0
@@ -345,8 +365,8 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
 
     private fun stageComplete() {
         val m = goalM.toInt()
-        distMoney = (m * 0.4f).toInt()
-        stageBonus = 200 * stage
+        distMoney = (m * 0.25f).toInt()
+        stageBonus = 120 * stage
         save.money += distMoney + runMoney + stageBonus
         save.best[stage] = max(save.best[stage], m)
         finishStats(true)
@@ -402,7 +422,7 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
         boss = null
         bossRocks.clear()
         zombies.clear(); obstacles.clear(); debris.clear(); items.clear()
-        shots.clear(); particles.clear(); texts.clear()
+        shots.clear(); particles.clear(); texts.clear(); beams.clear()
         loadStage(save.stageSel.coerceIn(1, maxStartStage()))
         setState(State.MENU)
     }
@@ -463,6 +483,10 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
             left -= h
         }
         c.wheelRot += c.forwardSpeed / Car.WHEEL_R * dt
+        // the body squats under throttle and dips under the brakes (drawing only)
+        val wantSquat = if (c.grounded[0] || c.grounded[1]) -c.throttle * 0.045f else 0f
+        c.squat += (wantSquat - c.squat) * min(1f, dt * 7f)
+        if (c.slashT > 0f) c.slashT -= dt
 
         // fuel & boost
         if (gas && c.fuel > 0f) c.fuel -= dt else c.fuel -= 0.03f * dt
@@ -648,7 +672,7 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
         explode(c.x, c.y - 10f, 0xFFFF6D00.toInt(), 80)
         explode(c.x + 40f, c.y - 30f, 0xFFFFEA00.toInt(), 40)
         repeat(7) {
-            debris.add(Debris(Debris.METAL, c.x + rnd(-60f, 60f), c.y - 20f, c.vx * 0.5f + rnd(-350f, 350f), -rnd(350f, 800f), 0f, rnd(-14f, 14f), rnd(24f, 50f), rnd(10f, 20f), save.carType.color))
+            debris.add(Debris(Debris.METAL, c.x + rnd(-60f, 60f), c.y - 20f, c.vx * 0.5f + rnd(-350f, 350f), -rnd(350f, 800f), 0f, rnd(-14f, 14f), rnd(24f, 50f), rnd(10f, 20f), vehicle.color))
         }
         c.vy -= 520f
         c.vx *= 0.4f
@@ -709,10 +733,20 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
 
     private fun physics(h: Float) {
         val c = car
+        // inputs ramp in and out over a fraction of a second instead of snapping on/off
+        val wantT = when {
+            dyingT > 0f -> 0f
+            gas && c.fuel > 0f -> 1f
+            brake -> -1f
+            else -> 0f
+        }
+        c.throttle += (wantT - c.throttle) * min(1f, h * (if (wantT == 0f) 14f else 8f))
+        val wantLean = if (dyingT > 0f) 0f else (if (leanFwd) 1f else 0f) - (if (leanBack) 1f else 0f)
+        c.leanIn += (wantLean - c.leanIn) * min(1f, h * 10f)
         val landed = phys.step(
             terrain, c, h,
-            gas = gas && c.fuel > 0f && dyingT <= 0f, brake = brake && dyingT <= 0f,
-            lean = if (dyingT > 0f) 0f else (if (leanFwd) 1f else 0f) - (if (leanBack) 1f else 0f),
+            throttle = c.throttle,
+            lean = c.leanIn,
             topSpeed = topSpeed, engineAcc = engineAcc, mu = mu,
         )
         if (landed) {
@@ -748,6 +782,18 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
             })
             if (abs(dx) < 1300f) {
                 z.x += sign(dx) * z.type.speed * dt
+            }
+            if (z.burnT > 0f) {
+                // set alight by the flamethrower
+                z.burnT -= dt
+                z.hp -= 1.2f * dt
+                if (Random.nextFloat() < dt * 25f) {
+                    particles.add(Particle(z.x + rnd(-12f, 12f), z.y - z.fly - rnd(10f, z.type.h), rnd(-20f, 20f), -rnd(60f, 140f), 0.4f, 0.4f, rnd(5f, 10f), if (Random.nextBoolean()) 0xFFFF6D00.toInt() else 0xFFFFD740.toInt()))
+                }
+                if (z.hp <= 0f) {
+                    smashZombie(z, rnd(-80f, 80f), -200f)
+                    continue
+                }
             }
             val ground = terrain.heightAt(z.x)
             if (z.type.flying) {
@@ -792,7 +838,7 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
         }
         debris.add(Debris(kind, z.x, z.y - z.type.h / 2, vx, vy, 0f, rnd(-12f, 12f), z.type.w, z.type.h, z.shirt))
         bleed(z.x, z.y - z.type.h / 2, 14)
-        addMoney(z.type.reward, z.x, z.y - z.type.h - 20f)
+        addMoney((z.type.reward * rewardMul).toInt(), z.x, z.y - z.type.h - 20f)
         sfx.play(Sfx.S.SPLAT, 0.8f)
     }
 
@@ -813,7 +859,7 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
             if (abs(loc[0]) >= ox || abs(loc[1]) >= oy) continue
             when {
                 o.type == ObstacleType.BARREL -> barrelBlast(o)
-                abs(fs) > o.type.breakSpeed || (c.shieldT > 0f && o.type != ObstacleType.WRECK) ||
+                abs(fs) > o.type.breakSpeed / max(1f, ramMul) || (c.shieldT > 0f && o.type != ObstacleType.WRECK) ||
                     (c.shieldT > 0f && abs(fs) > 300f) -> {
                     breakObstacle(o, c.vx)
                     val keep = 1f - o.type.mass * 0.6f * (1f - armor * 0.5f)
@@ -838,7 +884,7 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
                         if (into > Obstacle.RAM_SPEED && o.ramCd <= 0f) {
                             // a solid ram wears the obstacle down by 25%; four rams break it
                             o.ramCd = 0.35f
-                            o.ramHp -= Obstacle.RAM_HIT
+                            o.ramHp -= Obstacle.RAM_HIT * (if (ramMul >= 1.4f) 2f else 1f)
                             o.flash = 0.12f
                             damageCar(into * 0.012f * (1f - armor))
                             shake = max(shake, 0.2f)
@@ -880,7 +926,7 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
     private fun breakObstacle(o: Obstacle, vx: Float) {
         o.alive = false
         smashed++
-        addMoney(o.type.reward, o.x, o.y - o.type.h - 10f)
+        addMoney((o.type.reward * rewardMul).toInt(), o.x, o.y - o.type.h - 10f)
         val cy = o.y - o.type.h / 2
         if (o.type == ObstacleType.WRECK) {
             repeat(6) {
@@ -904,7 +950,7 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
         explode(cx, cy, 0xFFFF5722.toInt(), 40)
         sfx.play(Sfx.S.BOOM)
         shake = 0.35f
-        blastArea(cx, cy, 220f, 5)
+        blastArea(cx, cy, 220f, 5f)
         val c = car
         val d = hypot(c.x - cx, c.y - cy)
         if (d < 260f) {
@@ -915,7 +961,7 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
     }
 
     /** Damages / kills everything in a radius (barrels, catapult). */
-    private fun blastArea(cx: Float, cy: Float, r: Float, dmg: Int) {
+    private fun blastArea(cx: Float, cy: Float, r: Float, dmg: Float) {
         boss?.let { bb ->
             if (bb.alive && abs(bb.x - cx) < r + bb.w / 2 && abs(bb.cy - cy) < r + bb.h / 2) hurtBoss(bb, dmg * 2f)
         }
@@ -924,7 +970,7 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
             val d = hypot(z.x - cx, z.y - z.type.h / 2 - cy)
             if (d < r) {
                 z.hp -= dmg
-                if (z.hp <= 0) smashZombie(z, (z.x - cx) * 3f, -400f - rnd(0f, 200f))
+                if (z.hp <= 0f) smashZombie(z, (z.x - cx) * 3f, -400f - rnd(0f, 200f))
             }
         }
         for (o in obstacles) {
@@ -932,16 +978,16 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
             val d = hypot(o.x - cx, o.y - o.type.h / 2 - cy)
             if (d < r + o.type.w * 0.3f) {
                 if (o.type == ObstacleType.BARREL) {
-                    o.hp = 0
+                    o.hp = 0f
                 } else {
                     o.hp -= dmg
                     o.flash = 0.1f
-                    if (o.hp <= 0) breakObstacle(o, (o.x - cx) * 2f)
+                    if (o.hp <= 0f) breakObstacle(o, (o.x - cx) * 2f)
                 }
             }
         }
         // chain reaction
-        val chain = obstacles.filter { it.alive && it.type == ObstacleType.BARREL && it.hp <= 0 }
+        val chain = obstacles.filter { it.alive && it.type == ObstacleType.BARREL && it.hp <= 0f }
         for (b in chain) barrelBlast(b)
     }
 
@@ -1095,7 +1141,7 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
             if (into > 0f) {
                 if (into > Obstacle.RAM_SPEED && b.ramCd <= 0f) {
                     b.ramCd = 0.45f
-                    val dmg = into / 35f * (if (c.boosting) 1.5f else 1f)
+                    val dmg = into / 35f * (if (c.boosting) 1.5f else 1f) * ramMul
                     hurtBoss(b, dmg)
                     damageCar((5f + 2f * tier) * (1f - armor))
                     shake = max(shake, 0.3f)
@@ -1244,7 +1290,7 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
                 text("LÁ CHẮN!", it, 0xFF82B1FF.toInt())
             }
             ItemType.AMMO -> {
-                c.ammo += 15
+                c.ammo += 15f
                 text("+15 ĐẠN", it, 0xFFFFCC80.toInt())
             }
             ItemType.TIME -> {
@@ -1266,105 +1312,247 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
 
     // -------------------------------------------------------------- weapon
 
+    /** World position of the weapon mount on the current vehicle. */
+    private fun mountPos(out: FloatArray) {
+        val c = car
+        val cs = cos(c.angle)
+        val sn = sin(c.angle)
+        val mx = vehicle.cls.mountX
+        val my = vehicle.cls.mountY
+        out[0] = c.x + mx * cs - my * sn
+        out[1] = c.y + mx * sn + my * cs
+    }
+
+    private val mount = FloatArray(2)
+
     private fun updateWeapon(dt: Float) {
         val c = car
         c.fireCd -= dt
-        // gun origin on the roof
-        val cs = cos(c.angle)
-        val sn = sin(c.angle)
-        val ox = c.x + (-10f) * cs - (-Car.HALF_H - 22f) * sn
-        val oy = c.y + (-10f) * sn + (-Car.HALF_H - 22f) * cs
+        if (weapon == WeaponType.KNIFE) {
+            updateKnife()
+            return
+        }
+        val st = wstats
+        mountPos(mount)
+        val ox = mount[0]
+        val oy = mount[1]
         var tx = 0f
         var ty = 0f
         var best = Float.MAX_VALUE
         for (z in zombies) {
             val dx = z.x - c.x
-            if (dx < 60f || dx > 950f || dx > best) continue
+            if (dx < 60f || dx > st.range || dx > best) continue
             best = dx; tx = z.x; ty = z.y - z.type.h * 0.6f
         }
         boss?.let { bb ->
             val dx = bb.x - c.x
             // the turret swings round: the boss is the priority target, in front or behind
-            if (bb.alive && bb.engaged && abs(dx) < 1100f) {
+            if (bb.alive && bb.engaged && abs(dx) < max(st.range, 500f) + bb.w / 2) {
                 best = abs(dx); tx = bb.x; ty = bb.cy
             }
         }
         if (best == Float.MAX_VALUE) {
+            val weak = st.damage < 2f && st.splash == 0f && weapon != WeaponType.FLAMER
             for (o in obstacles) {
-                if (o.type == ObstacleType.WRECK && weapon == WeaponType.GUN) continue
+                if (o.type == ObstacleType.WRECK && weak) continue
                 val dx = o.x - c.x
-                if (dx < 100f || dx > 800f || dx > best) continue
+                if (dx < 100f || dx > min(st.range, 850f) || dx > best) continue
                 best = dx; tx = o.x; ty = o.y - o.type.h / 2
             }
         }
         val targetAim = if (best == Float.MAX_VALUE) c.angle else atan2(ty - oy, tx - ox)
         c.aim += (targetAim - c.aim) * min(1f, dt * 12f)
-        if (best == Float.MAX_VALUE || c.ammo <= 0 || c.fireCd > 0f) return
-        c.fireCd = weapon.interval
-        c.ammo--
+        if (best == Float.MAX_VALUE || c.ammo < weapon.ammoUse || c.fireCd > 0f) return
+        c.fireCd = st.interval
+        c.ammo -= weapon.ammoUse
         val dx = tx - ox
         val dy = ty - oy
         val d = max(1f, hypot(dx, dy))
+        val ang = atan2(dy, dx)
+        fun shot(a: Float, speed: Float, life: Float) = Projectile(weapon, ox, oy, cos(a) * speed + c.vx, sin(a) * speed + c.vy, st.damage, st.pierce, st.splash).also { it.life = life }
         when (weapon) {
-            WeaponType.GUN -> {
-                shots.add(Projectile(weapon, ox, oy, dx / d * 2000f + c.vx, dy / d * 2000f + c.vy))
-                sfx.play(Sfx.S.SHOOT, 0.3f)
+            WeaponType.PISTOL, WeaponType.SMG, WeaponType.MINIGUN -> {
+                val jitter = if (weapon == WeaponType.MINIGUN) rnd(-0.05f, 0.05f) else 0f
+                shots.add(shot(ang + jitter, weapon.speed, st.range / weapon.speed * 1.3f))
+                sfx.play(Sfx.S.SHOOT, if (weapon == WeaponType.PISTOL) 0.4f else 0.3f)
+            }
+            WeaponType.SHOTGUN -> {
+                val n = weapon.pellets
+                for (k in 0 until n) {
+                    val a = ang + (k - (n - 1) / 2f) / ((n - 1) / 2f) * weapon.spread + rnd(-0.03f, 0.03f)
+                    shots.add(shot(a, weapon.speed * rnd(0.9f, 1.1f), st.range / weapon.speed * 1.2f))
+                }
+                sfx.play(Sfx.S.BOOM, 0.35f)
+                shake = max(shake, 0.06f)
             }
             WeaponType.CROSSBOW -> {
-                shots.add(Projectile(weapon, ox, oy, dx / d * 1600f + c.vx, dy / d * 1600f + c.vy))
+                shots.add(shot(ang, weapon.speed, st.range / weapon.speed * 1.3f))
                 sfx.play(Sfx.S.BOW, 0.6f)
             }
             WeaponType.CATAPULT -> {
                 val t = (d / 900f).coerceIn(0.35f, 1.1f)
-                shots.add(Projectile(weapon, ox, oy, dx / t, dy / t - 0.5f * G * t).also { it.life = 3f })
+                shots.add(Projectile(weapon, ox, oy, dx / t, dy / t - 0.5f * G * t, st.damage, 1, st.splash).also { it.life = 3f })
                 sfx.play(Sfx.S.CATAPULT, 0.7f)
             }
+            WeaponType.FLAMER -> {
+                val sp = weapon.speed * rnd(0.85f, 1.1f)
+                shots.add(shot(ang + rnd(-0.12f, 0.12f), sp, st.range / sp * 1.25f))
+                if (Random.nextFloat() < 0.25f) sfx.play(Sfx.S.BOOST, 0.25f)
+            }
+            WeaponType.ROCKET -> {
+                shots.add(shot(ang - 0.25f, weapon.speed, 3f))
+                sfx.play(Sfx.S.BOOST, 0.6f)
+            }
+            WeaponType.LASER -> fireLaser(ox, oy, ang, st)
+            WeaponType.KNIFE -> {}
         }
+    }
+
+    /** Front blades: slash whatever is just ahead of the bumper. No ammo needed. */
+    private fun updateKnife() {
+        val c = car
+        val st = wstats
+        c.aim = c.angle
+        if (c.fireCd > 0f) return
+        val reach = Car.HALF_LEN + st.range
+        var hitAny = false
+        for (z in zombies) {
+            if (!z.alive) continue
+            toLocal(z.x, z.y - z.type.h / 2, loc)
+            if (loc[0] > Car.HALF_LEN - 30f && loc[0] < reach + z.type.w / 2 && abs(loc[1]) < 60f + z.type.h / 2) {
+                z.hp -= st.damage
+                bleed(z.x, z.y - z.type.h / 2, 6)
+                if (z.hp <= 0f) smashZombie(z, c.vx * 0.8f + 200f * c.fwdX, -300f)
+                hitAny = true
+            }
+        }
+        for (o in obstacles) {
+            if (!o.alive || o.type == ObstacleType.BARREL) continue
+            toLocal(o.x, o.y - o.type.h / 2, loc)
+            if (loc[0] > 0f && loc[0] < reach + o.type.w / 2 && abs(loc[1]) < 50f + o.type.h / 2) {
+                o.hp -= st.damage
+                o.flash = 0.1f
+                o.barT = 3f
+                sparks(o.x - o.type.w / 2, o.y - o.type.h / 2)
+                if (o.hp <= 0f) breakObstacle(o, c.vx)
+                hitAny = true
+            }
+        }
+        boss?.let { bb ->
+            if (bb.alive && abs(bb.x - c.x) < reach + bb.w / 2 && abs(bb.cy - c.y) < bb.h / 2 + 70f) {
+                hurtBoss(bb, st.damage)
+                bleed(bb.x - bb.w / 2, bb.cy, 5)
+                hitAny = true
+            }
+        }
+        if (hitAny) {
+            c.fireCd = st.interval
+            c.slashT = 0.2f
+            sfx.play(Sfx.S.HIT, 0.5f)
+        }
+    }
+
+    /** Instant beam that pierces everything along its line. */
+    private fun fireLaser(ox: Float, oy: Float, ang: Float, st: WeaponStats) {
+        val dx = cos(ang)
+        val dy = sin(ang)
+        var len = st.range
+        // stop at the ground
+        var k = 40f
+        while (k < len) {
+            if (oy + dy * k > terrain.heightAt(ox + dx * k)) {
+                len = k; break
+            }
+            k += 30f
+        }
+        fun along(px: Float, py: Float, rad: Float): Boolean {
+            val t = (px - ox) * dx + (py - oy) * dy
+            if (t < 0f || t > len) return false
+            val ex = ox + dx * t - px
+            val ey = oy + dy * t - py
+            return ex * ex + ey * ey < rad * rad
+        }
+        for (z in zombies) {
+            if (!z.alive || !along(z.x, z.y - z.type.h / 2, z.type.h / 2 + 10f)) continue
+            z.hp -= st.damage
+            bleed(z.x, z.y - z.type.h / 2, 4)
+            if (z.hp <= 0f) smashZombie(z, dx * 300f, -250f)
+        }
+        for (o in obstacles) {
+            if (!o.alive || !along(o.x, o.y - o.type.h / 2, o.type.h / 2 + 10f)) continue
+            if (o.type == ObstacleType.BARREL) {
+                barrelBlast(o); continue
+            }
+            o.hp -= st.damage
+            o.flash = 0.1f
+            o.barT = 3f
+            if (o.hp <= 0f) breakObstacle(o, dx * 200f)
+        }
+        boss?.let { bb -> if (bb.alive && along(bb.x, bb.cy, max(bb.w, bb.h) / 2 + 20f)) hurtBoss(bb, st.damage) }
+        beams.add(Beam(ox, oy, ox + dx * len, oy + dy * len))
+        sparks(ox + dx * len, oy + dy * len)
+        sfx.play(Sfx.S.BEEP, 0.5f)
     }
 
     private fun updateShots(dt: Float) {
         for (s in shots) {
             if (!s.alive) continue
             s.life -= dt
-            if (s.kind == WeaponType.CATAPULT) s.vy += G * dt
+            s.age += dt
+            when (s.kind) {
+                WeaponType.CATAPULT -> s.vy += G * dt
+                WeaponType.FLAMER -> {
+                    s.vx *= 1f - 1.2f * dt
+                    s.vy = s.vy * (1f - 1.2f * dt) - 90f * dt
+                }
+                WeaponType.ROCKET -> steerRocket(s, dt)
+                else -> {}
+            }
             s.x += s.vx * dt
             s.y += s.vy * dt
+            val blasts = s.splash > 0f
             if (s.life <= 0f) {
-                s.alive = false; continue
+                s.alive = false
+                if (blasts) blast(s)
+                continue
             }
             if (s.y > terrain.heightAt(s.x)) {
                 s.alive = false
-                if (s.kind == WeaponType.CATAPULT) catapultBlast(s) else sparks(s.x, s.y)
+                if (blasts) blast(s) else if (s.kind != WeaponType.FLAMER) sparks(s.x, s.y)
                 continue
             }
+            val pad = if (s.kind == WeaponType.FLAMER) 10f + s.age * 60f else 6f
             val bb = boss
-            if (bb != null && bb.alive && abs(s.x - bb.x) < bb.w / 2 && abs(s.y - bb.cy) < bb.h / 2 + (if (bb.flying) 40f else 10f)) {
-                s.alive = false
-                if (s.kind == WeaponType.CATAPULT) {
-                    catapultBlast(s)
-                } else {
-                    hurtBoss(bb, s.damage.toFloat())
-                    bleed(s.x, s.y, 3)
+            if (bb != null && bb.alive && bb !in s.hit && abs(s.x - bb.x) < bb.w / 2 + pad && abs(s.y - bb.cy) < bb.h / 2 + (if (bb.flying) 40f else 10f)) {
+                if (blasts) {
+                    s.alive = false
+                    blast(s)
+                    continue
                 }
-                continue
+                s.hit.add(bb)
+                hurtBoss(bb, s.damage)
+                if (s.kind != WeaponType.FLAMER) bleed(s.x, s.y, 3)
+                if (--s.pierce <= 0) {
+                    s.alive = false; continue
+                }
             }
-            if (s.kind == WeaponType.CATAPULT) {
+            if (blasts) {
                 // explode on direct contact too
-                val hitZ = zombies.any { it.alive && abs(it.x - s.x) < it.type.w && s.y > it.y - it.type.h }
+                val hitZ = zombies.any { it.alive && abs(it.x - s.x) < it.type.w && s.y > it.y - it.type.h - it.fly && s.y < it.y + 10f }
                 val hitO = obstacles.any { it.alive && abs(it.x - s.x) < it.type.w / 2 && s.y > it.y - it.type.h }
                 if (hitZ || hitO) {
                     s.alive = false
-                    catapultBlast(s)
+                    blast(s)
                 }
                 continue
             }
             for (z in zombies) {
                 if (!z.alive || z in s.hit) continue
-                if (abs(z.x - s.x) < z.type.w / 2 + 6f && s.y > z.y - z.type.h && s.y < z.y) {
+                if (abs(z.x - s.x) < z.type.w / 2 + pad && s.y > z.y - z.type.h - pad && s.y < z.y + pad) {
                     s.hit.add(z)
                     z.hp -= s.damage
-                    bleed(s.x, s.y, 4)
-                    if (z.hp <= 0) smashZombie(z, s.vx * 0.12f, -220f)
+                    if (s.kind == WeaponType.FLAMER) z.burnT = 2f else bleed(s.x, s.y, 4)
+                    if (z.hp <= 0f) smashZombie(z, s.vx * 0.12f, -220f)
                     if (--s.pierce <= 0) {
                         s.alive = false; break
                     }
@@ -1373,7 +1561,7 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
             if (!s.alive) continue
             for (o in obstacles) {
                 if (!o.alive || o in s.hit) continue
-                if (abs(o.x - s.x) < o.type.w / 2 && s.y > o.y - o.type.h && s.y < o.y) {
+                if (abs(o.x - s.x) < o.type.w / 2 + pad && s.y > o.y - o.type.h - pad && s.y < o.y) {
                     s.hit.add(o)
                     if (o.type == ObstacleType.BARREL) {
                         barrelBlast(o)
@@ -1381,8 +1569,8 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
                         o.hp -= s.damage
                         o.flash = 0.08f
                         o.barT = 3f
-                        sparks(s.x, s.y)
-                        if (o.hp <= 0) breakObstacle(o, s.vx * 0.2f)
+                        if (s.kind != WeaponType.FLAMER) sparks(s.x, s.y)
+                        if (o.hp <= 0f) breakObstacle(o, s.vx * 0.2f)
                     }
                     if (--s.pierce <= 0) {
                         s.alive = false; break
@@ -1393,16 +1581,54 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
         shots.removeAll { !it.alive }
     }
 
-    private fun catapultBlast(s: Projectile) {
-        explode(s.x, s.y, 0xFF8D6E63.toInt(), 30)
-        sfx.play(Sfx.S.BOOM, 0.7f)
-        shake = max(shake, 0.15f)
-        blastArea(s.x, s.y - 30f, 160f, s.damage)
+    /** Rockets turn towards the nearest monster (or the boss) and speed up. */
+    private fun steerRocket(s: Projectile, dt: Float) {
+        var tx = Float.NaN
+        var ty = 0f
+        var best = 900f
+        boss?.let { bb ->
+            if (bb.alive) {
+                val d = hypot(bb.x - s.x, bb.cy - s.y)
+                if (d < 1400f) {
+                    best = 0f; tx = bb.x; ty = bb.cy
+                }
+            }
+        }
+        if (best > 0f) for (z in zombies) {
+            if (!z.alive) continue
+            val d = hypot(z.x - s.x, z.y - z.type.h / 2 - s.y)
+            if (d < best && z.x > s.x - 100f) {
+                best = d; tx = z.x; ty = z.y - z.type.h / 2
+            }
+        }
+        val sp = min(1500f, hypot(s.vx, s.vy) + 1400f * dt)
+        var a = atan2(s.vy, s.vx)
+        if (!tx.isNaN() && s.age > 0.12f) {
+            var da = atan2(ty - s.y, tx - s.x) - a
+            while (da > PI) da -= (2 * PI).toFloat()
+            while (da < -PI) da += (2 * PI).toFloat()
+            a += da.coerceIn(-5f * dt, 5f * dt)
+        }
+        s.vx = cos(a) * sp
+        s.vy = sin(a) * sp
+        if (Random.nextFloat() < 0.7f) {
+            particles.add(Particle(s.x - cos(a) * 20f, s.y - sin(a) * 20f, rnd(-30f, 30f), rnd(-40f, 0f), 0.5f, 0.5f, rnd(6f, 10f), 0xFF9E9E9E.toInt(), 0f, 2f))
+        }
+    }
+
+    private fun blast(s: Projectile) {
+        val big = s.kind == WeaponType.ROCKET
+        explode(s.x, s.y, if (big) 0xFFFF6D00.toInt() else 0xFF8D6E63.toInt(), if (big) 40 else 30)
+        sfx.play(if (big) Sfx.S.EXPLODE else Sfx.S.BOOM, 0.7f)
+        shake = max(shake, if (big) 0.22f else 0.15f)
+        blastArea(s.x, s.y - 30f, s.splash, s.damage)
     }
 
     // ------------------------------------------------------------- effects
 
     private fun updateEffects(dt: Float) {
+        for (b in beams) b.life -= dt
+        beams.removeAll { it.life <= 0f }
         val pi = particles.iterator()
         while (pi.hasNext()) {
             val p = pi.next()
@@ -1489,10 +1715,11 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
                 Button("music", "🎵", W - 190f, 20f, W - 114f, 96f, if (save.music) 0x66000000 else 0x66B71C1C),
             )
             State.MAPS -> listOf(b("menu", "QUAY LẠI", W / 2, H - 84f, 360f, grey))
-            State.SHOP, State.GARAGE -> listOf(
+            State.SHOP -> listOf(
                 b("menu", "MENU", W / 2 - 250f, H - 100f, 300f, grey),
                 b("play", "CHẠY!", W / 2 + 250f, H - 100f, 300f, green),
             )
+            State.GARAGE -> garageButtons(green, grey)
             State.PAUSED -> listOf(
                 b("resume", "TIẾP TỤC", W / 2, H * 0.36f, 420f, green),
                 b("quit", "BỎ CUỘC", W / 2, H * 0.36f + 110f, 420f, grey),
@@ -1521,6 +1748,45 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
         }
     }
 
+    private fun garageButtons(green: Int, grey: Int): List<Button> {
+        val l = ArrayList<Button>()
+        val gold = 0xFFF9A825.toInt()
+        l.add(Button("menu", "MENU", W / 2 - 400f, H - 100f, W / 2 - 100f, H - 14f, grey))
+        l.add(Button("play", "CHẠY!", W / 2 + 100f, H - 100f, W / 2 + 400f, H - 14f, green))
+        if (garageTab == 0) {
+            val v = Vehicles.of(garageClass, garageVariant)
+            val pr = previewRect()
+            val (label, color, on) = when {
+                !save.classUnlocked(v.cls) -> Triple("🔒 QUA ẢI ${v.cls.unlockStage}", grey, false)
+                save.vehicle == v.id -> Triple("ĐANG DÙNG", green, false)
+                save.ownsVehicle(v.id) -> Triple("CHỌN XE", 0xFF1E88E5.toInt(), true)
+                else -> Triple("MUA ${v.cost}$", gold, save.money >= v.cost)
+            }
+            l.add(Button("vehAct", label, pr[0] + 24f, pr[3] - 78f, pr[0] + 360f, pr[3] - 14f, color, on))
+        } else {
+            val w = garageWeapon
+            val pr = weaponPanelRect()
+            val owned = save.ownsWeapon(w.ordinal)
+            val (label, color, on) = when {
+                !save.weaponUnlocked(w) -> Triple("🔒 QUA ẢI ${w.unlockStage}", grey, false)
+                save.weapon == w.ordinal -> Triple("ĐANG DÙNG", green, false)
+                owned -> Triple("TRANG BỊ", 0xFF1E88E5.toInt(), true)
+                else -> Triple("MUA ${w.cost}$", gold, save.money >= w.cost)
+            }
+            l.add(Button("wpnAct", label, pr[2] - 330f, pr[1] + 30f, pr[2] - 24f, pr[1] + 102f, color, on))
+            if (owned) {
+                val lv = save.weaponLevel(w)
+                if (lv >= WeaponType.MAX_LEVEL) {
+                    l.add(Button("wpnUp", "CẤP TỐI ĐA", pr[2] - 330f, pr[1] + 118f, pr[2] - 24f, pr[1] + 190f, grey, false))
+                } else {
+                    val cost = w.upgradeCost(lv)
+                    l.add(Button("wpnUp", "NÂNG CẤP ${cost}$", pr[2] - 330f, pr[1] + 118f, pr[2] - 24f, pr[1] + 190f, 0xFF8E24AA.toInt(), save.money >= cost))
+                }
+            }
+        }
+        return l
+    }
+
     /** Upgrade cards: 3 x 2 grid. */
     fun upgradeCard(i: Int): FloatArray {
         val cw = (W - 120f) / 3f
@@ -1541,16 +1807,44 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
         return floatArrayOf(l, t, l + cw, t + 122f)
     }
 
-    fun carCard(i: Int): FloatArray {
-        val cw = (W - 130f) / 4f
-        val l = 40f + i * (cw + 16f)
-        return floatArrayOf(l, 110f, l + cw, 360f)
+    // garage layout (shared by the renderer and touch handling)
+
+    fun garageTabRect(i: Int): FloatArray {
+        val l = 40f + i * 250f
+        return floatArrayOf(l, 22f, l + 230f, 86f)
     }
 
-    fun weaponCard(i: Int): FloatArray {
-        val cw = (W - 120f) / 3f
-        val l = 40f + i * (cw + 20f)
-        return floatArrayOf(l, 400f, l + cw, 600f)
+    fun classRect(i: Int): FloatArray {
+        val t = 104f + i * 100f
+        return floatArrayOf(40f, t, 310f, t + 88f)
+    }
+
+    fun previewRect() = floatArrayOf(330f, 104f, W - 40f, 392f)
+
+    fun variantRect(i: Int): FloatArray {
+        val cw = (W - 370f - 4 * 14f) / 5f
+        val l = 330f + i * (cw + 14f)
+        return floatArrayOf(l, 404f, l + cw, 600f)
+    }
+
+    fun weaponRect(i: Int): FloatArray {
+        val cw = (W - 80f - 4 * 14f) / 5f
+        val col = i % 5
+        val row = i / 5
+        val l = 40f + col * (cw + 14f)
+        val t = 104f + row * 138f
+        return floatArrayOf(l, t, l + cw, t + 126f)
+    }
+
+    fun weaponPanelRect() = floatArrayOf(40f, 384f, W - 40f, 604f)
+
+    /** Opens the garage on the vehicle and weapon in use. */
+    private fun openGarage() {
+        val v = save.vehicleType
+        garageClass = v.cls
+        garageVariant = v.variant
+        garageWeapon = save.weaponType
+        setState(State.GARAGE)
     }
 
     private fun inRect(r: FloatArray, x: Float, y: Float) = x >= r[0] && x <= r[2] && y >= r[1] && y <= r[3]
@@ -1586,11 +1880,31 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
             }
         }
         if (state == State.GARAGE) {
-            for (i in CarType.entries.indices) if (inRect(carCard(i), x, y)) {
-                pickCar(i); return
+            for (i in 0..1) if (inRect(garageTabRect(i), x, y)) {
+                sfx.play(Sfx.S.CLICK)
+                garageTab = i
+                return
             }
-            for (i in WeaponType.entries.indices) if (inRect(weaponCard(i), x, y)) {
-                pickWeapon(i); return
+            if (garageTab == 0) {
+                for (cl in VehicleClass.entries) if (inRect(classRect(cl.ordinal), x, y)) {
+                    sfx.play(Sfx.S.CLICK)
+                    garageClass = cl
+                    // show the best version owned, or the next one to buy
+                    garageVariant = (0 until Vehicles.PER_CLASS).firstOrNull { !save.ownsVehicle(Vehicles.of(cl, it).id) } ?: 0
+                    if (save.vehicleType.cls == cl) garageVariant = save.vehicleType.variant
+                    return
+                }
+                for (i in 0 until Vehicles.PER_CLASS) if (inRect(variantRect(i), x, y)) {
+                    sfx.play(Sfx.S.CLICK)
+                    garageVariant = i
+                    return
+                }
+            } else {
+                for (w in WeaponType.entries) if (inRect(weaponRect(w.ordinal), x, y)) {
+                    sfx.play(Sfx.S.CLICK)
+                    garageWeapon = w
+                    return
+                }
             }
         }
         val btn = buttons().firstOrNull { it.contains(x, y) } ?: return
@@ -1599,7 +1913,10 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
         when (btn.id) {
             "play" -> startRun()
             "shop" -> setState(State.SHOP)
-            "garage" -> setState(State.GARAGE)
+            "garage" -> openGarage()
+            "vehAct" -> pickVehicle(Vehicles.of(garageClass, garageVariant))
+            "wpnAct" -> pickWeapon(garageWeapon)
+            "wpnUp" -> upgradeWeapon(garageWeapon)
             "menu" -> goMenu()
             "resume" -> setState(State.PLAYING)
             "quit" -> endRun("Bỏ cuộc")
@@ -1664,32 +1981,37 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
         sfx.play(Sfx.S.COIN)
     }
 
-    private fun pickCar(i: Int) {
-        val ct = CarType.entries[i]
-        if (save.ownsCar(i)) {
-            save.car = i
-        } else if (save.money >= ct.cost) {
-            save.money -= ct.cost
-            save.ownedCars = save.ownedCars or (1 shl i)
-            save.car = i
-        } else {
-            return
+    private fun pickVehicle(v: Vehicle) {
+        if (!save.classUnlocked(v.cls)) return
+        if (!save.ownsVehicle(v.id)) {
+            if (save.money < v.cost) return
+            save.money -= v.cost
+            save.ownedVehicles = save.ownedVehicles or (1 shl v.id)
         }
+        save.vehicle = v.id
         sfx.play(Sfx.S.COIN)
         save.save()
     }
 
-    private fun pickWeapon(i: Int) {
-        val w = WeaponType.entries[i]
-        if (save.ownsWeapon(i)) {
-            save.weapon = i
-        } else if (save.money >= w.cost) {
+    private fun pickWeapon(w: WeaponType) {
+        if (!save.weaponUnlocked(w)) return
+        if (!save.ownsWeapon(w.ordinal)) {
+            if (save.money < w.cost) return
             save.money -= w.cost
-            save.ownedWeapons = save.ownedWeapons or (1 shl i)
-            save.weapon = i
-        } else {
-            return
+            save.ownedWeapons = save.ownedWeapons or (1 shl w.ordinal)
         }
+        save.weapon = w.ordinal
+        sfx.play(Sfx.S.COIN)
+        save.save()
+    }
+
+    private fun upgradeWeapon(w: WeaponType) {
+        val lv = save.weaponLevel(w)
+        if (!save.ownsWeapon(w.ordinal) || lv >= WeaponType.MAX_LEVEL) return
+        val cost = w.upgradeCost(lv)
+        if (save.money < cost) return
+        save.money -= cost
+        save.weaponLevels[w.ordinal]++
         sfx.play(Sfx.S.COIN)
         save.save()
     }

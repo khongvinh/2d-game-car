@@ -20,23 +20,54 @@ class SaveData(context: Context) {
     /** Best distance (m) reached on each stage, to draw the "record" flag. */
     val best = IntArray(Game.STAGES + 1) { prefs.getInt("best$it", 0) }
     val upgrades = IntArray(Upgrade.entries.size) { prefs.getInt("up$it", 0) }
-    var ownedCars = prefs.getInt("ownedCars", 1)
-    var ownedWeapons = prefs.getInt("ownedWeapons", 1)
-    var car = prefs.getInt("car", 0)
-    var weapon = prefs.getInt("weapon", 0)
+    /** Bit per [Vehicles.all] id; the first motorbike is free. */
+    var ownedVehicles = prefs.getInt("ownedVeh", 1)
+    var vehicle = prefs.getInt("veh", 0)
+
+    /** Bit per [WeaponType] ordinal; the pistol is free. */
+    var ownedWeapons = prefs.getInt("ownedWpn", 1)
+    var weapon = prefs.getInt("wpn", 0)
+    val weaponLevels = IntArray(WeaponType.entries.size) { prefs.getInt("wl$it", 0) }
     var sound = prefs.getBoolean("sound", true)
     var music = prefs.getBoolean("music", true)
     var bestScore = prefs.getInt("bestScore", 0)
 
+    init {
+        migrateGarage()
+    }
+
+    /**
+     * Saves from before the big garage (v4.4) had 4 cars and 3 weapons: bought cars
+     * are refunded, the machine gun / crossbow / catapult carry over.
+     */
+    private fun migrateGarage() {
+        if (prefs.getInt("garageV", 0) >= 2) return
+        if (prefs.contains("ownedCars")) {
+            val oldCars = prefs.getInt("ownedCars", 1)
+            val refund = intArrayOf(0, 1500, 3000, 6000)
+            for (i in 1..3) if (oldCars and (1 shl i) != 0) money += refund[i]
+            val oldW = prefs.getInt("ownedWeapons", 1)
+            val map = intArrayOf(WeaponType.SMG.ordinal, WeaponType.CROSSBOW.ordinal, WeaponType.CATAPULT.ordinal)
+            ownedWeapons = 1
+            for (i in 0..2) if (oldW and (1 shl i) != 0) ownedWeapons = ownedWeapons or (1 shl map[i])
+            weapon = map[prefs.getInt("weapon", 0).coerceIn(0, 2)]
+        }
+        prefs.edit().putInt("garageV", 2).remove("ownedCars").remove("car").remove("ownedWeapons").remove("weapon").apply()
+        save()
+    }
+
     fun level(u: Upgrade) = upgrades[u.ordinal]
 
-    val carType get() = CarType.entries[car]
-    val weaponType get() = WeaponType.entries[weapon]
+    val vehicleType get() = Vehicles.of(vehicle)
+    val weaponType get() = WeaponType.entries[weapon.coerceIn(0, WeaponType.entries.size - 1)]
+    fun weaponLevel(w: WeaponType) = weaponLevels[w.ordinal]
     val garageUnlocked get() = bestStage >= 1
     val cloneUnlocked get() = bestStage >= 5
 
-    fun ownsCar(i: Int) = ownedCars and (1 shl i) != 0
+    fun ownsVehicle(id: Int) = ownedVehicles and (1 shl id) != 0
     fun ownsWeapon(i: Int) = ownedWeapons and (1 shl i) != 0
+    fun classUnlocked(c: VehicleClass) = bestStage >= c.unlockStage
+    fun weaponUnlocked(w: WeaponType) = bestStage >= w.unlockStage
 
     fun save() {
         val e = prefs.edit()
@@ -46,10 +77,11 @@ class SaveData(context: Context) {
         e.putInt("day", day)
         best.forEachIndexed { i, v -> e.putInt("best$i", v) }
         upgrades.forEachIndexed { i, v -> e.putInt("up$i", v) }
-        e.putInt("ownedCars", ownedCars)
-        e.putInt("ownedWeapons", ownedWeapons)
-        e.putInt("car", car)
-        e.putInt("weapon", weapon)
+        e.putInt("ownedVeh", ownedVehicles)
+        e.putInt("veh", vehicle)
+        e.putInt("ownedWpn", ownedWeapons)
+        e.putInt("wpn", weapon)
+        weaponLevels.forEachIndexed { i, v -> e.putInt("wl$i", v) }
         e.putBoolean("sound", sound)
         e.putBoolean("music", music)
         e.putInt("bestScore", bestScore)

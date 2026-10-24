@@ -12,3 +12,4 @@ tasks.register<JavaExec>("sim") { classpath = sourceSets["main"].runtimeClasspat
 tasks.register<JavaExec>("ram") { classpath = sourceSets["main"].runtimeClasspath; mainClass.set("shot.RamRunKt"); jvmArgs("-Djava.awt.headless=true"); args(outDir) }
 tasks.register<JavaExec>("boss") { classpath = sourceSets["main"].runtimeClasspath; mainClass.set("shot.BossRunKt"); jvmArgs("-Djava.awt.headless=true"); args(outDir) }
 tasks.register<JavaExec>("themes") { classpath = sourceSets["main"].runtimeClasspath; mainClass.set("shot.ThemeRunKt"); jvmArgs("-Djava.awt.headless=true"); args(outDir) }
+tasks.register<JavaExec>("garage") { classpath = sourceSets["main"].runtimeClasspath; mainClass.set("shot.GarageRunKt"); jvmArgs("-Djava.awt.headless=true"); args(outDir) }

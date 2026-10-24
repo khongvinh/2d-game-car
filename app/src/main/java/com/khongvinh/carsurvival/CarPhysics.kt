@@ -15,8 +15,8 @@ import kotlin.math.sin
 class CarPhysics {
     companion object {
         const val G = 900f
-        const val SPRING = 120f
-        const val DAMP = 10f
+        const val SPRING = 105f
+        const val DAMP = 9.5f
         const val INERTIA = 2600f
         const val BOOST_ACC = 1300f
         const val BRAKE_ACC = 700f
@@ -37,13 +37,15 @@ class CarPhysics {
         t: Terrain,
         c: Car,
         h: Float,
-        gas: Boolean,
-        brake: Boolean,
+        /** -1 full brake/reverse .. 1 full gas (already smoothed by the caller). */
+        throttle: Float,
         lean: Float,
         topSpeed: Float,
         engineAcc: Float,
         mu: Float,
     ): Boolean {
+        val gas = max(0f, throttle)
+        val brake = max(0f, -throttle)
         val cs = cos(c.angle)
         val sn = sin(c.angle)
         var fx = 0f
@@ -77,12 +79,15 @@ class CarPhysics {
             val ty = nx
             val vt = pvx * tx + pvy * ty
             var ft = 0f
-            if (gas) ft += engineAcc * 0.5f * max(0f, 1f - vt / topSpeed)
-            if (brake) {
-                ft += if (vt > 60f) -BRAKE_ACC * 0.5f else -engineAcc * 0.25f * max(0f, 1f + vt / 260f)
+            ft += gas * engineAcc * 0.5f * max(0f, 1f - vt / topSpeed)
+            if (brake > 0f) {
+                ft += brake * (if (vt > 60f) -BRAKE_ACC * 0.5f else -engineAcc * 0.25f * max(0f, 1f + vt / 260f))
             }
-            if (!gas && !brake) ft -= vt * 0.25f
-            if (abs(vt) < 40f && !gas && !brake) ft -= vt * 6f
+            val idle = 1f - gas - brake
+            if (idle > 0f) {
+                ft -= vt * 0.25f * idle
+                if (abs(vt) < 40f) ft -= vt * 6f * idle
+            }
             val maxF = mu * fn
             ft = ft.coerceIn(-maxF, maxF)
             val fxw = fn * nx + ft * tx

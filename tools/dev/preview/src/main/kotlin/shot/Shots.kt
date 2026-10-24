@@ -51,7 +51,7 @@ fun main(args: Array<String>) {
     tick(g, 1f)
     shot(g, "01_menu")
     tap(g, "play")
-    g.car.ammo = 100
+    g.car.ammo = 100f
     val gas = g.controls().first { it.id == "gas" }
     g.touchDown(1, gas.cx, gas.cy)
     tick(g, 3f); shot(g, "02_play")
