@@ -105,6 +105,9 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
     var stormHurt = 0f
     var revived = false
 
+    /** Place of the last run on the distance leaderboard (0 = not on it). */
+    var boardRank = 0
+
     // car stats for this run
     private var topSpeed = 700f
     private var engineAcc = 520f
@@ -198,6 +201,7 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
         val c = car
         c.vx = 0f; c.vy = 0f; c.spin = 0f; c.angle = 0f
         c.throttle = 0f; c.leanIn = 0f; c.squat = 0f; c.slashT = 0f
+        stuckX = 0f; stuckGasT = 0f
         c.maxHp = (100f + 30f * lv(Upgrade.ARMOR)) * ct.hpMul
         c.hp = c.maxHp
         c.maxFuel = (22f + 6f * lv(Upgrade.FUEL)) * ct.fuelMul
@@ -294,6 +298,9 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
                         }
                         zombies.add(Zombie(buddy, x2, terrain.heightAt(x2)))
                     }
+                } else if (terrain.awkward(x) || terrain.onBridge(x) || terrain.onBridge(x + 200f)) {
+                    // never block a dip, a steep face or a bridge: a monster stands there instead
+                    zombies.add(Zombie(if (region == Region.ALIEN) ZombieType.ALIEN else ZombieType.WALKER, x, terrain.heightAt(x)))
                 } else {
                     val oRoll = rnd.nextFloat()
                     when {
@@ -356,6 +363,7 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
             newRecord = save.best[stage] > 0
             save.best[stage] = m
         }
+        boardRank = save.addRecord(m, stage, vehicle.id, save.day)
         finishStats(false)
         save.day++
         save.save()
@@ -369,6 +377,7 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
         stageBonus = 120 * stage
         save.money += distMoney + runMoney + stageBonus
         save.best[stage] = max(save.best[stage], m)
+        boardRank = save.addRecord(m, stage, vehicle.id, save.day)
         finishStats(true)
         save.bestStage = max(save.bestStage, stage)
         save.stageSel = min(STAGES, max(save.stageSel, stage + 1))
@@ -391,6 +400,7 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
         if (bossKilled) boss?.let { achievements.add("👹 Hạ ${it.name.lowercase().replaceFirstChar { ch -> ch.uppercase() }}") }
         if (finished && car.hp >= car.maxHp * 0.9f) achievements.add("✨ Không trầy xước")
         if (newRecord) achievements.add("📏 Kỷ lục quãng đường")
+        if (boardRank in 1..3) achievements.add("🏅 Hạng $boardRank bảng xếp hạng")
         if (newBestScore) achievements.add("⭐ Điểm cao nhất mới")
         if (kills >= 50) achievements.add("🧟 Đồ tể zombie") else if (kills >= 20) achievements.add("🧟 Sát thủ zombie")
         if (smashed >= 15) achievements.add("💥 Xe ủi")
@@ -436,7 +446,7 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
         if (hurtFlash > 0f) hurtFlash -= dt
         music.enabled = save.music
         when (state) {
-            State.MENU, State.MAPS, State.SHOP, State.GARAGE -> music.play(Music.Track.CHILL, 1f)
+            State.MENU, State.MAPS, State.GARAGE -> music.play(Music.Track.CHILL, 1f)
             State.PLAYING -> music.play(if (intense) Music.Track.INTENSE else Music.Track.CHILL, 1f)
             State.PAUSED -> music.play(if (intense) Music.Track.INTENSE else Music.Track.CHILL, 0.3f)
             State.RESULT -> music.play(Music.Track.CHILL, 0.6f)
@@ -568,6 +578,7 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
 
         // flipped / out of fuel
         val speed = hypot(c.vx, c.vy)
+        val b0 = boss
         // upside down, or standing on its nose/tail and not moving
         val wheelsOff = !c.grounded[0] && !c.grounded[1]
         if ((cos(c.angle) < 0.3f || (wheelsOff && cos(c.angle) < 0.6f)) && speed < 120f) {
@@ -577,6 +588,18 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
             }
         } else {
             c.flipT = 0f
+        }
+        // wedged against crates / wrecks with the gas held: smash through after a moment
+        if (gas && c.fuel > 0f && (b0 == null || !b0.alive || c.x < goalX - 600f)) {
+            if (abs(c.x - stuckX) < 40f) stuckGasT += dt else {
+                stuckX = c.x; stuckGasT = 0f
+            }
+            if (stuckGasT > 2.2f) {
+                unstick()
+                stuckX = c.x; stuckGasT = 0f
+            }
+        } else {
+            stuckX = c.x; stuckGasT = 0f
         }
         if (c.fuel <= 0f && speed < 25f) {
             c.stuckT += dt
@@ -604,6 +627,36 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
         }
 
         updateCamera(dt)
+    }
+
+    private var stuckX = 0f
+    private var stuckGasT = 0f
+
+    /** Clears the crates / wrecks pinning the car down. */
+    private fun unstick() {
+        val c = car
+        var freed = false
+        for (o in obstacles) {
+            if (!o.alive || abs(o.x - c.x) > Car.HALF_LEN + o.type.w / 2 + 90f || abs(o.y - c.y) > 260f) continue
+            if (o.type == ObstacleType.BARREL) {
+                o.alive = false
+                smashed++
+                explode(o.x, o.y - o.type.h / 2, 0xFFFF5722.toInt(), 20)
+            } else {
+                breakObstacle(o, c.fwdX * 300f)
+            }
+            freed = true
+        }
+        if (freed) {
+            // a small nudge forward once the way is clear (only when roughly level)
+            if (abs(c.angle) < 0.5f) {
+                c.vx += c.fwdX * 160f
+                c.vy -= 160f
+            }
+            shake = max(shake, 0.25f)
+            sfx.play(Sfx.S.HIT, 0.8f)
+            texts.add(FloatText("PHÁ TAN!", c.x + 60f, c.y - 120f, 0xFFFFAB00.toInt()).also { it.size = 52f })
+        }
     }
 
     private fun updateCamera(dt: Float) {
@@ -752,6 +805,11 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
         if (landed) {
             sfx.play(Sfx.S.LAND, 0.6f)
             shake = max(shake, 0.12f)
+            // sparks fly where the chassis scrapes the road
+            val gy = terrain.heightAt(c.x)
+            repeat(10) {
+                particles.add(Particle(c.x + rnd(-70f, 70f), gy - 4f, -c.vx * 0.3f + rnd(-260f, 260f), -rnd(120f, 380f), 0.35f, 0.35f, rnd(2.5f, 4.5f), if (Random.nextBoolean()) 0xFFFFD54F.toInt() else 0xFFFFF8E1.toInt(), G * 0.6f))
+            }
         }
     }
 
@@ -798,7 +856,9 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
             val ground = terrain.heightAt(z.x)
             if (z.type.flying) {
                 // hover, then swoop down at the car when close
-                val target = if (abs(dx) < 320f) max(10f, ground - c.y - 10f) else 150f + 35f * sin(z.phase * 0.3f)
+                var target = if (abs(dx) < 320f) max(10f, ground - c.y - 10f) else 150f + 35f * sin(z.phase * 0.3f)
+                val roof = terrain.ceilingAt(z.x)
+                if (!roof.isNaN()) target = min(target, ground - roof - z.type.h - 20f)
                 z.fly += (target - z.fly) * min(1f, dt * 3f)
                 z.y = ground - z.fly
             } else {
@@ -880,6 +940,8 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
                     if (into > 0f) {
                         c.vx -= c.fwdX * fs * 1.25f
                         c.vy -= c.fwdY * fs * 1.25f
+                        // pushing against a wall must not lever the car onto its tail
+                        c.spin *= 0.6f
                         if (into > 60f) o.barT = 4f
                         if (into > Obstacle.RAM_SPEED && o.ramCd <= 0f) {
                             // a solid ram wears the obstacle down by 25%; four rams break it
@@ -1460,7 +1522,8 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
         // stop at the ground
         var k = 40f
         while (k < len) {
-            if (oy + dy * k > terrain.heightAt(ox + dx * k)) {
+            val roof = terrain.ceilingAt(ox + dx * k)
+            if (oy + dy * k > terrain.heightAt(ox + dx * k) || (!roof.isNaN() && oy + dy * k < roof)) {
                 len = k; break
             }
             k += 30f
@@ -1516,7 +1579,8 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
                 if (blasts) blast(s)
                 continue
             }
-            if (s.y > terrain.heightAt(s.x)) {
+            val roof = terrain.ceilingAt(s.x)
+            if (s.y > terrain.heightAt(s.x) || (!roof.isNaN() && s.y < roof)) {
                 s.alive = false
                 if (blasts) blast(s) else if (s.kind != WeaponType.FLAMER) sparks(s.x, s.y)
                 continue
@@ -1650,6 +1714,10 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
     private fun addMoney(n: Int, x: Float, y: Float) {
         runMoney += n
         texts.add(FloatText("+$n$", x, y, 0xFFFFD740.toInt()))
+        // a couple of coins pop out
+        repeat(2) {
+            particles.add(Particle(x + rnd(-20f, 20f), y + 30f, rnd(-120f, 120f), -rnd(300f, 480f), 0.8f, 0.8f, 7f, 0xFFFFC107.toInt(), G))
+        }
     }
 
     private fun rnd(a: Float, b: Float) = a + Random.nextFloat() * (b - a)
@@ -1708,17 +1776,12 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
         return when (state) {
             State.MENU -> listOf(
                 Button("maps", "🗺  ẢI ${save.stageSel}: ${Themes.of(save.stageSel).name.uppercase()}", cx - 230f, 128f, cx + 230f, 214f, 0xFF6D4C41.toInt()),
-                b("play", "CHẠY!", cx, 266f, 460f, green),
-                b("shop", "NÂNG CẤP", cx, 366f, 460f, blue),
-                b("garage", if (save.garageUnlocked) "GARA" else "GARA 🔒 (qua ải 1)", cx, 466f, 460f, purple, save.garageUnlocked),
+                b("play", "CHẠY!", cx, 262f, 460f, green),
+                b("garage", "GARA", cx, 360f, 460f, purple),
                 Button("sound", if (save.sound) "🔊" else "🔇", W - 100f, 20f, W - 24f, 96f, 0x66000000),
                 Button("music", "🎵", W - 190f, 20f, W - 114f, 96f, if (save.music) 0x66000000 else 0x66B71C1C),
             )
             State.MAPS -> listOf(b("menu", "QUAY LẠI", W / 2, H - 84f, 360f, grey))
-            State.SHOP -> listOf(
-                b("menu", "MENU", W / 2 - 250f, H - 100f, 300f, grey),
-                b("play", "CHẠY!", W / 2 + 250f, H - 100f, 300f, green),
-            )
             State.GARAGE -> garageButtons(green, grey)
             State.PAUSED -> listOf(
                 b("resume", "TIẾP TỤC", W / 2, H * 0.36f, 420f, green),
@@ -1726,9 +1789,7 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
             )
             State.RESULT -> {
                 val l = ArrayList<Button>()
-                val ids = mutableListOf("menu" to "MENU", "shop" to "NÂNG CẤP")
-                if (save.garageUnlocked) ids.add("garage" to "GARA")
-                ids.add("play" to "CHẠY TIẾP")
+                val ids = listOf("menu" to "MENU", "garage" to "GARA", "play" to "CHẠY TIẾP")
                 val w = 260f
                 val gap = 24f
                 var x = W / 2 - (ids.size * w + (ids.size - 1) * gap) / 2 + w / 2
@@ -1740,7 +1801,7 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
             }
             State.STAGE_DONE -> listOf(
                 b("menu", "MENU", W / 2 - 300f, H - 120f, 260f, grey),
-                b("shop", "NÂNG CẤP", W / 2, H - 120f, 260f, blue),
+                b("garage", "GARA", W / 2, H - 120f, 260f, blue),
                 b("play", "ẢI TIẾP", W / 2 + 300f, H - 120f, 260f, green),
             )
             State.VICTORY -> listOf(b("menu", "MENU", W / 2, H - 130f, 360f, green))
@@ -1753,7 +1814,9 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
         val gold = 0xFFF9A825.toInt()
         l.add(Button("menu", "MENU", W / 2 - 400f, H - 100f, W / 2 - 100f, H - 14f, grey))
         l.add(Button("play", "CHẠY!", W / 2 + 100f, H - 100f, W / 2 + 400f, H - 14f, green))
-        if (garageTab == 0) {
+        if (garageTab == 2) {
+            // upgrade cards are tapped directly
+        } else if (garageTab == 0) {
             val v = Vehicles.of(garageClass, garageVariant)
             val pr = previewRect()
             val (label, color, on) = when {
@@ -1793,8 +1856,8 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
         val col = i % 3
         val row = i / 3
         val l = 40f + col * (cw + 20f)
-        val t = 120f + row * 235f
-        return floatArrayOf(l, t, l + cw, t + 215f)
+        val t = 104f + row * 248f
+        return floatArrayOf(l, t, l + cw, t + 230f)
     }
 
     /** Map cards: 5 per row, one row per region. */
@@ -1862,11 +1925,6 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
             return
         }
         if (stateTime < 0.4f) return
-        if (state == State.SHOP) {
-            for (i in Upgrade.entries.indices) if (inRect(upgradeCard(i), x, y)) {
-                buyUpgrade(Upgrade.entries[i]); return
-            }
-        }
         if (state == State.MAPS) {
             for (i in 0 until STAGES) if (inRect(mapCard(i), x, y)) {
                 if (i + 1 <= maxStartStage()) {
@@ -1880,7 +1938,10 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
             }
         }
         if (state == State.GARAGE) {
-            for (i in 0..1) if (inRect(garageTabRect(i), x, y)) {
+            if (garageTab == 2) for (i in Upgrade.entries.indices) if (inRect(upgradeCard(i), x, y)) {
+                buyUpgrade(Upgrade.entries[i]); return
+            }
+            for (i in 0..2) if (inRect(garageTabRect(i), x, y)) {
                 sfx.play(Sfx.S.CLICK)
                 garageTab = i
                 return
@@ -1912,7 +1973,6 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
         sfx.play(Sfx.S.CLICK)
         when (btn.id) {
             "play" -> startRun()
-            "shop" -> setState(State.SHOP)
             "garage" -> openGarage()
             "vehAct" -> pickVehicle(Vehicles.of(garageClass, garageVariant))
             "wpnAct" -> pickWeapon(garageWeapon)

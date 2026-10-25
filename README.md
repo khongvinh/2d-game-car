@@ -40,7 +40,10 @@ hay thư viện ngoài, không cần file ảnh/âm thanh.
 - **Qua ải 5** → mở vật phẩm **👥 Nhân bản**: trong 10 giây bạn có thêm 1 mạng
   (bị phá hủy, lật xe hay dính bão sẽ hồi sinh ngay).
 
-### Bản đồ
+### Bản đồ & kiểu đường
+Mỗi ải một kiểu đường: đồng bằng, đồi cát, đèo đá, xa lộ có hầm chui, hang động có trần, cầu qua vực / dung nham / đầm lầy / hư không.
+Màn hình chính có **bảng xếp hạng** 5 lượt chạy xa nhất.
+
 Nút **🗺 ẢI** ở menu mở màn chọn bản đồ: 20 bản đồ trong 4 vùng — Sa mạc (ải 1–5), Núi lửa (6–10),
 Rừng đêm (11–15), Hành tinh lạ (16–20). Mỗi vùng có cảnh và quái riêng: zombie, thằn lằn lửa, dơi,
 người ngoài hành tinh và khối nhớt.
@@ -55,7 +58,7 @@ Quái Vật Ngoài Hành Tinh. Cổng trạm chỉ mở khi trùm gục.
 ### Nâng cấp
 Động cơ · Bình xăng · Tên lửa đẩy · Giáp & máu · Đạn dược · Lốp xe — mỗi loại 5 cấp, cấp sau đắt hơn nhiều.
 
-### Gara (mở sau ải 1)
+### Gara (3 tab: Xe · Vũ khí · Nâng cấp)
 **5 dòng xe, mỗi dòng 5 phiên bản** (25 xe): Xe máy (có sẵn) → Xe hơi (qua ải 5) → Bán tải (qua ải 10)
 → Bọc thép (qua ải 15) → Xe tăng (qua ải 20). Phiên bản sau khỏe hơn, giá cao hơn (600$ → 58.500$).
 

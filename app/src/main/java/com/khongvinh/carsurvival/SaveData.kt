@@ -4,6 +4,10 @@ import android.content.Context
 
 /** Persistent wallet, stage progress, garage and upgrade levels. */
 class SaveData(context: Context) {
+    companion object {
+        const val MAX_RECORDS = 10
+    }
+
     private val prefs = context.getSharedPreferences("car_survival_v3", Context.MODE_PRIVATE)
 
     var money = prefs.getInt("money", 0)
@@ -31,6 +35,26 @@ class SaveData(context: Context) {
     var sound = prefs.getBoolean("sound", true)
     var music = prefs.getBoolean("music", true)
     var bestScore = prefs.getInt("bestScore", 0)
+
+    /** Leaderboard of the longest runs: metres, stage, vehicle id, day; best first. */
+    val records = ArrayList<IntArray>().also { list ->
+        for (row in prefs.getString("runs", "")?.split(";") ?: emptyList()) {
+            val v = row.split(",").mapNotNull { it.toIntOrNull() }
+            if (v.size == 4) list.add(v.toIntArray())
+        }
+    }
+
+    /** Adds a run to the leaderboard; returns its rank (1-based) or 0 if it did not make it. */
+    fun addRecord(m: Int, stage: Int, vehicle: Int, day: Int): Int {
+        if (m <= 0) return 0
+        val row = intArrayOf(m, stage, vehicle, day)
+        var at = records.indexOfFirst { m > it[0] }
+        if (at < 0) at = records.size
+        if (at >= MAX_RECORDS) return 0
+        records.add(at, row)
+        while (records.size > MAX_RECORDS) records.removeAt(records.size - 1)
+        return at + 1
+    }
 
     init {
         migrateGarage()
@@ -61,7 +85,6 @@ class SaveData(context: Context) {
     val vehicleType get() = Vehicles.of(vehicle)
     val weaponType get() = WeaponType.entries[weapon.coerceIn(0, WeaponType.entries.size - 1)]
     fun weaponLevel(w: WeaponType) = weaponLevels[w.ordinal]
-    val garageUnlocked get() = bestStage >= 1
     val cloneUnlocked get() = bestStage >= 5
 
     fun ownsVehicle(id: Int) = ownedVehicles and (1 shl id) != 0
@@ -85,6 +108,7 @@ class SaveData(context: Context) {
         e.putBoolean("sound", sound)
         e.putBoolean("music", music)
         e.putInt("bestScore", bestScore)
+        e.putString("runs", records.joinToString(";") { it.joinToString(",") })
         e.apply()
     }
 }

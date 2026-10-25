@@ -68,6 +68,9 @@ fun garageMain(args: Array<String>) {
         val rr = g.weaponRect(WeaponType.ROCKET.ordinal)
         tapAt(g, (rr[0] + rr[2]) / 2, (rr[1] + rr[3]) / 2); tick(g, 0.2f)
         shotAt(g, "g_${w}_wpn_rocket", w)
+        val ur = g.garageTabRect(2)
+        tapAt(g, (ur[0] + ur[2]) / 2, (ur[1] + ur[3]) / 2); tick(g, 0.2f)
+        shotAt(g, "g_${w}_upg", w)
     }
     // vehicles and weapons in action
     val combos = listOf(

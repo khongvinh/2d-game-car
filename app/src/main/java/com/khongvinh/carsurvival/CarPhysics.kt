@@ -160,6 +160,20 @@ class CarPhysics {
                 c.vx *= (1f - 2f * h)
             }
         }
+        // tunnel and cave roofs (the margin leaves room for the rider / roof weapon)
+        for (p in bodyPts) {
+            val rx = p[0] * cs2 - p[1] * sn2
+            val ry = p[0] * sn2 + p[1] * cs2
+            val ce = t.ceilingAt(c.x + rx)
+            if (ce.isNaN()) continue
+            val pen = ce - (c.y + ry - 34f)
+            if (pen > 0f) {
+                c.y += pen
+                val pvy = c.vy + c.spin * rx
+                if (pvy < 0f) c.vy -= pvy * 1.2f
+                c.spin *= (1f - 6f * h)
+            }
+        }
         return landed
     }
 }

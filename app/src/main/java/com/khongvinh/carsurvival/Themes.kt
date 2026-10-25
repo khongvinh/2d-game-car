@@ -8,6 +8,25 @@ enum class Region(val title: String) {
     ALIEN("Hành tinh lạ"),
 }
 
+/**
+ * The kind of road a stage is driven on. [surface]: 0 dirt, 1 asphalt highway,
+ * 2 metal deck, 3 cobbled stone. [chasm]: what lies under the bridges
+ * (0 canyon, 1 lava, 2 swamp water, 3 purple void).
+ */
+class RoadStyle(
+    val name: String,
+    val surface: Int,
+    /** Hill height multiplier (plains are low, dunes high). */
+    val amp: Float,
+    /** Rocks / potholes / ramps multiplier. */
+    val rough: Float,
+    val tunnels: Int = 0,
+    /** One long cave over most of the stage instead of short tunnels. */
+    val cave: Boolean = false,
+    val bridges: Int = 0,
+    val chasm: Int = 0,
+)
+
 /** Look of one stage's map. Colours are ARGB ints. */
 class MapTheme(
     val stage: Int,
@@ -30,7 +49,9 @@ class MapTheme(
     /** Road crust: dark edge, top band, bright rim. */
     val crust: IntArray,
     val grass: IntArray,
-)
+) {
+    val road get() = Themes.road(stage)
+}
 
 object Themes {
     private fun lerp(a: Int, b: Int, t: Float): Int {
@@ -55,6 +76,31 @@ object Themes {
     val all: List<MapTheme> = (1..Game.STAGES).map { build(it) }
 
     fun of(stage: Int) = all[(stage - 1).coerceIn(0, all.size - 1)]
+
+    private val ROADS = arrayOf(
+        RoadStyle("Đồng bằng", 0, 0.45f, 0.6f),
+        RoadStyle("Cầu vượt vực", 0, 0.9f, 1f, bridges = 3, chasm = 0),
+        RoadStyle("Xa lộ & hầm chui", 1, 0.65f, 0.7f, tunnels = 2),
+        RoadStyle("Đồi cát", 0, 1.3f, 0.9f),
+        RoadStyle("Đường mòn & hầm", 0, 0.6f, 0.8f, tunnels = 1),
+        RoadStyle("Đèo đá", 3, 1.15f, 1.1f),
+        RoadStyle("Cầu qua dung nham", 3, 0.85f, 1f, bridges = 4, chasm = 1),
+        RoadStyle("Hầm xuyên núi", 3, 0.9f, 1f, tunnels = 3),
+        RoadStyle("Hang dung nham", 3, 0.7f, 0.9f, cave = true),
+        RoadStyle("Hang rồng", 3, 0.75f, 1f, cave = true),
+        RoadStyle("Đồng bằng sương", 0, 0.5f, 0.7f),
+        RoadStyle("Cầu gỗ qua đầm", 0, 0.7f, 0.9f, bridges = 4, chasm = 2),
+        RoadStyle("Đường làng & hầm", 1, 0.7f, 0.8f, tunnels = 2),
+        RoadStyle("Đồi nghĩa trang", 0, 1.1f, 1.1f),
+        RoadStyle("Hầm ngục lâu đài", 3, 0.7f, 1f, cave = true),
+        RoadStyle("Hố thiên thạch", 0, 1.15f, 1.25f),
+        RoadStyle("Hang pha lê", 0, 0.75f, 1f, cave = true),
+        RoadStyle("Xa lộ căn cứ", 2, 0.7f, 0.9f, tunnels = 3),
+        RoadStyle("Cầu năng lượng", 2, 0.85f, 1.1f, bridges = 4, chasm = 3),
+        RoadStyle("Hành lang tàu mẹ", 2, 0.6f, 1f, cave = true),
+    )
+
+    fun road(stage: Int) = ROADS[(stage - 1).coerceIn(0, ROADS.size - 1)]
 
     private fun c(vararg v: Long) = IntArray(v.size) { v[it].toInt() }
 

@@ -11,6 +11,8 @@ fun themeMain(args: Array<String>) {
     save.bestStage = 19
     save.stageSel = 7
     save.best[1] = 700; save.best[2] = 450
+    save.addRecord(1834, 9, 7, 41); save.addRecord(1520, 8, 12, 39); save.addRecord(990, 5, 3, 20)
+    save.addRecord(2410, 12, 13, 55); save.addRecord(700, 1, 0, 2); save.addRecord(640, 4, 1, 9)
     val g = Game(save, Sfx(ctx), Music())
     g.resize(W.toFloat(), H.toFloat())
     tick(g, 1f)

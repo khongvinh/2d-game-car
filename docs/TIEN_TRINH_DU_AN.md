@@ -1,6 +1,6 @@
 # TỔNG HỢP TIẾN TRÌNH DỰ ÁN "ĐUA XE SINH TỒN"
 
-Tài liệu bàn giao để tiếp tục làm việc ở phiên chat mới mà không bị thiếu sót. Cập nhật đến phiên bản v4.4 (ngày 24/10/2026).
+Tài liệu bàn giao để tiếp tục làm việc ở phiên chat mới mà không bị thiếu sót. Cập nhật đến phiên bản v4.5 (ngày 25/10/2026).
 
 ## 1. Thông tin chung
 
@@ -12,8 +12,8 @@ Tài liệu bàn giao để tiếp tục làm việc ở phiên chat mới mà k
 | Ngôn ngữ / công nghệ | Kotlin + Canvas (SurfaceView), không engine, không thư viện ngoài, không file ảnh/âm thanh |
 | Repo GitHub | khongvinh/2d-game-car |
 | Nhánh làm việc | claude/2d-driving-game-f0kpjk (chưa có Pull Request, chưa merge) |
-| Commit mới nhất | xem git log nhánh làm việc (v4.4: gara 25 xe + 10 vũ khí có cấp, cày tiền, xe mượt) |
-| Phiên bản hiện tại | v4.4 (versionCode 8) |
+| Commit mới nhất | xem git log nhánh làm việc (v4.5: 20 kiểu đường, hầm/hang/cầu, gara 3 tab, bảng xếp hạng, giao diện thép gỉ) |
+| Phiên bản hiện tại | v4.5 (versionCode 9) |
 | Build tự động | GitHub Actions "Build APK" (.github/workflows/android.yml) — đang xanh, xuất artifact DuaXeSinhTon-apk |
 | Khóa ký | app/debug.keystore (cố định, mật khẩu android) nên các bản cài đè lên nhau được |
 
@@ -87,7 +87,7 @@ Tài liệu bàn giao để tiếp tục làm việc ở phiên chat mới mà k
 - Mô phỏng (tools/dev/preview `gradle boss`, máu thử 400): ải 5 thắng 17,6 giây (còn 372); ải 10 thắng 15,2 giây (334); ải 15 thắng 29,6 giây (292); ải 20 thắng 40,8 giây (114) và tới VICTORY.
 - Công cụ preview: thêm task `themes` (ảnh menu, màn chọn map, các ải 1/4/7/9/12/14/17/20) và `boss` (đánh 4 trùm).
 
-### v4.4 — Gara lớn: 25 xe, 10 vũ khí có cấp, cày tiền, xe chạy mượt (hiện tại)
+### v4.4 — Gara lớn: 25 xe, 10 vũ khí có cấp, cày tiền, xe chạy mượt
 - Yêu cầu: xe ban đầu là xe máy; qua ải 5 mở xe hơi, ải 10 bán tải, ải 20 xe tăng + bọc thép; giá xe +30%; thêm súng, dao, tên lửa… nhiều thuộc tính; phải cày (farm quái mới có tiền), mỗi loại xe 5 phiên bản; đồ họa xe đẹp hầm hố; xe chạy mượt, hết cứng nhắc. Người dùng xác nhận nhạc v4.3 đã khớp.
 - Diễn giải: "qua ải 20 xe tăng, xe bọc thép" → Bọc thép mở ở ải 15 (lấp khoảng trống 5-10-15-20), Xe tăng mở khi qua ải 20 (thưởng sau khi phá đảo, dùng để cày lại). Có thể đổi dễ trong Garage.kt (VehicleClass.unlockStage).
 - Code: Garage.kt mới (VehicleClass, Vehicle, Vehicles, WeaponType + stats theo cấp, PRICE_MUL = 1.3); CarArt.kt mới (vẽ 25 xe: xe máy có người lái + 5 kiểu, xe hơi rỉ sét/cơ bắp/rally/gai/tử thần, bán tải, bọc thép chở tiền/SWAT/lội nước/xe ủi/pháo đài, xe tăng có xích chạy, tháp pháo, rằn ri; 10 vũ khí; dao chém gắn mũi xe); bỏ CarType.
@@ -100,7 +100,20 @@ Tài liệu bàn giao để tiếp tục làm việc ở phiên chat mới mà k
 - Mô phỏng (gradle boss, máu thử 400): Cào Cào + Súng lục cấp 2 đánh trùm ải 5 còn thiếu 3 máu sau 83 giây (phải nâng cấp); Mô Tô Chiến Binh + Súng máy cấp 2 thắng 12,8 giây; Siêu Xe Gai + Nỏ cấp 3 thắng rồng 15 giây; Bán Tải Lưới Thép + Phun lửa cấp 4 thắng dơi 20 giây; Bọc Thép Lội Nước + Tên lửa cấp 5 thắng ải 20 sau 16 giây. Vật lý: không lật ở mọi ải. Xe máy qua ải 1 trong 40 giây, nhận 658$.
 - Công cụ: task preview `garage` (ảnh g_lineup 25 xe, màn gara ở 1600 và 1280 px, ảnh từng vũ khí trong trận).
 
-## 3. Luật chơi hiện tại (v4.4)
+### v4.5 — Hết kẹt xe, sửa núi xuyên đường, 20 kiểu đường, gara 3 tab, bảng xếp hạng, giao diện kim loại gỉ (hiện tại)
+- Yêu cầu (kèm 3 ảnh chụp: xe kẹt giữa thùng gỗ, núi lửa nhìn xuyên qua đất, ảnh mẫu đồ họa kiểu thép gỉ): sửa kẹt xe vào chướng ngại vật; sửa hình chồng (núi thấy xuyên qua đường); mỗi ải một kiểu đường (hầm chui, hang động, đồng bằng…); bỏ NÂNG CẤP ở màn hình chính vì đã có gara; thêm bảng xếp hạng quãng đường xa nhất ở màn hình chính; đồ họa giống ảnh 3. Câu hỏi CH Play/AAB: đã trả lời (xem mục 9), người dùng bảo để sau.
+- Lỗi núi xuyên đường: Paint giữ alpha của đốm tàn lửa/đom đóm/bào tử (vẽ cuối nền) nên đất (vẽ bằng shader) bị trong suốt ở vùng Núi lửa/Rừng đêm/Hành tinh lạ. Sửa: đặt fill.alpha = 255 trước mọi lần vẽ bằng shader.
+- Kẹt xe: (1) không đặt vật cản ở chỗ dốc > 0,45, đáy hố (thấp hơn hai bên 40 trong ±180) hay trên/ngay trước cầu (đặt quái thay vào); (2) giữ ga mà xe không tiến quá 40 đơn vị trong 2,2 giây và có thùng/xác xe trong tầm thì tự "PHÁ TAN!" và đẩy nhẹ (không áp dụng ở cổng trùm); (3) khi xe ép vào vật cản thì giảm xoay 40% để không bị chổng đuôi lật.
+- Kiểu đường (Themes.ROADS, Terrain): RoadStyle(tên, mặt đường 0 đất / 1 nhựa / 2 kim loại / 3 đá, độ cao đồi, độ gồ ghề, số hầm, hang, số cầu, đáy vực 0 hẻm / 1 dung nham / 2 đầm / 3 hư không).
+  - Ải 1 Đồng bằng; 2 Cầu vượt vực (3 cầu); 3 Xa lộ & hầm chui (nhựa, 2 hầm); 4 Đồi cát; 5 Đường mòn & hầm; 6 Đèo đá; 7 Cầu qua dung nham (4 cầu); 8 Hầm xuyên núi (3 hầm); 9 Hang dung nham; 10 Hang rồng; 11 Đồng bằng sương; 12 Cầu gỗ qua đầm; 13 Đường làng & hầm; 14 Đồi nghĩa trang; 15 Hầm ngục lâu đài; 16 Hố thiên thạch; 17 Hang pha lê; 18 Xa lộ căn cứ (kim loại, 3 hầm); 19 Cầu năng lượng; 20 Hành lang tàu mẹ.
+  - Hầm/hang có trần thật (Terrain.ceilingAt, CLEARANCE 300): xe, đạn, tia laser, quái bay đều bị trần chặn. Hang chạy từ 18% đến 85% quãng đường; ải trùm luôn để trống 2900 đơn vị cuối. Trong hầm đường bằng hơn, không có dốc nhảy; vào hầm màn hình tối đi.
+  - Vẽ: núi đá bao hầm, lòng hầm tối có sườn bê tông/thép, đèn trần chiếu hình nón, cửa hầm có sọc vàng đen; hang có nhũ đá, pha lê phát sáng, dung nham nhỏ giọt; cầu ván gỗ/cầu năng lượng có cột, dây võng, đáy vực dung nham sủi bọt/nước đầm/hư không đầy sao; mặt đường nhựa có vạch vàng + lan can, kim loại có đường sáng, đá có sỏi.
+- Màn hình chính: bỏ nút NÂNG CẤP; nút CHẠY! và GARA; dòng phụ hiện vùng • kiểu đường • độ dài • kỷ lục; bảng "🏆 BẢNG XẾP HẠNG — CHẠY XA NHẤT" (top 5 trong 10 lượt lưu: mét, ải, xe, ngày; lưu prefs "runs"). Vào top 3 có thành tích "🏅 Hạng n bảng xếp hạng". Bảng xếp hạng chỉ trên máy (online cần Google Play Games, để sau).
+- Gara mở ngay từ đầu, 3 tab: XE, VŨ KHÍ, NÂNG CẤP (6 nâng cấp cũ chuyển vào đây). Bỏ State.SHOP; nút ở bảng tổng kết/vượt ải đổi thành GARA.
+- Đồ họa kiểu thép gỉ (giống ảnh mẫu): mọi bảng HUD/thẻ gara là tấm thép có vết gỉ, vết xước, đinh tán 4 góc, lòng tối; nút điều khiển là tấm thép có mặt màu, nút GA có sọc lửa; đồng hồ tốc độ viền thép bắt bu lông; nút menu có đinh tán; núi lửa có dòng dung nham phát sáng; tro bụi và mảnh vụn bay ngang màn (núi lửa), vệt bụi cát (sa mạc); thân xe có ánh kim loại và vết bẩn; tiếp đất mạnh tóe tia lửa; hạ quái văng đồng xu.
+- Kiểm tra: bot chỉ giữ ga qua đủ 20 ải (task preview `drive`), không còn kẹt; vật lý không lật; 4 trùm thắng; preview `roads` chụp từng kiểu đường.
+
+## 3. Luật chơi hiện tại (v4.5)
 
 ### Điều khiển
 | Nút | Tác dụng |
@@ -153,7 +166,7 @@ Tài liệu bàn giao để tiếp tục làm việc ở phiên chat mới mà k
 | Đạn dược | 100 | 20 + 20 viên/cấp |
 | Lốp xe | 110 | Độ bám 1,0 + 0,15/cấp |
 
-### Gara (mở sau ải 1) — 5 dòng xe x 5 phiên bản, giá đã +30%
+### Gara (mở từ đầu, 3 tab Xe / Vũ khí / Nâng cấp) — 5 dòng xe x 5 phiên bản, giá đã +30%
 - Dòng xe mở khóa theo ải đã vượt: Xe máy (có sẵn), Xe hơi (qua ải 5), Bán tải (qua ải 10), Bọc thép (qua ải 15), Xe tăng (qua ải 20).
 - Chỉ số gốc của dòng (máu / tốc độ / lực kéo / giáp / xăng / bám / sức húc): Xe máy 0,75/1,04/0,95/0%/0,85/1,05/0,6; Xe hơi 1,0/1,10/1,05/5%/1,0/1,0/0,9; Bán tải 1,3/1,02/1,15/10%/1,2/1,08/1,15; Bọc thép 1,8/1,0/1,3/22%/1,3/1,1/1,45; Xe tăng 2,4/0,96/1,5/32%/1,45/1,25/2,0.
 - Phiên bản k (0..4): máu +10%·k, tốc độ +3%·k, lực kéo +5%·k, giáp +2,5%·k, xăng +6%·k, bám +3%·k, sức húc +10%·k.
@@ -195,7 +208,7 @@ Vũ khí (10 loại, mỗi loại nâng 5 cấp: +18% sát thương, -6% thời 
 | GameView.kt | SurfaceView + vòng lặp game (thread), cảm ứng đa điểm; canvas ảo cao 720 đơn vị |
 | Game.kt | Luật chơi: trạng thái, ải/màn, sinh zombie/vật cản/vật phẩm, va chạm, vũ khí, bão, tiền, điểm, thành tích, nhạc theo trạng thái, nút bấm |
 | CarPhysics.kt | Vật lý xe thuần Kotlin: 2 bánh lò xo, bám đường, nghiêng, tên lửa, tự cân bằng khi bay, va chạm thân xe với đất |
-| Terrain.kt | Sinh địa hình: đồi nhiều tầng, đá, ổ gà, ván giặt, dốc nhảy, giới hạn dốc 38°, bo thung lũng, cảnh vật |
+| Terrain.kt | Sinh địa hình theo RoadStyle (hầm, hang có trần, cầu qua vực): đồi nhiều tầng, đá, ổ gà, ván giặt, dốc nhảy, giới hạn dốc 38°, bo thung lũng, cảnh vật |
 | Themes.kt | 4 vùng (Region) và 20 bản đồ (MapTheme): tên, màu trời/núi/đất/cỏ, kiểu đường chân trời |
 | Renderer.kt | Vẽ toàn bộ: nền theo bản đồ (trời/núi/thành phố/núi lửa/lâu đài/tháp ngoài hành tinh), màn chọn bản đồ, quái theo vùng, 4 kiểu trùm, địa hình, xe, zombie, trùm + đá ném + cổng trạm, vật cản + thanh độ bền, bão, HUD (cả thanh máu trùm), menu, cửa hàng, gara, bảng tổng kết |
 | Garage.kt | 5 dòng xe x 5 phiên bản (Vehicles), 10 vũ khí (WeaponType) + chỉ số theo cấp, giá +30% |
@@ -258,14 +271,15 @@ cd tools/dev/preview && gradle boss      # thử đánh trùm ải 5 và ải 20
 - Danh sách người dùng đã đồng ý làm dần: chỉnh độ khó sau khi chơi thử; bão gắt hơn từ đầu; thêm loại zombie mới (nhảy, mặc giáp); bản đồ mới (thành phố, rừng, tuyết); thêm xe/vũ khí (súng phun lửa, lưỡi cưa); chuẩn bị đưa lên Google Play (khóa ký release, icon, ảnh giới thiệu).
 - Đã xong từ danh sách này: trùm cuối mỗi 5 ải (v4.2); bản đồ mới theo vùng + quái theo vùng (v4.3).
 - v4.3: người dùng xác nhận nhạc đã khớp.
-- Chờ người dùng chơi thử v4.4: tốc độ cày tiền, giá xe/vũ khí, cảm giác lái mới, độ khó trùm (máu 50/120/180/240).
+- Chờ người dùng chơi thử v4.5: kiểu đường mới, giao diện thép gỉ, còn kẹt xe không; v4.4 (cày tiền, giá, cảm giác lái) chưa có phản hồi cụ thể.
+- CH Play / AAB (người dùng hỏi, bảo để sau): code đạt (64-bit, không quyền, không thu dữ liệu). Còn thiếu: khóa ký upload riêng (đang ký debug, mật khẩu "android" công khai — Play từ chối), build bundleRelease (.aab) trên CI với khóa trong GitHub Secrets, kiểm tra targetSdk (có thể đã phải 36 từ 31/8/2026), icon 512, ảnh bìa 1024x500, ảnh chụp, trang chính sách quyền riêng tư, mô tả (tránh nhắc "Earn to Die"); phía người dùng: tài khoản nhà phát triển 25 USD + xác minh danh tính, thử nghiệm kín 12 người x 14 ngày (tài khoản cá nhân mới), bảng xếp hạng độ tuổi (bạo lực zombie → khoảng 12+/Teen).
 - Chưa tạo Pull Request; khi người dùng muốn gộp vào nhánh chính thì tạo PR từ claude/2d-driving-game-f0kpjk.
 
 ## 10. Các phiên chat
 
 | Phiên | Tiêu đề | Phạm vi |
 |---|---|---|
-| #1 | Đua Xe Sinh Tồn #1 — v1.0→v4.4: tạo game, kiểu Earn to Die, bão 3 bo, nhạc, độ bền vật cản, trùm cuối, 20 bản đồ, 4 trùm, gara 25 xe | Từ đầu đến v4.4 + tài liệu bàn giao, công cụ tools/dev, quy tắc CLAUDE.md |
+| #1 | Đua Xe Sinh Tồn #1 — v1.0→v4.5: tạo game, kiểu Earn to Die, bão 3 bo, nhạc, trùm cuối, 20 bản đồ, gara 25 xe, 20 kiểu đường, giao diện thép | Từ đầu đến v4.5 + tài liệu bàn giao, công cụ tools/dev, quy tắc CLAUDE.md |
 
 - Quy tắc làm việc (đặt tiêu đề phiên, tự lưu tiến trình khi ngữ cảnh ≥ 90% rồi nhắc mở chat mới) nằm trong CLAUDE.md ở gốc repo.
 

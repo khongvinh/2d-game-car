@@ -197,6 +197,26 @@ class CarArt {
         c.drawRect(-140f, -30f, 140f, -18f, fill)
         fill.color = 0x45000000
         c.drawRect(-140f, 4f, 140f, 60f, fill)
+        if (!ghost) {
+            // metallic sheen: two diagonal glints
+            fill.color = 0x1CFFFFFF
+            path.reset()
+            path.moveTo(-34f, -90f); path.lineTo(-8f, -90f); path.lineTo(-58f, 60f); path.lineTo(-84f, 60f); path.close()
+            c.drawPath(path, fill)
+            path.reset()
+            path.moveTo(4f, -90f); path.lineTo(12f, -90f); path.lineTo(-38f, 60f); path.lineTo(-46f, 60f); path.close()
+            c.drawPath(path, fill)
+            // road grime and scuffs along the bottom
+            fill.color = 0x40382A1E
+            for (i in 0 until 12) {
+                val gx = -96f + i * 17f + (i * 37 % 9)
+                c.drawCircle(gx, 12f + (i * 13 % 7), 3f + (i % 3), fill)
+            }
+            stroke.color = 0x22FFFFFF
+            stroke.strokeWidth = 1.2f
+            c.drawLine(-60f, -6f, -44f, -9f, stroke)
+            c.drawLine(30f, 2f, 48f, -1f, stroke)
+        }
         if (wreck) {
             for (i in 0 until 7) {
                 val on = (time * 8f + i * 1.7f).toInt() % 3 != 0

@@ -42,13 +42,14 @@ class Renderer(private val g: Game) {
         art.time = g.anim
         drawBackground(c)
         drawWorld(c)
+        drawAtmosphere(c)
+        fill.alpha = 255 // a paint's alpha also fades its shader
         fill.shader = vignette
         c.drawRect(0f, 0f, g.W, g.H, fill)
         fill.shader = null
         when (g.state) {
             State.MENU -> drawMenu(c)
             State.MAPS -> drawMaps(c)
-            State.SHOP -> drawShop(c)
             State.GARAGE -> drawGarage(c)
             State.PLAYING, State.PAUSED -> {
                 drawDamageOverlay(c)
@@ -66,6 +67,7 @@ class Renderer(private val g: Game) {
         val th = g.theme
         val W = g.W
         val H = g.H
+        fill.alpha = 255 // a paint's alpha also fades its shader
         fill.shader = skyShader
         c.drawRect(0f, 0f, W, H, fill)
         if (th.stars) {
@@ -78,6 +80,7 @@ class Renderer(private val g: Game) {
                 c.drawCircle(sx, sy, 1.2f + (k % 3) * 0.7f, fill)
             }
         }
+        fill.alpha = 255 // a paint's alpha also fades its shader
         fill.shader = sunShader
         c.drawRect(0f, 0f, W, H * 0.8f, fill)
         fill.shader = null
@@ -151,6 +154,44 @@ class Renderer(private val g: Game) {
         }
     }
 
+    /** Ash and grit drifting across the screen (volcano), dust streaks (desert). */
+    private fun drawAtmosphere(c: Canvas) {
+        val W = g.W
+        val H = g.H
+        when (g.region) {
+            Region.VOLCANO -> for (k in 0 until 46) {
+                val h = hash(k * 53 + 5)
+                val sp = 40f + (h % 70)
+                val px = (((h % 2000) - g.anim * (30f + h % 40) - g.camX * Game.ZOOM * 0.3f) % (W + 60f) + W + 60f) % (W + 60f) - 30f
+                val py = ((g.anim * sp + (h / 7) % 800) % (H + 40f)) - 20f
+                if (k % 3 == 0) {
+                    // a tumbling chunk of debris
+                    fill.color = 0xCC2A2522.toInt()
+                    val sz = 3f + (h % 4)
+                    c.save()
+                    c.translate(px, py)
+                    c.rotate(g.anim * (60f + h % 120))
+                    c.drawRect(-sz, -sz * 0.6f, sz, sz * 0.6f, fill)
+                    c.restore()
+                } else {
+                    fill.color = if (k % 3 == 1) 0x88B0A8A0.toInt() else 0x55FFB74D
+                    c.drawCircle(px, py, 1.4f + (h % 3) * 0.6f, fill)
+                }
+            }
+            Region.DESERT -> {
+                stroke.color = 0x22FFE0B2
+                stroke.strokeWidth = 2f
+                for (k in 0 until 14) {
+                    val h = hash(k * 41 + 9)
+                    val px = (((h % 2000) - g.anim * (220f + h % 160)) % (W + 200f) + W + 200f) % (W + 200f) - 100f
+                    val py = H * 0.35f + (h / 3 % 1000) / 1000f * H * 0.6f
+                    c.drawLine(px, py, px + 60f + h % 50, py - 2f, stroke)
+                }
+            }
+            else -> {}
+        }
+    }
+
     private fun mesas(c: Canvas, par: Float, base: Float, shader: Shader?, seed: Float, amp: Float, region: Region) {
         val W = g.W
         path.reset()
@@ -175,6 +216,7 @@ class Renderer(private val g: Game) {
         }
         path.lineTo(W, g.H)
         path.close()
+        fill.alpha = 255 // a paint's alpha also fades its shader
         fill.shader = shader
         c.drawPath(path, fill)
         fill.shader = null
@@ -199,7 +241,10 @@ class Renderer(private val g: Game) {
         val x1 = g.camX + g.viewW + 200f
 
         for (d in g.terrain.decor) if (d.x in x0..x1) drawDecor(c, d)
+        drawTunnels(c, x0 - 300f, x1 + 300f)
         drawTerrain(c)
+        drawBridges(c, x0 - 200f, x1 + 200f)
+        drawTunnelFront(c, x0 - 300f, x1 + 300f)
         drawFinish(c)
         drawRecord(c)
         drawCheckpoints(c)
@@ -228,6 +273,10 @@ class Renderer(private val g: Game) {
             c.drawCircle(p.x, p.y, p.size * (1f + p.grow * (1f - ratio)), fill)
         }
         fill.alpha = 255
+        if (g.terrain.covered(car.x, 80f) && g.state == State.PLAYING) {
+            fill.color = 0x50000000
+            c.drawRect(g.camX - 400f, g.camY - 400f, g.camX + g.viewW + 400f, g.camY + g.viewH + 400f, fill)
+        }
         for (t in g.texts) {
             val a = (255 * min(1f, t.life)).toInt()
             // pop in, then float
@@ -243,7 +292,7 @@ class Renderer(private val g: Game) {
             c.drawText(t.text, t.x, t.y, text)
         }
         text.alpha = 255
-        if (g.state != State.MENU && g.state != State.MAPS && g.state != State.SHOP && g.state != State.GARAGE) drawStorm(c)
+        if (g.state != State.MENU && g.state != State.MAPS && g.state != State.GARAGE) drawStorm(c)
         c.restore()
     }
 
@@ -265,6 +314,7 @@ class Renderer(private val g: Game) {
         }
         path.lineTo(Terrain.START_X + i1 * Terrain.SEG, bottom)
         path.close()
+        fill.alpha = 255 // a paint's alpha also fades its shader
         fill.shader = groundShader
         c.drawPath(path, fill)
         fill.shader = null
@@ -285,24 +335,100 @@ class Renderer(private val g: Game) {
                 c.drawRect(x, y + 110f + (h % 5) * 12f, x + 90f, y + 117f + (h % 5) * 12f, fill)
             }
         }
-        // road crust: dark edge, sandy top, bright rim
+        // road surface: dirt, asphalt highway, metal deck or cobbled stone
         val th = g.theme
-        stroke.color = th.crust[0]
-        stroke.strokeWidth = 20f
-        topPath.offset(0f, 9f)
-        c.drawPath(topPath, stroke)
-        stroke.color = th.crust[1]
-        stroke.strokeWidth = 9f
-        topPath.offset(0f, -6f)
-        c.drawPath(topPath, stroke)
-        stroke.color = th.crust[2]
-        stroke.strokeWidth = 3f
-        topPath.offset(0f, -4f)
-        c.drawPath(topPath, stroke)
+        when (t.style.surface) {
+            1 -> {
+                stroke.color = 0xFF2B2B2B.toInt()
+                stroke.strokeWidth = 26f
+                topPath.offset(0f, 12f)
+                c.drawPath(topPath, stroke)
+                stroke.color = 0xFF4E4E4E.toInt()
+                stroke.strokeWidth = 5f
+                topPath.offset(0f, -11f)
+                c.drawPath(topPath, stroke)
+                // lane markings and guardrail posts
+                stroke.color = 0xFFFFD54F.toInt()
+                stroke.strokeWidth = 3f
+                for (i in i0..i1) {
+                    if (i % 3 != 0) continue
+                    val x = Terrain.START_X + i * Terrain.SEG
+                    c.drawLine(x, t.point(i) + 12f, x + 24f, t.point(i) * 0.4f + t.point(i + 1) * 0.6f + 12f, stroke)
+                }
+            }
+            2 -> {
+                stroke.color = 0xFF263238.toInt()
+                stroke.strokeWidth = 24f
+                topPath.offset(0f, 11f)
+                c.drawPath(topPath, stroke)
+                stroke.color = 0xFF78909C.toInt()
+                stroke.strokeWidth = 6f
+                topPath.offset(0f, -9f)
+                c.drawPath(topPath, stroke)
+                stroke.color = 0xFF64FFDA.toInt()
+                stroke.strokeWidth = 2f
+                topPath.offset(0f, 5f)
+                c.drawPath(topPath, stroke)
+                stroke.color = 0xFF102027.toInt()
+                stroke.strokeWidth = 2f
+                for (i in i0..i1) {
+                    if (i % 2 != 0) continue
+                    val x = Terrain.START_X + i * Terrain.SEG
+                    c.drawLine(x, t.point(i) + 2f, x, t.point(i) + 22f, stroke)
+                }
+            }
+            3 -> {
+                stroke.color = 0xFF2E2A27.toInt()
+                stroke.strokeWidth = 22f
+                topPath.offset(0f, 10f)
+                c.drawPath(topPath, stroke)
+                stroke.color = 0xFF6D6660.toInt()
+                stroke.strokeWidth = 7f
+                topPath.offset(0f, -7f)
+                c.drawPath(topPath, stroke)
+                fill.color = 0xFF57504A.toInt()
+                for (i in i0..i1) {
+                    val x = Terrain.START_X + i * Terrain.SEG
+                    val y = t.point(i)
+                    c.drawOval(x + 2f, y + 6f, x + 18f, y + 14f, fill)
+                    c.drawOval(x + 22f, y + 8f, x + 36f, y + 16f, fill)
+                }
+            }
+            else -> {
+                stroke.color = th.crust[0]
+                stroke.strokeWidth = 20f
+                topPath.offset(0f, 9f)
+                c.drawPath(topPath, stroke)
+                stroke.color = th.crust[1]
+                stroke.strokeWidth = 9f
+                topPath.offset(0f, -6f)
+                c.drawPath(topPath, stroke)
+                stroke.color = th.crust[2]
+                stroke.strokeWidth = 3f
+                topPath.offset(0f, -4f)
+                c.drawPath(topPath, stroke)
+            }
+        }
+        if (t.style.surface == 1) {
+            // guardrail along the highway (not inside tunnels)
+            for (i in i0..i1) {
+                if (i % 5 != 0) continue
+                val x = Terrain.START_X + i * Terrain.SEG
+                if (t.covered(x) || t.onBridge(x)) continue
+                val y = t.point(i)
+                stroke.color = 0xFF90A4AE.toInt()
+                stroke.strokeWidth = 4f
+                c.drawLine(x, y - 2f, x, y - 30f, stroke)
+                stroke.strokeWidth = 5f
+                c.drawLine(x - 2f, y - 26f, x + 5 * Terrain.SEG + 2f, t.point(i + 5) - 26f, stroke)
+            }
+        }
 
         // dry grass, pebbles and bushes on the surface
+        if (t.style.surface != 0) return
         for (i in i0..i1) {
             val x = Terrain.START_X + i * Terrain.SEG
+            if (t.covered(x) || t.onBridge(x)) continue
             val y = t.point(i) - 1f
             val h = hash(i * 7 + 3)
             when (h % 7) {
@@ -328,6 +454,341 @@ class Renderer(private val g: Game) {
                     c.drawLine(x, y, x + 8f, y - 24f, stroke)
                     c.drawLine(x - 5f, y - 10f, x - 16f, y - 16f, stroke)
                     c.drawLine(x + 4f, y - 12f, x + 15f, y - 18f, stroke)
+                }
+            }
+        }
+    }
+
+    // ------------------------------------------------------- tunnels & bridges
+
+    private val rockPath = Path()
+
+    private fun rockColor(): Int = when (g.region) {
+        Region.DESERT -> 0xFF8A6446.toInt()
+        Region.VOLCANO -> 0xFF3A2E2B.toInt()
+        Region.NIGHT -> 0xFF39404D.toInt()
+        Region.ALIEN -> 0xFF4A2F66.toInt()
+    }
+
+    private fun shade(col: Int, f: Float) = Color.argb(
+        255, (((col shr 16) and 255) * f).toInt().coerceIn(0, 255), (((col shr 8) and 255) * f).toInt().coerceIn(0, 255), ((col and 255) * f).toInt().coerceIn(0, 255),
+    )
+
+    /** Top of the rock mass above a tunnel (caves fill the whole sky). */
+    private fun rockTop(x: Float, ce: Float): Float =
+        if (g.terrain.style.cave) g.camY - 400f else ce - 150f - 45f * (0.5f + 0.5f * sin(x * 0.006f)) - 30f * sin(x * 0.017f)
+
+    /** Mountain the tunnel runs through, and the dark tunnel bore behind the road. */
+    private fun drawTunnels(c: Canvas, x0: Float, x1: Float) {
+        val t = g.terrain
+        val rock = rockColor()
+        for (tn in t.tunnels) {
+            val a = tn[0]
+            val b = tn[1]
+            if (b + 300f < x0 || a - 300f > x1) continue
+            val from = max(a - 260f, x0)
+            val to = min(b + 260f, x1)
+            val ceA = t.ceilingAt(a + 1f)
+            val ceB = t.ceilingAt(b - 1f)
+            // the mountain: rises from the ground before the portal, falls after it
+            rockPath.reset()
+            var x = from
+            var first = true
+            while (x <= to) {
+                val ce = t.ceilingAt(x)
+                val y = when {
+                    x < a -> {
+                        val k = ((x - (a - 260f)) / 260f).coerceIn(0f, 1f)
+                        val f = k * k * (3f - 2f * k)
+                        t.heightAt(x) + (rockTop(a, ceA) - t.heightAt(x)) * f
+                    }
+                    x > b -> {
+                        val k = (((b + 260f) - x) / 260f).coerceIn(0f, 1f)
+                        val f = k * k * (3f - 2f * k)
+                        t.heightAt(x) + (rockTop(b, ceB) - t.heightAt(x)) * f
+                    }
+                    else -> rockTop(x, if (ce.isNaN()) ceA else ce)
+                }
+                if (first) {
+                    rockPath.moveTo(x, t.heightAt(x) + 30f); rockPath.lineTo(x, y); first = false
+                } else rockPath.lineTo(x, y)
+                x += 30f
+            }
+            rockPath.lineTo(to, t.heightAt(to) + 30f)
+            rockPath.close()
+            fill.color = rock
+            c.drawPath(rockPath, fill)
+            c.save()
+            c.clipPath(rockPath)
+            // strata and boulders in the rock face
+            for (k in 0 until 14) {
+                val h = hash(k * 31 + (a.toInt() / 7))
+                val bx = from + (h % 1000) / 1000f * (to - from)
+                val by = t.heightAt(bx) - 120f - (h % 400)
+                fill.color = if (k % 2 == 0) shade(rock, 0.8f) else shade(rock, 1.15f)
+                c.drawOval(bx - 40f - (h % 30), by - 14f, bx + 40f + (h % 40), by + 14f, fill)
+            }
+            stroke.color = shade(rock, 0.7f)
+            stroke.strokeWidth = 4f
+            for (k in 0 until 4) {
+                val yy = t.heightAt((a + b) / 2) - 380f - k * 70f
+                c.drawLine(from, yy + sin(k * 1.7f) * 20f, to, yy + 30f + cos(k * 2.1f) * 20f, stroke)
+            }
+            c.restore()
+
+            // the bore: between the road and the roof
+            val ia = t.indexOf(max(a, x0 - 40f))
+            val ib = t.indexOf(min(b, x1 + 40f)) + 1
+            rockPath.reset()
+            for (i in ia..ib) {
+                val xx = Terrain.START_X + i * Terrain.SEG
+                val ce = t.ceilingPoint(i)
+                val yy = if (ce.isNaN()) t.point(i) else ce
+                if (i == ia) rockPath.moveTo(xx, yy) else rockPath.lineTo(xx, yy)
+            }
+            for (i in ib downTo ia) rockPath.lineTo(Terrain.START_X + i * Terrain.SEG, t.point(i) + 20f)
+            rockPath.close()
+            fill.color = shade(rock, if (t.style.cave) 0.45f else 0.32f)
+            c.drawPath(rockPath, fill)
+            c.save()
+            c.clipPath(rockPath)
+            val sfc = t.style.surface
+            for (i in ia..ib) {
+                val xx = Terrain.START_X + i * Terrain.SEG
+                val ce = t.ceilingPoint(i)
+                if (ce.isNaN()) continue
+                val gy = t.point(i)
+                if (!t.style.cave && i % 5 == 0) {
+                    // concrete / steel ribs of a built tunnel
+                    fill.color = if (sfc == 2) 0xFF2F3D44.toInt() else shade(rock, 0.45f)
+                    c.drawRect(xx, ce, xx + 18f, gy, fill)
+                } else if (t.style.cave && i % 3 == 0) {
+                    // glowing veins in the cave wall
+                    val h = hash(i * 13)
+                    val col = when (g.region) {
+                        Region.VOLCANO -> 0x88FF6D00.toInt()
+                        Region.ALIEN -> 0x8864FFDA.toInt()
+                        Region.NIGHT -> 0x5590A4AE
+                        else -> 0x55FFCC80
+                    }
+                    stroke.color = col
+                    stroke.strokeWidth = 3f
+                    val my = ce + (gy - ce) * (0.25f + (h % 50) / 100f)
+                    c.drawLine(xx, my, xx + 30f, my - 18f + (h % 30), stroke)
+                }
+            }
+            c.restore()
+        }
+    }
+
+    /** Portals, lamps, stalactites and crystals: drawn over the road, under the cars. */
+    private fun drawTunnelFront(c: Canvas, x0: Float, x1: Float) {
+        val t = g.terrain
+        val rock = rockColor()
+        for (tn in t.tunnels) {
+            val a = tn[0]
+            val b = tn[1]
+            if (b + 100f < x0 || a - 100f > x1) continue
+            val ia = t.indexOf(max(a, x0))
+            val ib = t.indexOf(min(b, x1))
+            for (i in ia..ib) {
+                val xx = Terrain.START_X + i * Terrain.SEG
+                val ce = t.ceilingPoint(i)
+                if (ce.isNaN()) continue
+                val h = hash(i * 7 + 1)
+                if (t.style.cave) {
+                    if (h % 3 == 0) {
+                        // stalactite (or a crystal on alien worlds)
+                        val len = 22f + (h % 50)
+                        fill.color = when (g.region) {
+                            Region.ALIEN -> 0xFF4DD0E1.toInt()
+                            Region.VOLCANO -> shade(rock, 1.2f)
+                            else -> shade(rock, 1.3f)
+                        }
+                        path.reset()
+                        path.moveTo(xx - 9f, ce - 2f); path.lineTo(xx + 9f, ce - 2f); path.lineTo(xx + 1f, ce + len); path.close()
+                        c.drawPath(path, fill)
+                        if (g.region == Region.VOLCANO && h % 2 == 0) {
+                            // dripping lava
+                            val drip = ((g.anim * 120f + h) % 220f)
+                            fill.color = 0xFFFF6D00.toInt()
+                            c.drawCircle(xx + 1f, ce + len + drip, 3f, fill)
+                        }
+                        if (g.region == Region.ALIEN) {
+                            fill.color = 0x3364FFDA
+                            c.drawCircle(xx, ce + len * 0.5f, len * 0.7f, fill)
+                        }
+                    }
+                } else if (i % 6 == 0) {
+                    // ceiling lamp with a warm pool of light
+                    fill.color = 0x22FFE082
+                    path.reset()
+                    path.moveTo(xx - 12f, ce + 10f); path.lineTo(xx + 12f, ce + 10f)
+                    path.lineTo(xx + 90f, t.point(i)); path.lineTo(xx - 90f, t.point(i)); path.close()
+                    c.drawPath(path, fill)
+                    fill.color = 0xFF37474F.toInt()
+                    c.drawRect(xx - 16f, ce - 2f, xx + 16f, ce + 8f, fill)
+                    fill.color = 0xFFFFF59D.toInt()
+                    c.drawRect(xx - 12f, ce + 6f, xx + 12f, ce + 11f, fill)
+                }
+            }
+            // roof edge
+            stroke.color = shade(rock, 0.6f)
+            stroke.strokeWidth = 8f
+            rockPath.reset()
+            for (i in ia..ib + 1) {
+                val ce = t.ceilingPoint(i)
+                if (ce.isNaN()) continue
+                val xx = Terrain.START_X + i * Terrain.SEG
+                if (i == ia) rockPath.moveTo(xx, ce) else rockPath.lineTo(xx, ce)
+            }
+            c.drawPath(rockPath, stroke)
+            // portals
+            for (px in floatArrayOf(a, b)) {
+                if (px < x0 - 100f || px > x1 + 100f) continue
+                val ce = t.ceilingAt(if (px == a) a + 2f else b - 2f)
+                if (ce.isNaN()) continue
+                val gy = t.heightAt(px)
+                val built = !t.style.cave
+                fill.color = if (built) (if (t.style.surface == 2) 0xFF546E7A.toInt() else 0xFF9E9A94.toInt()) else shade(rock, 0.75f)
+                val dir = if (px == a) -1f else 1f
+                c.drawRect(min(px, px + dir * 36f), ce - 40f, max(px, px + dir * 36f), gy, fill)
+                c.drawRect(min(px, px + dir * 36f) - 10f, ce - 52f, max(px, px + dir * 36f) + 10f, ce - 30f, fill)
+                if (built) {
+                    // hazard stripes on the portal beam
+                    fill.color = 0xFFFFC107.toInt()
+                    var sy = ce - 50f
+                    while (sy < ce - 32f) {
+                        c.drawRect(min(px, px + dir * 36f) - 8f, sy, max(px, px + dir * 36f) + 8f, sy + 4f, fill)
+                        sy += 9f
+                    }
+                }
+                stroke.color = 0x66000000
+                stroke.strokeWidth = 3f
+                c.drawLine(px, ce - 40f, px, gy, stroke)
+            }
+        }
+    }
+
+    /** Chasms under bridge decks, the decks themselves, posts and rails. */
+    private fun drawBridges(c: Canvas, x0: Float, x1: Float) {
+        val t = g.terrain
+        val bottom = g.camY + g.viewH + 400f
+        val kind = t.style.chasm
+        for (br in t.bridges) {
+            val a = br[0]
+            val b = br[1]
+            if (b < x0 || a > x1) continue
+            val ya = t.heightAt(a)
+            val yb = t.heightAt(b)
+            // the gap
+            path.reset()
+            path.moveTo(a - 6f, ya + 14f)
+            path.lineTo(a + 50f, bottom)
+            path.lineTo(b - 50f, bottom)
+            path.lineTo(b + 6f, yb + 14f)
+            path.close()
+            fill.color = when (kind) {
+                1 -> 0xFF1A0A06.toInt()
+                2 -> 0xFF0E1A12.toInt()
+                3 -> 0xFF12051F.toInt()
+                else -> 0xFF22140D.toInt()
+            }
+            c.drawPath(path, fill)
+            c.save()
+            c.clipPath(path)
+            val mid = (ya + yb) / 2
+            when (kind) {
+                1 -> { // molten lava far below, glowing up the walls
+                    val ly = mid + 220f
+                    fill.color = 0x55FF5722
+                    c.drawRect(a, ly - 120f, b, ly, fill)
+                    fill.color = 0xFFFF6D00.toInt()
+                    c.drawRect(a, ly, b, bottom, fill)
+                    fill.color = 0xFFFFC107.toInt()
+                    for (k in 0 until 6) {
+                        val bx = a + ((hash(k + a.toInt()) % 1000) / 1000f) * (b - a)
+                        val pop = (g.anim * 1.3f + k * 0.37f) % 1f
+                        c.drawCircle(bx, ly + 8f - pop * 14f, 5f + pop * 6f, fill)
+                    }
+                }
+                2 -> { // murky swamp water
+                    val wy = mid + 160f
+                    fill.color = 0xFF2E4A2C.toInt()
+                    c.drawRect(a, wy, b, bottom, fill)
+                    stroke.color = 0x6690A97A
+                    stroke.strokeWidth = 3f
+                    for (k in 0 until 5) {
+                        val rx = a + (b - a) * (k + 0.5f) / 5f + sin(g.anim + k) * 12f
+                        c.drawLine(rx - 20f, wy + 8f + k % 2 * 10f, rx + 20f, wy + 8f + k % 2 * 10f, stroke)
+                    }
+                }
+                3 -> { // purple void with drifting stars
+                    for (k in 0 until 18) {
+                        val h = hash(k * 17 + a.toInt())
+                        fill.color = Color.argb(150 + (h % 100), 200, 160, 255)
+                        c.drawCircle(a + (h % 1000) / 1000f * (b - a), mid + 60f + (h % 500), 1.5f + (h % 3), fill)
+                    }
+                }
+                else -> { // canyon walls falling away into shadow
+                    fill.color = 0x40A1887F
+                    c.drawRect(a, mid + 20f, b, mid + 90f, fill)
+                    fill.color = 0x30000000
+                    c.drawRect(a, mid + 140f, b, bottom, fill)
+                }
+            }
+            c.restore()
+
+            val energy = kind == 3
+            // supports
+            stroke.color = if (energy) 0xFF546E7A.toInt() else 0xFF4E342E.toInt()
+            stroke.strokeWidth = 10f
+            c.drawLine(a + 10f, ya + 10f, a + 60f, ya + 170f, stroke)
+            c.drawLine(b - 10f, yb + 10f, b - 60f, yb + 170f, stroke)
+            // deck
+            if (energy) {
+                stroke.color = 0x8864FFDA.toInt()
+                stroke.strokeWidth = 16f
+                c.drawLine(a, ya + 4f, b, yb + 4f, stroke)
+                stroke.color = 0xFFE0F7FA.toInt()
+                stroke.strokeWidth = 4f
+                c.drawLine(a, ya, b, yb, stroke)
+            } else {
+                var x = a
+                var k = 0
+                while (x < b) {
+                    val y = ya + (yb - ya) * (x - a) / (b - a)
+                    fill.color = if (k % 3 == 0) 0xFF6D4C41.toInt() else if (k % 3 == 1) 0xFF795548.toInt() else 0xFF5D4037.toInt()
+                    c.drawRect(x, y - 1f, x + 19f, y + 12f, fill)
+                    fill.color = 0x40000000
+                    c.drawRect(x, y + 8f, x + 19f, y + 12f, fill)
+                    x += 22f
+                    k++
+                }
+            }
+            // posts and sagging rails
+            for (px in floatArrayOf(a, b)) {
+                val py = t.heightAt(px)
+                fill.color = if (energy) 0xFF455A64.toInt() else 0xFF4E342E.toInt()
+                c.drawRect(px - 6f, py - 70f, px + 6f, py + 4f, fill)
+            }
+            stroke.color = if (energy) 0xAA64FFDA.toInt() else 0xFF8D6E63.toInt()
+            stroke.strokeWidth = 3f
+            for (hgt in floatArrayOf(66f, 36f)) {
+                path.reset()
+                path.moveTo(a, ya - hgt)
+                path.quadTo((a + b) / 2, mid - hgt + 34f, b, yb - hgt)
+                c.drawPath(path, stroke)
+            }
+            if (!energy) {
+                stroke.strokeWidth = 2f
+                var x = a + 40f
+                while (x < b - 20f) {
+                    val k = (x - a) / (b - a)
+                    val y = ya + (yb - ya) * k
+                    val sag = 4f * k * (1f - k) * 34f
+                    c.drawLine(x, y, x, y - 66f + sag, stroke)
+                    x += 44f
                 }
             }
         }
@@ -625,7 +1086,7 @@ class Renderer(private val g: Game) {
 
     // ----------------------------------------------------------------- car
 
-    private val inGarageScreens get() = g.state == State.MENU || g.state == State.MAPS || g.state == State.SHOP || g.state == State.GARAGE
+    private val inGarageScreens get() = g.state == State.MENU || g.state == State.MAPS || g.state == State.GARAGE
 
     private fun drawPlayerCar(c: Canvas) {
         val car = g.car
@@ -1366,11 +1827,28 @@ class Renderer(private val g: Game) {
         val kmh = abs(car.forwardSpeed) / Game.METER * 3.6f
         val cx = W / 2
         val cy = H + 12f
-        fill.color = 0xE61B1B1B.toInt()
-        c.drawCircle(cx, cy, 134f, fill)
-        stroke.color = 0x66FFFFFF
+        // steel bezel with bolts
+        fill.color = 0x66000000
+        c.drawCircle(cx + 3f, cy + 5f, 150f, fill)
+        fill.color = 0xFF55504A.toInt()
+        c.drawCircle(cx, cy, 150f, fill)
+        fill.color = 0x2EFFFFFF
+        c.drawCircle(cx, cy - 6f, 144f, fill)
+        fill.color = 0x60834012
+        c.drawOval(cx - 130f, cy - 120f, cx - 80f, cy - 100f, fill)
+        c.drawOval(cx + 70f, cy - 135f, cx + 120f, cy - 118f, fill)
+        stroke.color = 0xFF221F1C.toInt()
         stroke.strokeWidth = 3f
-        c.drawCircle(cx, cy, 134f, stroke)
+        c.drawCircle(cx, cy, 150f, stroke)
+        for (k in 0..6) {
+            val a = PI.toFloat() * (1.06f + k * 0.147f)
+            rivet(c, cx + cos(a) * 141f, cy + sin(a) * 141f, 3.6f)
+        }
+        fill.color = 0xF0161514.toInt()
+        c.drawCircle(cx, cy, 132f, fill)
+        stroke.color = 0x55000000
+        stroke.strokeWidth = 3f
+        c.drawCircle(cx, cy, 132f, stroke)
         r.set(cx - 118f, cy - 118f, cx + 118f, cy + 118f)
         stroke.strokeWidth = 8f
         stroke.color = 0xFF43A047.toInt()
@@ -1411,23 +1889,57 @@ class Renderer(private val g: Game) {
     }
 
     private fun drawButton(c: Canvas, b: Button, held: Boolean) {
-        val grow = if (held) 4f else 0f
-        r.set(b.l - grow, b.t - grow, b.r + grow, b.b + grow)
-        fill.color = 0x40000000
-        c.drawRoundRect(r.left + 3f, r.top + 6f, r.right + 3f, r.bottom + 6f, 26f, 26f, fill)
-        fill.color = b.color
-        fill.alpha = if (held) 230 else (b.color ushr 24).coerceAtLeast(110)
-        c.drawRoundRect(r, 26f, 26f, fill)
+        val grow = if (held) 3f else 0f
+        val l = b.l - grow
+        val t = b.t - grow
+        val rr = b.r + grow
+        val bb = b.b + grow
+        metalPlate(c, l, t, rr, bb, 22f)
+        // coloured face set into the plate
+        val rgb = b.color and 0xFFFFFF
+        val face = if (rgb == 0xFFFFFF) 0xFF6B655F.toInt() else blend(0xFF3A3632.toInt(), 0xFF000000.toInt() or rgb, if (held) 0.95f else 0.7f)
+        r.set(l + 9f, t + 9f, rr - 9f, bb - 9f)
+        fill.color = face
+        c.drawRoundRect(r, 15f, 15f, fill)
+        platePath.reset()
+        platePath.addRoundRect(r, 15f, 15f, Path.Direction.CW)
+        c.save()
+        c.clipPath(platePath)
         fill.color = 0x30FFFFFF
-        c.drawRoundRect(r.left + 4f, r.top + 4f, r.right - 4f, r.top + (r.bottom - r.top) * 0.45f, 22f, 22f, fill)
-        fill.alpha = 255
-        stroke.color = if (held) 0xEEFFFFFF.toInt() else 0x88FFFFFF.toInt()
-        stroke.strokeWidth = if (held) 4f else 3f
-        c.drawRoundRect(r, 26f, 26f, stroke)
+        c.drawRect(r.left, r.top, r.right, r.top + (r.bottom - r.top) * 0.42f, fill)
+        if (b.id == "gas") {
+            // flame stripes along the bottom of the throttle
+            var x = r.left - 30f
+            var k = 0
+            while (x < r.right) {
+                fill.color = if (k % 2 == 0) 0xFFFF6D00.toInt() else 0xFFFFC107.toInt()
+                path.reset()
+                path.moveTo(x, r.bottom); path.lineTo(x + 22f, r.bottom - 46f); path.lineTo(x + 40f, r.bottom - 46f); path.lineTo(x + 18f, r.bottom); path.close()
+                c.drawPath(path, fill)
+                x += 34f
+                k++
+            }
+        }
+        c.restore()
+        stroke.color = if (held) 0xEEFFFFFF.toInt() else 0x66000000
+        stroke.strokeWidth = if (held) 3f else 2f
+        c.drawRoundRect(r, 15f, 15f, stroke)
+        rivet(c, l + 6f, t + 6f, 3f)
+        rivet(c, rr - 6f, t + 6f, 3f)
+        rivet(c, l + 6f, bb - 6f, 3f)
+        rivet(c, rr - 6f, bb - 6f, 3f)
         text.textAlign = Paint.Align.CENTER
-        text.color = Color.WHITE
         val size = min(52f, (b.b - b.t) * 0.38f)
-        fitText(c, b.label, b.cx, b.cy + size * 0.36f, size, b.r - b.l - 16f)
+        text.textSize = size
+        val w = text.measureText(b.label)
+        if (w > b.r - b.l - 24f) text.textSize *= (b.r - b.l - 24f) / w
+        text.style = Paint.Style.STROKE
+        text.strokeWidth = 6f
+        text.color = 0xAA000000.toInt()
+        c.drawText(b.label, b.cx, b.cy + text.textSize * 0.36f, text)
+        text.style = Paint.Style.FILL
+        text.color = Color.WHITE
+        c.drawText(b.label, b.cx, b.cy + text.textSize * 0.36f, text)
     }
 
     // ------------------------------------------------------------ screens
@@ -1472,10 +1984,19 @@ class Renderer(private val g: Game) {
             fill.color = 0x30000000
             r.set(b.l + 4f, b.b - 14f, b.r - 4f, b.b - 4f)
             c.drawRoundRect(r, 8f, 8f, fill)
-            stroke.color = 0x66FFFFFF
-            stroke.strokeWidth = 2f
+            stroke.color = 0xFF221F1C.toInt()
+            stroke.strokeWidth = 4f
             r.set(b.l, b.t, b.r, b.b)
             c.drawRoundRect(r, 24f, 24f, stroke)
+            stroke.color = 0x55FFFFFF
+            stroke.strokeWidth = 1.5f
+            c.drawRoundRect(b.l + 4f, b.t + 4f, b.r - 4f, b.b - 4f, 20f, 20f, stroke)
+            if (b.b - b.t > 60f && b.r - b.l > 120f) {
+                rivet(c, b.l + 14f, b.t + 14f, 3.4f)
+                rivet(c, b.r - 14f, b.t + 14f, 3.4f)
+                rivet(c, b.l + 14f, b.b - 14f, 3.4f)
+                rivet(c, b.r - 14f, b.b - 14f, 3.4f)
+            }
             text.textAlign = Paint.Align.CENTER
             val size = min(40f, (b.b - b.t) * 0.45f)
             text.textSize = size
@@ -1544,8 +2065,50 @@ class Renderer(private val g: Game) {
         val sx = W * 0.74f
         text.textAlign = Paint.Align.CENTER
         text.color = 0xFFFFF3E0.toInt()
-        fitText(c, "${Themes.of(s.stageSel).region.title} • ${g.stageGoalM(s.stageSel).toInt()}m • kỷ lục ${s.best[s.stageSel]}m", sx, 240f, 22f, 460f)
+        val th = Themes.of(s.stageSel)
+        fitText(c, "${th.region.title} • ${th.road.name} • ${g.stageGoalM(s.stageSel).toInt()}m • kỷ lục ${s.best[s.stageSel]}m", sx, 236f, 22f, 460f)
+        drawLeaderboard(c, sx - 230f, 458f, sx + 230f, g.H - 14f)
 
+    }
+
+    /** Top runs by distance, kept on this phone. */
+    private fun drawLeaderboard(c: Canvas, l: Float, t: Float, rr: Float, b: Float) {
+        val s = g.save
+        metalPanel(c, l, t, rr, b)
+        text.textAlign = Paint.Align.CENTER
+        text.color = 0xFFFFD740.toInt()
+        fitText(c, "🏆 BẢNG XẾP HẠNG — CHẠY XA NHẤT", (l + rr) / 2, t + 38f, 24f, rr - l - 40f)
+        val rows = s.records.take(5)
+        if (rows.isEmpty()) {
+            text.color = 0xFFBDBDBD.toInt()
+            fitText(c, "Chưa có lượt chạy nào", (l + rr) / 2, t + 110f, 22f, rr - l - 40f)
+            return
+        }
+        val step = (b - t - 58f) / 5f
+        rows.forEachIndexed { i, row ->
+            val y = t + 58f + step * i + step * 0.62f
+            if (i % 2 == 0) {
+                fill.color = 0x22FFFFFF
+                c.drawRoundRect(l + 14f, y - step * 0.62f + 2f, rr - 14f, y + step * 0.38f - 2f, 8f, 8f, fill)
+            }
+            val medal = when (i) {
+                0 -> 0xFFFFD740.toInt()
+                1 -> 0xFFCFD8DC.toInt()
+                2 -> 0xFFFFAB73.toInt()
+                else -> 0xFF78909C.toInt()
+            }
+            fill.color = medal
+            c.drawCircle(l + 40f, y - 7f, 15f, fill)
+            text.textAlign = Paint.Align.CENTER
+            text.color = 0xFF1A1A1A.toInt()
+            text.textSize = 18f
+            c.drawText("${i + 1}", l + 40f, y - 1f, text)
+            text.textAlign = Paint.Align.LEFT
+            text.color = Color.WHITE
+            fitText(c, "${row[0]}m", l + 66f, y, 24f, 110f)
+            text.color = 0xFFB0BEC5.toInt()
+            fitText(c, "Ải ${row[1]} • ${Vehicles.of(row[2]).title} • ngày ${row[3]}", l + 180f, y - 1f, 18f, rr - l - 196f)
+        }
     }
 
     private fun drawMaps(c: Canvas) {
@@ -1639,9 +2202,8 @@ class Renderer(private val g: Game) {
     }
 
     private fun card(c: Canvas, rc: FloatArray, selected: Boolean) {
+        metalPanel(c, rc[0], rc[1], rc[2], rc[3], 18f)
         r.set(rc[0], rc[1], rc[2], rc[3])
-        fill.color = 0xEE263238.toInt()
-        c.drawRoundRect(r, 20f, 20f, fill)
         if (selected) {
             stroke.color = 0xFF69F0AE.toInt()
             stroke.strokeWidth = 6f
@@ -1649,15 +2211,9 @@ class Renderer(private val g: Game) {
         }
     }
 
-    private fun drawShop(c: Canvas) {
-        val W = g.W
+    /** Third garage tab: engine, fuel, boost, armour, ammo and tyre upgrades. */
+    private fun garageUpgrades(c: Canvas) {
         val s = g.save
-        dim(c, 0xC0)
-        title(c, "NÂNG CẤP XE", W / 2, 76f, 0xFFFFD740.toInt(), 60f)
-        text.textAlign = Paint.Align.RIGHT
-        text.textSize = 34f
-        text.color = 0xFFFFD740.toInt()
-        c.drawText("${s.money}$", W - 40f, 70f, text)
         Upgrade.entries.forEachIndexed { i, u ->
             val rc = g.upgradeCard(i)
             val lv = s.level(u)
@@ -1685,20 +2241,19 @@ class Renderer(private val g: Game) {
             text.color = color
             c.drawText(label, (rc[0] + rc[2]) / 2, rc[3] - 28f, text)
         }
-        drawMenuButtons(c)
     }
 
     private fun drawGarage(c: Canvas) {
         val W = g.W
         val s = g.save
         dim(c, 0xC8)
-        title(c, "GARA", W / 2, 76f, 0xFFE040FB.toInt(), 60f)
+        title(c, "GARA", (790f + W - 230f) / 2, 76f, 0xFFE040FB.toInt(), 60f, 300f)
         text.textAlign = Paint.Align.RIGHT
         text.textSize = 34f
         text.color = 0xFFFFD740.toInt()
         c.drawText("${s.money}$", W - 40f, 70f, text)
-        val tabs = arrayOf("XE", "VŨ KHÍ")
-        for (i in 0..1) {
+        val tabs = arrayOf("XE", "VŨ KHÍ", "NÂNG CẤP")
+        for (i in 0..2) {
             val rc = g.garageTabRect(i)
             val on = g.garageTab == i
             r.set(rc[0], rc[1], rc[2], rc[3])
@@ -1715,7 +2270,11 @@ class Renderer(private val g: Game) {
             text.color = if (on) Color.WHITE else 0xFFB0BEC5.toInt()
             fitText(c, tabs[i], (rc[0] + rc[2]) / 2, rc[3] - 20f, 32f, rc[2] - rc[0] - 20f)
         }
-        if (g.garageTab == 0) garageVehicles(c) else garageWeapons(c)
+        when (g.garageTab) {
+            0 -> garageVehicles(c)
+            1 -> garageWeapons(c)
+            else -> garageUpgrades(c)
+        }
         drawMenuButtons(c)
     }
 
@@ -1926,7 +2485,6 @@ class Renderer(private val g: Game) {
             )
             State.STAGE_DONE -> {
                 val unlock = ArrayList<String>()
-                if (g.stage == 1) unlock.add("🔓 Mở khóa GARA")
                 if (g.stage == 5) unlock.add("🔓 Mở khóa 👥 Nhân bản")
                 VehicleClass.entries.filter { it.unlockStage == g.stage }.forEach { unlock.add("🔓 ${it.title.uppercase()}") }
                 WeaponType.entries.filter { it.unlockStage == g.stage }.forEach { unlock.add("🔓 ${it.title}") }
@@ -2081,13 +2639,77 @@ class Renderer(private val g: Game) {
     }
 
 
-    private fun glassPanel(c: Canvas, l: Float, t: Float, rr: Float, b: Float, radius: Float = 18f) {
+    private fun glassPanel(c: Canvas, l: Float, t: Float, rr: Float, b: Float, radius: Float = 18f) =
+        metalPanel(c, l, t, rr, b, min(radius, 16f))
+
+    // --------------------------------------------------- rusty metal look
+
+    private val platePath = Path()
+
+    private fun rivet(c: Canvas, x: Float, y: Float, rad: Float = 4f) {
+        fill.color = 0x88000000.toInt()
+        c.drawCircle(x + 1f, y + 1.5f, rad, fill)
+        fill.color = 0xFF9A9188.toInt()
+        c.drawCircle(x, y, rad, fill)
+        fill.color = 0xFFDDD5CA.toInt()
+        c.drawCircle(x - rad * 0.3f, y - rad * 0.3f, rad * 0.38f, fill)
+    }
+
+    /** A worn steel plate with rust stains, scratches and a dark rim. */
+    private fun metalPlate(c: Canvas, l: Float, t: Float, rr: Float, b: Float, radius: Float, base: Int = 0xFF55504A.toInt()) {
         r.set(l, t, rr, b)
-        fill.color = 0x8C101418.toInt()
+        fill.color = 0x66000000
+        c.drawRoundRect(l + 3f, t + 5f, rr + 3f, b + 5f, radius, radius, fill)
+        fill.color = base
         c.drawRoundRect(r, radius, radius, fill)
-        stroke.color = 0x40FFFFFF
-        stroke.strokeWidth = 2f
+        platePath.reset()
+        platePath.addRoundRect(r, radius, radius, Path.Direction.CW)
+        c.save()
+        c.clipPath(platePath)
+        fill.color = 0x2EFFFFFF
+        c.drawRect(l, t, rr, t + (b - t) * 0.35f, fill)
+        fill.color = 0x38000000
+        c.drawRect(l, b - (b - t) * 0.3f, rr, b, fill)
+        val seed = (l * 7f + t * 13f).toInt()
+        for (k in 0 until 6) {
+            val h = hash(seed + k * 31)
+            val x = l + (h % 1000) / 1000f * (rr - l)
+            val y = t + ((h / 1000) % 1000) / 1000f * (b - t)
+            val w = 10f + (h % 34)
+            fill.color = if (k % 2 == 0) 0x70834012 else 0x48A0522D
+            c.drawOval(x - w, y - w * 0.45f, x + w, y + w * 0.45f, fill)
+            fill.color = 0x40301808
+            c.drawCircle(x + w * 0.3f, y, w * 0.18f, fill)
+        }
+        stroke.color = 0x24FFFFFF
+        stroke.strokeWidth = 1.5f
+        for (k in 0 until 3) {
+            val h = hash(seed * 3 + k)
+            val x = l + (h % 1000) / 1000f * (rr - l)
+            val y = t + ((h / 7) % 1000) / 1000f * (b - t)
+            c.drawLine(x, y, x + 18f + (h % 20), y + 4f - (h % 9), stroke)
+        }
+        c.restore()
+        stroke.color = 0xFF221F1C.toInt()
+        stroke.strokeWidth = 3f
         c.drawRoundRect(r, radius, radius, stroke)
+        stroke.color = 0x30FFFFFF
+        stroke.strokeWidth = 1.5f
+        c.drawRoundRect(l + 3f, t + 3f, rr - 3f, b - 3f, radius * 0.8f, radius * 0.8f, stroke)
+    }
+
+    /** Metal frame with corner rivets around a dark well for content. */
+    private fun metalPanel(c: Canvas, l: Float, t: Float, rr: Float, b: Float, radius: Float = 16f) {
+        metalPlate(c, l, t, rr, b, radius)
+        fill.color = 0xD81B1917.toInt()
+        c.drawRoundRect(l + 11f, t + 11f, rr - 11f, b - 11f, radius * 0.55f, radius * 0.55f, fill)
+        stroke.color = 0x66000000
+        stroke.strokeWidth = 2f
+        c.drawRoundRect(l + 11f, t + 11f, rr - 11f, b - 11f, radius * 0.55f, radius * 0.55f, stroke)
+        rivet(c, l + 6f, t + 6f, 3.2f)
+        rivet(c, rr - 6f, t + 6f, 3.2f)
+        rivet(c, l + 6f, b - 6f, 3.2f)
+        rivet(c, rr - 6f, b - 6f, 3.2f)
     }
 
 
@@ -2217,10 +2839,16 @@ class Renderer(private val g: Game) {
             c.drawPath(path, fill)
             // lava streaks and glowing crater
             val pulse = 0.6f + 0.4f * sin(g.anim * 2f + k)
-            stroke.color = Color.argb((200 * pulse).toInt(), 255, 112, 30)
-            stroke.strokeWidth = 5f
-            c.drawLine(x - 10f, base - vh + 4f, x - 40f, base - vh * 0.5f, stroke)
-            c.drawLine(x + 12f, base - vh + 4f, x + 30f, base - vh * 0.4f, stroke)
+            // glowing lava rivers running down the flanks
+            for (pass in 0..1) {
+                stroke.color = if (pass == 0) Color.argb((70 * pulse).toInt(), 255, 90, 20) else Color.argb((230 * pulse).toInt(), 255, 140, 40)
+                stroke.strokeWidth = if (pass == 0) 14f else 4f
+                c.drawLine(x - 10f, base - vh + 4f, x - 34f, base - vh * 0.55f, stroke)
+                c.drawLine(x - 34f, base - vh * 0.55f, x - 70f, base - vh * 0.1f, stroke)
+                c.drawLine(x - 34f, base - vh * 0.55f, x - 24f, base - vh * 0.05f, stroke)
+                c.drawLine(x + 12f, base - vh + 4f, x + 36f, base - vh * 0.45f, stroke)
+                c.drawLine(x + 36f, base - vh * 0.45f, x + 80f, base + 10f, stroke)
+            }
             fill.color = Color.argb((220 * pulse).toInt(), 255, 150, 40)
             c.drawOval(x - 38f, base - vh - 8f, x + 38f, base - vh + 8f, fill)
             // smoke column

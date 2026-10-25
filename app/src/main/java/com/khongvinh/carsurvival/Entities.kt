@@ -2,7 +2,7 @@ package com.khongvinh.carsurvival
 
 import kotlin.math.min
 
-enum class State { MENU, MAPS, SHOP, GARAGE, PLAYING, PAUSED, RESULT, STAGE_DONE, VICTORY }
+enum class State { MENU, MAPS, GARAGE, PLAYING, PAUSED, RESULT, STAGE_DONE, VICTORY }
 
 enum class Upgrade(val title: String, val desc: String, val base: Int) {
     ENGINE("Động cơ", "+tốc độ & lực kéo", 150),
