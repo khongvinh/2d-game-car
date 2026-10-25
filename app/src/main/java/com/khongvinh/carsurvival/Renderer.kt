@@ -488,6 +488,7 @@ class Renderer(private val g: Game) {
             if (b + 300f < x0 || a - 300f > x1) continue
             val from = max(a - 260f, x0)
             val to = min(b + 260f, x1)
+            if (to - from < 30f) continue
             val ceA = t.ceilingAt(a + 1f)
             val ceB = t.ceilingAt(b - 1f)
             // the mountain: rises from the ground before the portal, falls after it
@@ -539,6 +540,7 @@ class Renderer(private val g: Game) {
             // the bore: between the road and the roof
             val ia = t.indexOf(max(a, x0 - 40f))
             val ib = t.indexOf(min(b, x1 + 40f)) + 1
+            if (ib <= ia) continue
             rockPath.reset()
             for (i in ia..ib) {
                 val xx = Terrain.START_X + i * Terrain.SEG
@@ -2211,49 +2213,17 @@ class Renderer(private val g: Game) {
         }
     }
 
-    /** Third garage tab: engine, fuel, boost, armour, ammo and tyre upgrades. */
-    private fun garageUpgrades(c: Canvas) {
-        val s = g.save
-        Upgrade.entries.forEachIndexed { i, u ->
-            val rc = g.upgradeCard(i)
-            val lv = s.level(u)
-            card(c, rc, false)
-            text.textAlign = Paint.Align.LEFT
-            text.color = Color.WHITE
-            fitText(c, u.title, rc[0] + 24f, rc[1] + 54f, 36f, rc[2] - rc[0] - 48f)
-            text.color = 0xFFB0BEC5.toInt()
-            fitText(c, u.desc, rc[0] + 24f, rc[1] + 92f, 24f, rc[2] - rc[0] - 48f)
-            val pw = ((rc[2] - rc[0]) - 48f - 4 * 10f) / Upgrade.MAX_LEVEL
-            for (k in 0 until Upgrade.MAX_LEVEL) {
-                fill.color = if (k < lv) 0xFF69F0AE.toInt() else 0xFF455A64.toInt()
-                val l = rc[0] + 24f + k * (pw + 10f)
-                r.set(l, rc[1] + 112f, l + pw, rc[1] + 132f)
-                c.drawRoundRect(r, 6f, 6f, fill)
-            }
-            text.textAlign = Paint.Align.CENTER
-            text.textSize = 32f
-            val cost = u.cost(lv)
-            val (label, color) = when {
-                lv >= Upgrade.MAX_LEVEL -> "TỐI ĐA" to 0xFF69F0AE.toInt()
-                s.money >= cost -> "MUA $cost$" to 0xFFFFD740.toInt()
-                else -> "$cost$" to 0xFF9E9E9E.toInt()
-            }
-            text.color = color
-            c.drawText(label, (rc[0] + rc[2]) / 2, rc[3] - 28f, text)
-        }
-    }
-
     private fun drawGarage(c: Canvas) {
         val W = g.W
         val s = g.save
         dim(c, 0xC8)
-        title(c, "GARA", (790f + W - 230f) / 2, 76f, 0xFFE040FB.toInt(), 60f, 300f)
+        title(c, "GARA", W / 2, 76f, 0xFFE040FB.toInt(), 60f, 300f)
         text.textAlign = Paint.Align.RIGHT
         text.textSize = 34f
         text.color = 0xFFFFD740.toInt()
         c.drawText("${s.money}$", W - 40f, 70f, text)
-        val tabs = arrayOf("XE", "VŨ KHÍ", "NÂNG CẤP")
-        for (i in 0..2) {
+        val tabs = arrayOf("XE", "VŨ KHÍ")
+        for (i in 0..1) {
             val rc = g.garageTabRect(i)
             val on = g.garageTab == i
             r.set(rc[0], rc[1], rc[2], rc[3])
@@ -2270,11 +2240,7 @@ class Renderer(private val g: Game) {
             text.color = if (on) Color.WHITE else 0xFFB0BEC5.toInt()
             fitText(c, tabs[i], (rc[0] + rc[2]) / 2, rc[3] - 20f, 32f, rc[2] - rc[0] - 20f)
         }
-        when (g.garageTab) {
-            0 -> garageVehicles(c)
-            1 -> garageWeapons(c)
-            else -> garageUpgrades(c)
-        }
+        if (g.garageTab == 0) garageVehicles(c) else garageWeapons(c)
         drawMenuButtons(c)
     }
 
@@ -2325,15 +2291,17 @@ class Renderer(private val g: Game) {
         text.color = 0xFFB0BEC5.toInt()
         fitText(c, "${v.cls.title} • Phiên bản ${v.variant + 1}/${Vehicles.PER_CLASS}", tx, pr[1] + 78f, 22f, pr[2] - tx - 24f)
         val rows = listOf(
-            Triple("Máu", v.hpMul / 3.4f to cur.hpMul / 3.4f, "${(100 * v.hpMul).toInt()}"),
-            Triple("Tốc độ", (v.speedMul - 0.8f) / 0.45f to (cur.speedMul - 0.8f) / 0.45f, "${(84 * v.speedMul).toInt()} km/h"),
-            Triple("Lực kéo", v.powerMul / 1.85f to cur.powerMul / 1.85f, "${(v.powerMul * 100).toInt()}%"),
-            Triple("Giáp", v.armor / 0.45f to cur.armor / 0.45f, "${(v.armor * 100).toInt()}%"),
-            Triple("Xăng", v.fuelMul / 1.85f to cur.fuelMul / 1.85f, "${(v.fuelMul * 100).toInt()}%"),
-            Triple("Bám đường", v.grip / 1.42f to cur.grip / 1.42f, "${(v.grip * 100).toInt()}%"),
+            Triple("Máu", v.maxHp / 850f to cur.maxHp / 850f, "${v.maxHp.toInt()}"),
+            Triple("Tốc độ", v.topSpeed / 1450f to cur.topSpeed / 1450f, "${(v.topSpeed / Game.METER * 3.6f).toInt()} km/h"),
+            Triple("Lực kéo", v.engineAcc / 1800f to cur.engineAcc / 1800f, "${(v.engineAcc / 5.2f).toInt()}%"),
+            Triple("Giáp", v.totalArmor / 0.7f to cur.totalArmor / 0.7f, "${(v.totalArmor * 100).toInt()}%"),
+            Triple("Xăng", v.fuelTime / 80f to cur.fuelTime / 80f, "${v.fuelTime.toInt()} giây ga"),
+            Triple("Bám đường", v.traction / 2.4f to cur.traction / 2.4f, "${(v.traction * 100).toInt()}%"),
+            Triple("Tên lửa đẩy", v.boostTime / 7.5f to cur.boostTime / 7.5f, "%.1f giây".format(v.boostTime)),
+            Triple("Đạn", v.ammo / 120f to cur.ammo / 120f, "${v.ammo} viên"),
             Triple("Sức húc", v.ram / 2.9f to cur.ram / 2.9f, "${(v.ram * 100).toInt()}%"),
         )
-        statRows(c, rows, tx, pr[2] - 24f, pr[1] + 104f, 25f)
+        statRows(c, rows, tx, pr[2] - 24f, pr[1] + 100f, 21f)
 
         for (k in 0 until Vehicles.PER_CLASS) {
             val vv = Vehicles.of(g.garageClass, k)
@@ -2370,7 +2338,7 @@ class Renderer(private val g: Game) {
         rows.forEachIndexed { i, (label, frac, value) ->
             val y = y0 + i * step
             text.textAlign = Paint.Align.LEFT
-            text.textSize = 19f
+            text.textSize = if (step < 23f) 17f else 19f
             text.color = 0xFFB0BEC5.toInt()
             c.drawText(label, x0, y + 6f, text)
             fill.color = 0xFF37474F.toInt()

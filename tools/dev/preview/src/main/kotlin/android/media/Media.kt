@@ -18,6 +18,9 @@ class SoundPool {
     fun load(@Suppress("UNUSED_PARAMETER") p: String, @Suppress("UNUSED_PARAMETER") pr: Int): Int { val id = next++; listener?.invoke(this, id, 0); return id }
     fun play(id: Int, l: Float, r: Float, p: Int, loop: Int, rate: Float) = id + (l + r + p + loop + rate).toInt() * 0
     fun release() {}
+    fun setRate(@Suppress("UNUSED_PARAMETER") id: Int, @Suppress("UNUSED_PARAMETER") r: Float) {}
+    fun setVolume(@Suppress("UNUSED_PARAMETER") id: Int, @Suppress("UNUSED_PARAMETER") l: Float, @Suppress("UNUSED_PARAMETER") r: Float) {}
+    fun stop(@Suppress("UNUSED_PARAMETER") id: Int) {}
     fun setOnLoadCompleteListener(l: (SoundPool, Int, Int) -> Unit) { listener = l }
     private var listener: ((SoundPool, Int, Int) -> Unit)? = null
     private var next = 1

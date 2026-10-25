@@ -1,5 +1,6 @@
 package com.khongvinh.carsurvival
 
+import kotlin.math.min
 import kotlin.math.roundToInt
 
 /** Prices of vehicles and weapons are this much above the base table (+30%). */
@@ -39,6 +40,26 @@ class Vehicle(
     baseCost: Int,
 ) {
     val cost = price(baseCost)
+
+    /**
+     * Built-in tuning level (0..5) that replaces the old upgrade shop: later
+     * versions and heavier families come with a stronger engine, a bigger tank,
+     * more rocket fuel and a fuller ammo box.
+     */
+    val tune = min(5f, (cls.ordinal * Vehicles.PER_CLASS + variant) * 0.25f)
+
+    val maxHp get() = (100f + 30f * tune) * hpMul
+    val topSpeed get() = (700f + 110f * tune) * speedMul
+    val engineAcc get() = (520f + 80f * tune) * powerMul
+    val traction get() = (1.0f + 0.15f * tune) * grip
+    val totalArmor get() = min(0.7f, armor + 0.06f * tune)
+
+    /** Seconds of throttle on a full tank. */
+    val fuelTime get() = (22f + 6f * tune) * fuelMul
+
+    /** Seconds of rocket boost. */
+    val boostTime get() = 1.5f + 1.2f * tune
+    val ammo get() = 20 + (20f * tune).toInt()
 }
 
 object Vehicles {

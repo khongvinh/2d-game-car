@@ -18,7 +18,7 @@ import kotlin.random.Random
  * to a small WAV file in the cache dir and played through a [SoundPool].
  */
 class Sfx(context: Context) {
-    enum class S { COIN, POWER, HIT, EXPLODE, SHOOT, BOW, CATAPULT, BOOM, BEEP, GO, WIN, STAGE, LOSE, STORM, CLONE, CLICK, SPLAT, WOOD, BOOST, LAND, ROAR }
+    enum class S { COIN, POWER, HIT, EXPLODE, SHOOT, BOW, CATAPULT, BOOM, BEEP, GO, WIN, STAGE, LOSE, STORM, CLONE, CLICK, SPLAT, WOOD, BOOST, LAND, ROAR, ENGINE }
 
     private val pool: SoundPool = SoundPool.Builder()
         .setMaxStreams(16)
@@ -83,8 +83,53 @@ class Sfx(context: Context) {
         pool.play(id, volume, volume, PRIORITY[i], 0, 1f)
     }
 
+    // ---------------------------------------------------------------- engine
+
+    private var engineStream = 0
+    private var engineRate = 0f
+    private var engineVol = 0f
+
+    /**
+     * Keeps the looping engine sample running: [rate] is the pitch (0.5..2,
+     * follows the revs) and [volume] grows with the throttle. Call with
+     * [on] = false to silence it (menus, pause, wreck).
+     */
+    fun engine(on: Boolean, rate: Float = 1f, volume: Float = 0.3f) {
+        if (!on || !enabled) {
+            stopEngine()
+            return
+        }
+        val i = S.ENGINE.ordinal
+        val id = ids[i]
+        if (id == 0 || !(loaded[i] || loadedIds.contains(id))) return
+        val r = rate.coerceIn(0.5f, 2f)
+        val v = volume.coerceIn(0f, 1f)
+        if (engineStream == 0) {
+            engineStream = pool.play(id, v, v, 3, -1, r)
+            engineRate = r
+            engineVol = v
+            return
+        }
+        // only talk to the mixer when the change is audible
+        if (kotlin.math.abs(r - engineRate) > 0.015f) {
+            pool.setRate(engineStream, r)
+            engineRate = r
+        }
+        if (kotlin.math.abs(v - engineVol) > 0.02f) {
+            pool.setVolume(engineStream, v, v)
+            engineVol = v
+        }
+    }
+
+    fun stopEngine() {
+        if (engineStream != 0) {
+            pool.stop(engineStream)
+            engineStream = 0
+        }
+    }
+
     private companion object {
-        const val VERSION = 3
+        const val VERSION = 4
         val MIN_GAP_NS = LongArray(S.entries.size) { i ->
             when (S.entries[i]) {
                 S.SHOOT -> 90_000_000L
@@ -229,10 +274,42 @@ class Sfx(context: Context) {
             tone(it, 0f, 1.0f, 95f, 60f, 0.5f, true, 1.8f)
             tone(it, 0.05f, 0.9f, 140f, 80f, 0.35f, false, 2f)
         }
+        S.ENGINE -> engineLoop()
         S.LAND -> buf(0.2f).also {
             noise(it, 0f, 0.2f, 0.6f, 0.06f, 6f)
             tone(it, 0f, 0.15f, 90f, 50f, 0.5f, false, 6f)
         }
+    }
+
+    /**
+     * A seamless 0.4 s idle loop of a four-stroke engine: 50 Hz crank with two
+     * firing pulses per turn, a little exhaust rasp, and noise that wraps around
+     * so the loop point never clicks. SoundPool's rate raises the revs.
+     */
+    private fun engineLoop(): Buf {
+        val b = buf(0.4f)
+        val n = b.d.size
+        val f0 = 50.0
+        // circular low-passed noise for the rasp
+        val raw = FloatArray(n) { Random.nextFloat() * 2f - 1f }
+        val rasp = FloatArray(n)
+        var y = 0f
+        for (pass in 0..1) for (i in 0 until n) {
+            y += (raw[i] - y) * 0.2f
+            if (pass == 1) rasp[i] = y
+        }
+        for (i in 0 until n) {
+            val t = i.toDouble() / rate
+            val crank = 2 * PI * f0 * t
+            // firing pulses: sharp attack, quick decay, twice per crank turn
+            val ph = ((f0 * 2 * t) % 1.0).toFloat()
+            val pulse = exp(-ph * 9f) * (1f - exp(-ph * 120f))
+            var s = 0.55f * pulse * sin(2 * PI * f0 * 4 * t).toFloat()
+            s += 0.35f * sin(crank).toFloat() + 0.22f * sin(2 * crank + 0.6).toFloat() + 0.12f * sin(3 * crank + 1.3).toFloat()
+            s += 0.18f * rasp[i] * (0.4f + pulse)
+            b.d[i] = s * 0.75f
+        }
+        return b
     }
 
     private fun writeWav(f: File, b: Buf) {

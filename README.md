@@ -55,12 +55,9 @@ Quái Vật Ngoài Hành Tinh. Cổng trạm chỉ mở khi trùm gục.
 ### Vật phẩm trên đường
 `$` tiền · `⛽` xăng · `✚` sửa xe · `🛡` lá chắn 6 giây · `🎯` +15 đạn · `⏱` +5 giây & đẩy bão lùi · `👥` nhân bản
 
-### Nâng cấp
-Động cơ · Bình xăng · Tên lửa đẩy · Giáp & máu · Đạn dược · Lốp xe — mỗi loại 5 cấp, cấp sau đắt hơn nhiều.
-
-### Gara (3 tab: Xe · Vũ khí · Nâng cấp)
+### Gara (2 tab: Xe · Vũ khí)
 **5 dòng xe, mỗi dòng 5 phiên bản** (25 xe): Xe máy (có sẵn) → Xe hơi (qua ải 5) → Bán tải (qua ải 10)
-→ Bọc thép (qua ải 15) → Xe tăng (qua ải 20). Phiên bản sau khỏe hơn, giá cao hơn (600$ → 58.500$).
+→ Bọc thép (qua ải 15) → Xe tăng (qua ải 20). Phiên bản sau khỏe hơn (máu, động cơ, xăng, tên lửa, đạn đều tăng theo xe), giá cao hơn (780$ → 58.500$). Không còn mục nâng cấp riêng.
 
 **10 vũ khí, mỗi loại nâng 5 cấp:** Súng lục, Dao chém (không tốn đạn), Súng máy, Nỏ, Súng hoa cải,
 Máy ném đá, Súng phun lửa, Tên lửa tự dẫn, Súng laser, Súng nòng xoay. Mỗi vũ khí có sát thương,

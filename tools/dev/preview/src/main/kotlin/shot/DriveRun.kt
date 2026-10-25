@@ -16,7 +16,6 @@ fun main(args: Array<String>) {
         val save = SaveData(ctx)
         save.bestStage = 20; save.stageSel = st
         save.ownedVehicles = -1; save.vehicle = Vehicles.of(VehicleClass.CAR, 2).id
-        for (u in Upgrade.entries) save.upgrades[u.ordinal] = 2
         val g = Game(save, Sfx(ctx), Music())
         g.resize(W.toFloat(), H.toFloat())
         tick(g, 0.5f)

@@ -189,11 +189,10 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
         loadStage(save.stageSel.coerceIn(1, maxStartStage()))
         val ct = save.vehicleType
         vehicle = ct
-        val lv = { u: Upgrade -> save.level(u) }
-        topSpeed = (700f + 110f * lv(Upgrade.ENGINE)) * ct.speedMul
-        engineAcc = (520f + 80f * lv(Upgrade.ENGINE)) * ct.powerMul
-        mu = (1.0f + 0.15f * lv(Upgrade.GRIP)) * ct.grip
-        armor = min(0.7f, ct.armor + 0.06f * lv(Upgrade.ARMOR))
+        topSpeed = ct.topSpeed
+        engineAcc = ct.engineAcc
+        mu = ct.traction
+        armor = ct.totalArmor
         ramMul = ct.ram
         weapon = save.weaponType
         wstats = weapon.stats(save.weaponLevel(weapon))
@@ -202,13 +201,13 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
         c.vx = 0f; c.vy = 0f; c.spin = 0f; c.angle = 0f
         c.throttle = 0f; c.leanIn = 0f; c.squat = 0f; c.slashT = 0f
         stuckX = 0f; stuckGasT = 0f
-        c.maxHp = (100f + 30f * lv(Upgrade.ARMOR)) * ct.hpMul
+        c.maxHp = ct.maxHp
         c.hp = c.maxHp
-        c.maxFuel = (22f + 6f * lv(Upgrade.FUEL)) * ct.fuelMul
+        c.maxFuel = ct.fuelTime
         c.fuel = c.maxFuel
-        c.maxBoost = 1.5f + 1.2f * lv(Upgrade.BOOST)
+        c.maxBoost = ct.boostTime
         c.boost = c.maxBoost
-        c.ammo = 20f + 20f * lv(Upgrade.AMMO)
+        c.ammo = ct.ammo.toFloat()
         c.shieldT = 0f; c.cloneT = 0f; c.hurtT = 0f; c.flipT = 0f; c.stuckT = 0f; c.fireCd = 0f
         c.aim = 0f
 
@@ -453,6 +452,7 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
             State.STAGE_DONE, State.VICTORY -> music.play(Music.Track.VICTORY, 1f)
         }
         music.update(dt)
+        updateEngineSound(dt)
         when (state) {
             State.PLAYING -> updatePlay(dt)
             State.PAUSED -> {}
@@ -461,6 +461,32 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
                 updateDebris(dt)
             }
         }
+    }
+
+    private var engineRev = 0f
+
+    /** Engine note: pitch follows road speed (revs up in the air), loudness the throttle. */
+    private fun updateEngineSound(dt: Float) {
+        val c = car
+        if (state != State.PLAYING || dyingT > 0f || wrecked) {
+            sfx.engine(false)
+            engineRev = 0f
+            return
+        }
+        val airborne = !c.grounded[0] && !c.grounded[1]
+        var want = (abs(c.forwardSpeed) / topSpeed).coerceIn(0f, 1.2f)
+        if (airborne && c.throttle > 0.2f) want = max(want, 1f)
+        want = want * 0.8f + max(0f, c.throttle) * 0.3f
+        engineRev += (want - engineRev) * min(1f, dt * 5f)
+        val pitch = when (vehicle.cls) {
+            VehicleClass.MOTO -> 1.35f
+            VehicleClass.CAR -> 1.05f
+            VehicleClass.PICKUP -> 0.92f
+            VehicleClass.ARMORED -> 0.8f
+            VehicleClass.TANK -> 0.68f
+        }
+        val vol = 0.14f + 0.2f * max(0f, c.throttle) + (if (c.boosting) 0.08f else 0f)
+        sfx.engine(true, pitch * (0.62f + engineRev * 0.85f), vol)
     }
 
     private fun updatePlay(dt: Float) {
@@ -1814,9 +1840,7 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
         val gold = 0xFFF9A825.toInt()
         l.add(Button("menu", "MENU", W / 2 - 400f, H - 100f, W / 2 - 100f, H - 14f, grey))
         l.add(Button("play", "CHẠY!", W / 2 + 100f, H - 100f, W / 2 + 400f, H - 14f, green))
-        if (garageTab == 2) {
-            // upgrade cards are tapped directly
-        } else if (garageTab == 0) {
+        if (garageTab == 0) {
             val v = Vehicles.of(garageClass, garageVariant)
             val pr = previewRect()
             val (label, color, on) = when {
@@ -1848,16 +1872,6 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
             }
         }
         return l
-    }
-
-    /** Upgrade cards: 3 x 2 grid. */
-    fun upgradeCard(i: Int): FloatArray {
-        val cw = (W - 120f) / 3f
-        val col = i % 3
-        val row = i / 3
-        val l = 40f + col * (cw + 20f)
-        val t = 104f + row * 248f
-        return floatArrayOf(l, t, l + cw, t + 230f)
     }
 
     /** Map cards: 5 per row, one row per region. */
@@ -1938,10 +1952,7 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
             }
         }
         if (state == State.GARAGE) {
-            if (garageTab == 2) for (i in Upgrade.entries.indices) if (inRect(upgradeCard(i), x, y)) {
-                buyUpgrade(Upgrade.entries[i]); return
-            }
-            for (i in 0..2) if (inRect(garageTabRect(i), x, y)) {
+            for (i in 0..1) if (inRect(garageTabRect(i), x, y)) {
                 sfx.play(Sfx.S.CLICK)
                 garageTab = i
                 return
@@ -2029,17 +2040,6 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
     }
 
     fun isHeld(id: String) = id in pointers.values
-
-    private fun buyUpgrade(u: Upgrade) {
-        val lv = save.level(u)
-        if (lv >= Upgrade.MAX_LEVEL) return
-        val cost = u.cost(lv)
-        if (save.money < cost) return
-        save.money -= cost
-        save.upgrades[u.ordinal]++
-        save.save()
-        sfx.play(Sfx.S.COIN)
-    }
 
     private fun pickVehicle(v: Vehicle) {
         if (!save.classUnlocked(v.cls)) return

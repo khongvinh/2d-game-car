@@ -23,7 +23,6 @@ class SaveData(context: Context) {
 
     /** Best distance (m) reached on each stage, to draw the "record" flag. */
     val best = IntArray(Game.STAGES + 1) { prefs.getInt("best$it", 0) }
-    val upgrades = IntArray(Upgrade.entries.size) { prefs.getInt("up$it", 0) }
     /** Bit per [Vehicles.all] id; the first motorbike is free. */
     var ownedVehicles = prefs.getInt("ownedVeh", 1)
     var vehicle = prefs.getInt("veh", 0)
@@ -65,7 +64,21 @@ class SaveData(context: Context) {
      * are refunded, the machine gun / crossbow / catapult carry over.
      */
     private fun migrateGarage() {
-        if (prefs.getInt("garageV", 0) >= 2) return
+        val v = prefs.getInt("garageV", 0)
+        if (v >= 3) return
+        // v4.6: the upgrade shop is gone (vehicles carry their own tuning): refund it
+        val upBase = intArrayOf(150, 120, 180, 140, 100, 110)
+        val e0 = prefs.edit()
+        for (i in upBase.indices) {
+            val lv = prefs.getInt("up$i", 0)
+            for (l in 0 until lv) money += (upBase[i] * (l + 1) * 1.5f).toInt() + 100 * l * l
+            e0.remove("up$i")
+        }
+        e0.putInt("garageV", 3).apply()
+        if (v >= 2) {
+            save()
+            return
+        }
         if (prefs.contains("ownedCars")) {
             val oldCars = prefs.getInt("ownedCars", 1)
             val refund = intArrayOf(0, 1500, 3000, 6000)
@@ -76,11 +89,9 @@ class SaveData(context: Context) {
             for (i in 0..2) if (oldW and (1 shl i) != 0) ownedWeapons = ownedWeapons or (1 shl map[i])
             weapon = map[prefs.getInt("weapon", 0).coerceIn(0, 2)]
         }
-        prefs.edit().putInt("garageV", 2).remove("ownedCars").remove("car").remove("ownedWeapons").remove("weapon").apply()
+        prefs.edit().putInt("garageV", 3).remove("ownedCars").remove("car").remove("ownedWeapons").remove("weapon").apply()
         save()
     }
-
-    fun level(u: Upgrade) = upgrades[u.ordinal]
 
     val vehicleType get() = Vehicles.of(vehicle)
     val weaponType get() = WeaponType.entries[weapon.coerceIn(0, WeaponType.entries.size - 1)]
@@ -99,7 +110,6 @@ class SaveData(context: Context) {
         e.putInt("stageSel", stageSel)
         e.putInt("day", day)
         best.forEachIndexed { i, v -> e.putInt("best$i", v) }
-        upgrades.forEachIndexed { i, v -> e.putInt("up$i", v) }
         e.putInt("ownedVeh", ownedVehicles)
         e.putInt("veh", vehicle)
         e.putInt("ownedWpn", ownedWeapons)

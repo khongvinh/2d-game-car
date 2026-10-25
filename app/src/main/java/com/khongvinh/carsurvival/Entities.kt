@@ -4,22 +4,6 @@ import kotlin.math.min
 
 enum class State { MENU, MAPS, GARAGE, PLAYING, PAUSED, RESULT, STAGE_DONE, VICTORY }
 
-enum class Upgrade(val title: String, val desc: String, val base: Int) {
-    ENGINE("Động cơ", "+tốc độ & lực kéo", 150),
-    FUEL("Bình xăng", "+25% xăng", 120),
-    BOOST("Tên lửa đẩy", "+bình tên lửa", 180),
-    ARMOR("Giáp & máu", "+máu, -sát thương", 140),
-    AMMO("Đạn dược", "+20 viên mỗi cấp", 100),
-    GRIP("Lốp xe", "+bám đường", 110);
-
-    /** Upgrades are a long grind: each level costs much more than the last. */
-    fun cost(level: Int) = (base * (level + 1) * 1.5f).toInt() + 100 * level * level
-
-    companion object {
-        const val MAX_LEVEL = 5
-    }
-}
-
 enum class ItemType(val icon: String, val color: Int) {
     COIN("$", 0xFFFFC107.toInt()),
     FUEL("⛽", 0xFFE53935.toInt()),

@@ -102,6 +102,7 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
 
     fun onHostPause() {
         synchronized(game) { game.pause() }
+        sfx.stopEngine()
         music.suspend()
     }
 

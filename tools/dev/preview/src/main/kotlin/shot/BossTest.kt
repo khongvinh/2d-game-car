@@ -12,8 +12,6 @@ fun bossMain(args: Array<String>) {
         val save = SaveData(ctx)
         save.bestStage = tier * 5 - 1
         save.stageSel = tier * 5
-        save.upgrades[Upgrade.AMMO.ordinal] = 2
-        if (tier >= 2) for (u in Upgrade.entries) save.upgrades[u.ordinal] = tier + 1
         // a realistic loadout for that point of the game
         val veh = if (weak) Vehicles.of(VehicleClass.MOTO, 1) else listOf(Vehicles.of(VehicleClass.MOTO, 4), Vehicles.of(VehicleClass.CAR, 3), Vehicles.of(VehicleClass.PICKUP, 2), Vehicles.of(VehicleClass.ARMORED, 2))[tier - 1]
         val wpn = if (weak) WeaponType.PISTOL else listOf(WeaponType.SMG, WeaponType.CROSSBOW, WeaponType.FLAMER, WeaponType.ROCKET)[tier - 1]

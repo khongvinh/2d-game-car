@@ -1,6 +1,6 @@
 # TỔNG HỢP TIẾN TRÌNH DỰ ÁN "ĐUA XE SINH TỒN"
 
-Tài liệu bàn giao để tiếp tục làm việc ở phiên chat mới mà không bị thiếu sót. Cập nhật đến phiên bản v4.5 (ngày 25/10/2026).
+Tài liệu bàn giao để tiếp tục làm việc ở phiên chat mới mà không bị thiếu sót. Cập nhật đến phiên bản v4.6 (ngày 25/10/2026).
 
 ## 1. Thông tin chung
 
@@ -12,8 +12,8 @@ Tài liệu bàn giao để tiếp tục làm việc ở phiên chat mới mà k
 | Ngôn ngữ / công nghệ | Kotlin + Canvas (SurfaceView), không engine, không thư viện ngoài, không file ảnh/âm thanh |
 | Repo GitHub | khongvinh/2d-game-car |
 | Nhánh làm việc | claude/2d-driving-game-f0kpjk (chưa có Pull Request, chưa merge) |
-| Commit mới nhất | xem git log nhánh làm việc (v4.5: 20 kiểu đường, hầm/hang/cầu, gara 3 tab, bảng xếp hạng, giao diện thép gỉ) |
-| Phiên bản hiện tại | v4.5 (versionCode 9) |
+| Commit mới nhất | xem git log nhánh làm việc (v4.6: bỏ nâng cấp, xe tự mang chỉ số, tiếng động cơ) |
+| Phiên bản hiện tại | v4.6 (versionCode 10) |
 | Build tự động | GitHub Actions "Build APK" (.github/workflows/android.yml) — đang xanh, xuất artifact DuaXeSinhTon-apk |
 | Khóa ký | app/debug.keystore (cố định, mật khẩu android) nên các bản cài đè lên nhau được |
 
@@ -100,7 +100,7 @@ Tài liệu bàn giao để tiếp tục làm việc ở phiên chat mới mà k
 - Mô phỏng (gradle boss, máu thử 400): Cào Cào + Súng lục cấp 2 đánh trùm ải 5 còn thiếu 3 máu sau 83 giây (phải nâng cấp); Mô Tô Chiến Binh + Súng máy cấp 2 thắng 12,8 giây; Siêu Xe Gai + Nỏ cấp 3 thắng rồng 15 giây; Bán Tải Lưới Thép + Phun lửa cấp 4 thắng dơi 20 giây; Bọc Thép Lội Nước + Tên lửa cấp 5 thắng ải 20 sau 16 giây. Vật lý: không lật ở mọi ải. Xe máy qua ải 1 trong 40 giây, nhận 658$.
 - Công cụ: task preview `garage` (ảnh g_lineup 25 xe, màn gara ở 1600 và 1280 px, ảnh từng vũ khí trong trận).
 
-### v4.5 — Hết kẹt xe, sửa núi xuyên đường, 20 kiểu đường, gara 3 tab, bảng xếp hạng, giao diện kim loại gỉ (hiện tại)
+### v4.5 — Hết kẹt xe, sửa núi xuyên đường, 20 kiểu đường, gara 3 tab, bảng xếp hạng, giao diện kim loại gỉ
 - Yêu cầu (kèm 3 ảnh chụp: xe kẹt giữa thùng gỗ, núi lửa nhìn xuyên qua đất, ảnh mẫu đồ họa kiểu thép gỉ): sửa kẹt xe vào chướng ngại vật; sửa hình chồng (núi thấy xuyên qua đường); mỗi ải một kiểu đường (hầm chui, hang động, đồng bằng…); bỏ NÂNG CẤP ở màn hình chính vì đã có gara; thêm bảng xếp hạng quãng đường xa nhất ở màn hình chính; đồ họa giống ảnh 3. Câu hỏi CH Play/AAB: đã trả lời (xem mục 9), người dùng bảo để sau.
 - Lỗi núi xuyên đường: Paint giữ alpha của đốm tàn lửa/đom đóm/bào tử (vẽ cuối nền) nên đất (vẽ bằng shader) bị trong suốt ở vùng Núi lửa/Rừng đêm/Hành tinh lạ. Sửa: đặt fill.alpha = 255 trước mọi lần vẽ bằng shader.
 - Kẹt xe: (1) không đặt vật cản ở chỗ dốc > 0,45, đáy hố (thấp hơn hai bên 40 trong ±180) hay trên/ngay trước cầu (đặt quái thay vào); (2) giữ ga mà xe không tiến quá 40 đơn vị trong 2,2 giây và có thùng/xác xe trong tầm thì tự "PHÁ TAN!" và đẩy nhẹ (không áp dụng ở cổng trùm); (3) khi xe ép vào vật cản thì giảm xoay 40% để không bị chổng đuôi lật.
@@ -113,7 +113,13 @@ Tài liệu bàn giao để tiếp tục làm việc ở phiên chat mới mà k
 - Đồ họa kiểu thép gỉ (giống ảnh mẫu): mọi bảng HUD/thẻ gara là tấm thép có vết gỉ, vết xước, đinh tán 4 góc, lòng tối; nút điều khiển là tấm thép có mặt màu, nút GA có sọc lửa; đồng hồ tốc độ viền thép bắt bu lông; nút menu có đinh tán; núi lửa có dòng dung nham phát sáng; tro bụi và mảnh vụn bay ngang màn (núi lửa), vệt bụi cát (sa mạc); thân xe có ánh kim loại và vết bẩn; tiếp đất mạnh tóe tia lửa; hạ quái văng đồng xu.
 - Kiểm tra: bot chỉ giữ ga qua đủ 20 ải (task preview `drive`), không còn kẹt; vật lý không lật; 4 trùm thắng; preview `roads` chụp từng kiểu đường.
 
-## 3. Luật chơi hiện tại (v4.5)
+### v4.6 — Bỏ hẳn nâng cấp (xe tự mang chỉ số), tiếng động cơ (hiện tại)
+- Yêu cầu: bỏ hẳn chức năng nâng cấp vì gara đã đủ; thêm âm thanh tiếng động cơ xe.
+- Bỏ enum Upgrade, tab NÂNG CẤP, SaveData.upgrades. Mỗi xe có mức "độ" sẵn tune = min(5, (thứ tự dòng x 5 + phiên bản) x 0,25) (Cub 0 → Mô Tô Chiến Binh 1 → Xe hơi 1,25..2,25 → Bán tải 2,5..3,5 → Bọc thép 3,75..4,75 → Xe tăng 5) thay cho cấp nâng cấp cũ: máu (100 + 30·tune)·hpMul, tốc độ tối đa (700 + 110·tune)·speedMul, lực kéo (520 + 80·tune)·powerMul, bám (1 + 0,15·tune)·grip, giáp min(70%, armor + 6%·tune), xăng (22 + 6·tune)·fuelMul giây, tên lửa 1,5 + 1,2·tune giây, đạn 20 + 20·tune. Gara hiện 9 chỉ số thật (Máu, Tốc độ km/h, Lực kéo, Giáp, Xăng giây ga, Bám đường, Tên lửa đẩy, Đạn, Sức húc).
+- Lưu dữ liệu garageV = 3: hoàn tiền mọi cấp nâng cấp đã mua (công thức base x (cấp+1) x 1,5 + 100 x cấp², base 150/120/180/140/100/110) rồi xóa khóa up0..up5.
+- Tiếng động cơ: mẫu lặp 0,4 giây tổng hợp (trục 50 Hz, 2 kỳ nổ mỗi vòng, tiếng rè ống xả, lặp liền không tiếng tách), phát lặp qua SoundPool (Sfx.engine), cao độ theo tốc độ (lên ga khi bay), to theo ga, +to khi bật tên lửa; mỗi dòng xe một giọng (xe máy cao 1,35, xe hơi 1,05, bán tải 0,92, bọc thép 0,8, xe tăng 0,68). Tắt ở menu/tạm dừng/xe nổ và khi ứng dụng xuống nền.
+
+## 3. Luật chơi hiện tại (v4.6)
 
 ### Điều khiển
 | Nút | Tác dụng |
@@ -156,7 +162,7 @@ Tài liệu bàn giao để tiếp tục làm việc ở phiên chat mới mà k
 | Xác xe | Phá ngay nếu tốc độ trên 720; sát thương 18; máu với đạn 8 |
 | Vật phẩm | $ tiền (5 + ải), ⛽ +25% xăng, ✚ +30% máu, 🛡 lá chắn 6 giây, 🎯 +15 đạn, ⏱ +5 giây & đẩy bão, 👥 nhân bản (hồi sinh 1 lần trong 10 giây, mở sau ải 5) |
 
-### Nâng cấp (mỗi loại 5 cấp, giá = base x (cấp+1) x 1,5 + 100 x cấp², từ v4.4)
+### Nâng cấp — ĐÃ BỎ từ v4.6 (giữ bảng để tham chiếu: công thức hoàn tiền và tune của xe dùng cùng hệ số)
 | Nâng cấp | Base | Tác dụng |
 |---|---|---|
 | Động cơ | 150 | Tốc độ tối đa 700 + 110/cấp; lực kéo 520 + 80/cấp |
@@ -166,7 +172,7 @@ Tài liệu bàn giao để tiếp tục làm việc ở phiên chat mới mà k
 | Đạn dược | 100 | 20 + 20 viên/cấp |
 | Lốp xe | 110 | Độ bám 1,0 + 0,15/cấp |
 
-### Gara (mở từ đầu, 3 tab Xe / Vũ khí / Nâng cấp) — 5 dòng xe x 5 phiên bản, giá đã +30%
+### Gara (mở từ đầu, 2 tab Xe / Vũ khí; không còn nâng cấp riêng từ v4.6) — 5 dòng xe x 5 phiên bản, giá đã +30%
 - Dòng xe mở khóa theo ải đã vượt: Xe máy (có sẵn), Xe hơi (qua ải 5), Bán tải (qua ải 10), Bọc thép (qua ải 15), Xe tăng (qua ải 20).
 - Chỉ số gốc của dòng (máu / tốc độ / lực kéo / giáp / xăng / bám / sức húc): Xe máy 0,75/1,04/0,95/0%/0,85/1,05/0,6; Xe hơi 1,0/1,10/1,05/5%/1,0/1,0/0,9; Bán tải 1,3/1,02/1,15/10%/1,2/1,08/1,15; Bọc thép 1,8/1,0/1,3/22%/1,3/1,1/1,45; Xe tăng 2,4/0,96/1,5/32%/1,45/1,25/2,0.
 - Phiên bản k (0..4): máu +10%·k, tốc độ +3%·k, lực kéo +5%·k, giáp +2,5%·k, xăng +6%·k, bám +3%·k, sức húc +10%·k.
@@ -279,7 +285,7 @@ cd tools/dev/preview && gradle boss      # thử đánh trùm ải 5 và ải 20
 
 | Phiên | Tiêu đề | Phạm vi |
 |---|---|---|
-| #1 | Đua Xe Sinh Tồn #1 — v1.0→v4.5: tạo game, kiểu Earn to Die, bão 3 bo, nhạc, trùm cuối, 20 bản đồ, gara 25 xe, 20 kiểu đường, giao diện thép | Từ đầu đến v4.5 + tài liệu bàn giao, công cụ tools/dev, quy tắc CLAUDE.md |
+| #1 | Đua Xe Sinh Tồn #1 — v1.0→v4.6: tạo game, kiểu Earn to Die, bão 3 bo, nhạc, trùm cuối, 20 bản đồ, gara 25 xe, 20 kiểu đường, giao diện thép, tiếng động cơ | Từ đầu đến v4.6 + tài liệu bàn giao, công cụ tools/dev, quy tắc CLAUDE.md |
 
 - Quy tắc làm việc (đặt tiêu đề phiên, tự lưu tiến trình khi ngữ cảnh ≥ 90% rồi nhắc mở chat mới) nằm trong CLAUDE.md ở gốc repo.
 
