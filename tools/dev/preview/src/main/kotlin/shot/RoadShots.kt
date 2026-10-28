@@ -11,6 +11,7 @@ fun roadMain(args: Array<String>) {
     for (st in stages) {
         val ctx = Context()
         val save = SaveData(ctx)
+        save.storySeen = 63
         save.bestStage = 20; save.stageSel = st
         val g = Game(save, Sfx(ctx), Music())
         g.resize(W.toFloat(), H.toFloat())

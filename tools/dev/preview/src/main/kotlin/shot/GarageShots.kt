@@ -44,6 +44,7 @@ fun garageMain(args: Array<String>) {
     for (w in listOf(W, 1280)) {
         val ctx = Context()
         val save = SaveData(ctx)
+        save.storySeen = 63
         save.bestStage = 16
         save.money = 60000
         save.ownedVehicles = 0b1111 or (0b11 shl 5) or (1 shl 10)
@@ -68,6 +69,10 @@ fun garageMain(args: Array<String>) {
         val rr = g.weaponRect(WeaponType.ROCKET.ordinal)
         tapAt(g, (rr[0] + rr[2]) / 2, (rr[1] + rr[3]) / 2); tick(g, 0.2f)
         shotAt(g, "g_${w}_wpn_rocket", w)
+        save.gems = 420; save.upgrades[0] = 12; save.upgrades[3] = 17; save.upgrades[4] = 20; save.upgrades[1] = 3
+        val ur = g.garageTabRect(2)
+        tapAt(g, (ur[0] + ur[2]) / 2, (ur[1] + ur[3]) / 2); tick(g, 0.2f)
+        shotAt(g, "g_${w}_upg", w)
     }
     // vehicles and weapons in action
     val combos = listOf(
@@ -77,6 +82,7 @@ fun garageMain(args: Array<String>) {
     for ((vid, wpn, st) in combos) {
         val ctx = Context()
         val save = SaveData(ctx)
+        save.storySeen = 63
         save.bestStage = 20; save.stageSel = st
         save.ownedVehicles = -1; save.vehicle = vid
         save.ownedWeapons = -1; save.weapon = wpn.ordinal

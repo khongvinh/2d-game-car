@@ -8,6 +8,7 @@ fun ramMain(args: Array<String>) {
     out = File(args[0]).also { it.mkdirs() }
     val ctx = Context()
     val save = SaveData(ctx)
+    save.storySeen = 63
     val g = Game(save, Sfx(ctx), Music())
     g.resize(W.toFloat(), H.toFloat())
     tick(g, 1f)

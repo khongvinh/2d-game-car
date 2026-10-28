@@ -35,6 +35,13 @@ class SaveData(context: Context) {
     var music = prefs.getBoolean("music", true)
     var bestScore = prefs.getInt("bestScore", 0)
 
+    /** Red gems for tuning upgrades, and the level of each upgrade. */
+    var gems = prefs.getInt("gems", 0)
+    val upgrades = IntArray(Upgrade.entries.size) { prefs.getInt("ug$it", 0) }
+
+    /** Story pages already shown: bit 0 prologue, 1..4 region chapters, 5 ending. */
+    var storySeen = prefs.getInt("story", 0)
+
     /** Leaderboard of the longest runs: metres, stage, vehicle id, day; best first. */
     val records = ArrayList<IntArray>().also { list ->
         for (row in prefs.getString("runs", "")?.split(";") ?: emptyList()) {
@@ -93,6 +100,28 @@ class SaveData(context: Context) {
         save()
     }
 
+    fun level(u: Upgrade) = upgrades[u.ordinal]
+
+    /** Wipes all progress (sound settings stay) so the player can start over. */
+    fun resetAll() {
+        money = 0
+        bestStage = 0
+        stageSel = 1
+        day = 1
+        best.fill(0)
+        ownedVehicles = 1
+        vehicle = 0
+        ownedWeapons = 1
+        weapon = 0
+        weaponLevels.fill(0)
+        bestScore = 0
+        records.clear()
+        gems = 0
+        upgrades.fill(0)
+        storySeen = 0
+        save()
+    }
+
     val vehicleType get() = Vehicles.of(vehicle)
     val weaponType get() = WeaponType.entries[weapon.coerceIn(0, WeaponType.entries.size - 1)]
     fun weaponLevel(w: WeaponType) = weaponLevels[w.ordinal]
@@ -119,6 +148,9 @@ class SaveData(context: Context) {
         e.putBoolean("music", music)
         e.putInt("bestScore", bestScore)
         e.putString("runs", records.joinToString(";") { it.joinToString(",") })
+        e.putInt("gems", gems)
+        upgrades.forEachIndexed { i, v -> e.putInt("ug$i", v) }
+        e.putInt("story", storySeen)
         e.apply()
     }
 }

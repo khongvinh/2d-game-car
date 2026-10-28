@@ -34,6 +34,7 @@ fun main(args: Array<String>) {
     out = File(args[0]).also { it.mkdirs() }
     val ctx = Context()
     val save = SaveData(ctx)
+    save.storySeen = 63
     save.money = 5000
     save.bestStage = 5
     save.stageSel = 1

@@ -105,6 +105,20 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
     var stormHurt = 0f
     var revived = false
 
+    /** HP taken from pillbox fire this run (balance checks). */
+    var bunkerDamage = 0f
+
+    /** Red gems picked up this run (banked when the run ends). */
+    var runGems = 0
+
+    /** Asks before wiping all progress from the menu. */
+    var confirmReset = false
+
+    // story screen
+    var storyPages: List<StoryPage> = emptyList()
+    var storyIndex = 0
+    private var afterStory: () -> Unit = {}
+
     /** Place of the last run on the distance leaderboard (0 = not on it). */
     var boardRank = 0
 
@@ -149,6 +163,45 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
         sfx.enabled = save.sound
         save.stageSel = save.stageSel.coerceIn(1, maxStartStage())
         loadStage(save.stageSel)
+        if (save.storySeen and (1 shl Story.PROLOGUE_BIT) == 0) {
+            showStory(Story.prologue) {
+                save.storySeen = save.storySeen or (1 shl Story.PROLOGUE_BIT)
+                save.save()
+                setState(State.MENU)
+            }
+        }
+    }
+
+    /** Shows [pages]; tapping through (or SKIP) runs [then]. */
+    private fun showStory(pages: List<StoryPage>, then: () -> Unit) {
+        storyPages = pages
+        storyIndex = 0
+        afterStory = then
+        setState(State.STORY)
+    }
+
+    private fun nextStoryPage() {
+        if (storyIndex < storyPages.size - 1) {
+            storyIndex++
+            stateTime = 0f
+        } else {
+            afterStory()
+        }
+    }
+
+    /** Starts a run, after the region's story chapter the first time. */
+    private fun play() {
+        val r = Themes.of(save.stageSel.coerceIn(1, maxStartStage())).region
+        val bit = 1 shl (r.ordinal + 1)
+        if (save.storySeen and bit == 0) {
+            showStory(listOf(Story.chapter(r))) {
+                save.storySeen = save.storySeen or bit
+                save.save()
+                startRun()
+            }
+        } else {
+            startRun()
+        }
     }
 
     fun maxStartStage() = min(STAGES, save.bestStage + 1)
@@ -189,10 +242,11 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
         loadStage(save.stageSel.coerceIn(1, maxStartStage()))
         val ct = save.vehicleType
         vehicle = ct
-        topSpeed = ct.topSpeed
-        engineAcc = ct.engineAcc
-        mu = ct.traction
-        armor = ct.totalArmor
+        val up = { u: Upgrade -> save.level(u).toFloat() }
+        topSpeed = ct.topSpeed * (1f + 0.025f * up(Upgrade.ENGINE))
+        engineAcc = ct.engineAcc * (1f + 0.03f * up(Upgrade.ENGINE))
+        mu = ct.traction * (1f + 0.02f * up(Upgrade.GRIP))
+        armor = min(0.75f, ct.totalArmor + 0.01f * up(Upgrade.ARMOR))
         ramMul = ct.ram
         weapon = save.weaponType
         wstats = weapon.stats(save.weaponLevel(weapon))
@@ -201,13 +255,13 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
         c.vx = 0f; c.vy = 0f; c.spin = 0f; c.angle = 0f
         c.throttle = 0f; c.leanIn = 0f; c.squat = 0f; c.slashT = 0f
         stuckX = 0f; stuckGasT = 0f
-        c.maxHp = ct.maxHp
+        c.maxHp = ct.maxHp * (1f + 0.04f * up(Upgrade.ARMOR))
         c.hp = c.maxHp
-        c.maxFuel = ct.fuelTime
+        c.maxFuel = ct.fuelTime * (1f + 0.05f * up(Upgrade.FUEL))
         c.fuel = c.maxFuel
-        c.maxBoost = ct.boostTime
+        c.maxBoost = ct.boostTime + 0.15f * up(Upgrade.BOOST)
         c.boost = c.maxBoost
-        c.ammo = ct.ammo.toFloat()
+        c.ammo = ct.ammo + 6f * up(Upgrade.AMMO)
         c.shieldT = 0f; c.cloneT = 0f; c.hurtT = 0f; c.flipT = 0f; c.stuckT = 0f; c.fireCd = 0f
         c.aim = 0f
 
@@ -217,12 +271,13 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
         bossKilled = false
         boss = if (stage % 5 == 0) Boss(stage / 5, goalX - 520f, terrain.heightAt(goalX - 520f)) else null
         populate()
+        placeBunkers()
 
         stormX = -1500f
         phase = 0
         phaseLeft = PHASE_TIME[0]
         lastBeep = 0
-        kills = 0; smashed = 0; runMoney = 0; distMoney = 0; stageBonus = 0
+        kills = 0; smashed = 0; runMoney = 0; distMoney = 0; stageBonus = 0; runGems = 0; bunkerDamage = 0f
         maxDist = 0f
         lastSection = 0
         newRecord = false
@@ -318,6 +373,15 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
                     }
                 }
             }
+            // red gems: more of them on later stages, some hanging over the road to jump for
+            val gemsHere = 1 + stage / 6 + rnd.nextInt(2)
+            for (k in 0 until gemsHere) {
+                val x = start + rnd.nextFloat() * seg
+                if (x > goalX - 600f) continue
+                val roof = terrain.ceilingAt(x)
+                val lift = if (roof.isNaN() && rnd.nextFloat() < 0.4f) 170f + rnd.nextFloat() * 120f else 70f
+                items.add(Item(ItemType.GEM, x, terrain.heightAt(x) - lift))
+            }
             // pickups
             val coins = 2 + rnd.nextInt(3)
             val cx = start + rnd.nextFloat() * (seg - 300f)
@@ -352,12 +416,37 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
         }
     }
 
+    /** Pillboxes that shoot back: 1 on stage 1, one more every 3 stages. */
+    private fun placeBunkers() {
+        val rnd = Random(stage * 31 + save.day * 7)
+        val n = 1 + stage / 3
+        val from = 1500f
+        val to = goalX - (if (boss != null) 3300f else 700f)
+        if (to <= from) return
+        val span = (to - from) / n
+        for (k in 0 until n) {
+            var tries = 0
+            while (tries++ < 12) {
+                val x = from + span * k + rnd.nextFloat() * span * 0.8f
+                if (terrain.awkward(x) || terrain.onBridge(x) || terrain.onBridge(x + 160f) || terrain.covered(x, 200f)) continue
+                if (obstacles.any { abs(it.x - x) < 220f }) continue
+                val o = Obstacle(ObstacleType.BUNKER, x, terrain.heightAt(x))
+                o.maxHp = 8f + stage
+                o.hp = o.maxHp
+                o.fireCd = 1f + rnd.nextFloat()
+                obstacles.add(o)
+                break
+            }
+        }
+    }
+
     private fun endRun(reason: String) {
         if (state != State.PLAYING && state != State.PAUSED) return
         endReason = reason
         val m = maxDist.toInt()
         distMoney = (m * 0.25f).toInt()
         save.money += distMoney + runMoney
+        save.gems += runGems
         if (m > save.best[stage]) {
             newRecord = save.best[stage] > 0
             save.best[stage] = m
@@ -375,6 +464,7 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
         distMoney = (m * 0.25f).toInt()
         stageBonus = 120 * stage
         save.money += distMoney + runMoney + stageBonus
+        save.gems += runGems
         save.best[stage] = max(save.best[stage], m)
         boardRank = save.addRecord(m, stage, vehicle.id, save.day)
         finishStats(true)
@@ -445,7 +535,7 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
         if (hurtFlash > 0f) hurtFlash -= dt
         music.enabled = save.music
         when (state) {
-            State.MENU, State.MAPS, State.GARAGE -> music.play(Music.Track.CHILL, 1f)
+            State.MENU, State.MAPS, State.GARAGE, State.STORY -> music.play(Music.Track.CHILL, 1f)
             State.PLAYING -> music.play(if (intense) Music.Track.INTENSE else Music.Track.CHILL, 1f)
             State.PAUSED -> music.play(if (intense) Music.Track.INTENSE else Music.Track.CHILL, 0.3f)
             State.RESULT -> music.play(Music.Track.CHILL, 0.6f)
@@ -938,6 +1028,7 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
             if (o.barT > 0f) o.barT -= dt
             val dx = o.x - c.x
             if (o.type == ObstacleType.CRATE && dx < 1500f && dx > -800f) settleCrate(o)
+            if (o.type == ObstacleType.BUNKER) bunkerGun(o, dt)
             if (dx > 400f || dx < -400f) continue
             toLocal(o.x, o.y - o.type.h / 2, loc)
             val ox = Car.HALF_LEN + o.type.w / 2
@@ -945,8 +1036,8 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
             if (abs(loc[0]) >= ox || abs(loc[1]) >= oy) continue
             when {
                 o.type == ObstacleType.BARREL -> barrelBlast(o)
-                abs(fs) > o.type.breakSpeed / max(1f, ramMul) || (c.shieldT > 0f && o.type != ObstacleType.WRECK) ||
-                    (c.shieldT > 0f && abs(fs) > 300f) -> {
+                abs(fs) > o.type.breakSpeed / max(1f, ramMul) || (c.shieldT > 0f && o.type != ObstacleType.WRECK && o.type != ObstacleType.BUNKER) ||
+                    (c.shieldT > 0f && abs(fs) > 300f && o.type != ObstacleType.BUNKER) -> {
                     breakObstacle(o, c.vx)
                     val keep = 1f - o.type.mass * 0.6f * (1f - armor * 0.5f)
                     c.vx *= keep
@@ -993,6 +1084,31 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
         obstacles.removeAll { !it.alive }
     }
 
+    /** A pillbox swings its gun at the car and fires bursts while it is in range. */
+    private fun bunkerGun(o: Obstacle, dt: Float) {
+        val c = car
+        if (o.muzzleT > 0f) o.muzzleT -= dt
+        val gx = o.x - 10f
+        val gy = o.y - 52f
+        val dx = c.x - gx
+        val dy = c.y - 20f - gy
+        if (dx > 400f || dx < -1150f || dyingT > 0f) return
+        val want = kotlin.math.atan2(dy, dx)
+        o.aim += (want - o.aim) * min(1f, dt * 4f)
+        o.fireCd -= dt
+        if (o.fireCd > 0f) return
+        // three-round burst, then reload
+        o.fireCd = if ((anim * 10f).toInt() % 3 == 0) max(0.9f, 1.9f - stage * 0.04f) else 0.16f
+        val spread = rnd(-0.05f, 0.05f)
+        val sp = 900f + stage * 15f
+        val mx = gx + cos(o.aim) * 46f
+        val my = gy + sin(o.aim) * 46f
+        bossRocks.add(BossRock(mx, my, cos(o.aim + spread) * sp, sin(o.aim + spread) * sp, 3, 4f + stage * 0.5f).also { it.life = 1.6f })
+        o.muzzleT = 0.07f
+        particles.add(Particle(mx, my, 0f, 0f, 0.08f, 0.08f, 14f, 0xFFFFE082.toInt()))
+        sfx.play(Sfx.S.SHOOT, 0.35f)
+    }
+
     /** Crates stacked on a crate that was smashed fall down. */
     private fun settleCrate(o: Obstacle) {
         val ground = terrain.heightAt(o.x)
@@ -1016,7 +1132,17 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
         smashed++
         addMoney((o.type.reward * rewardMul).toInt(), o.x, o.y - o.type.h - 10f)
         val cy = o.y - o.type.h / 2
-        if (o.type == ObstacleType.WRECK) {
+        if (o.type == ObstacleType.BUNKER) {
+            repeat(8) {
+                debris.add(Debris(Debris.METAL, o.x + rnd(-60f, 60f), cy, vx * 0.5f + rnd(-250f, 300f), -rnd(250f, 700f), 0f, rnd(-10f, 10f), rnd(26f, 54f), rnd(14f, 26f), 0xFF8D8A83.toInt()))
+            }
+            explode(o.x, cy, 0xFF9E9E9E.toInt(), 40)
+            explode(o.x, cy - 20f, 0xFFFF6D00.toInt(), 30)
+            shake = max(shake, 0.3f)
+            sfx.play(Sfx.S.EXPLODE)
+            runGems += 3
+            texts.add(FloatText("+3♦", o.x + 40f, o.y - o.type.h - 60f, 0xFFFF5252.toInt()).also { it.size = 44f })
+        } else if (o.type == ObstacleType.WRECK) {
             repeat(6) {
                 debris.add(Debris(Debris.METAL, o.x + rnd(-60f, 60f), cy, vx * 0.8f + rnd(-150f, 250f), -rnd(200f, 600f), 0f, rnd(-10f, 10f), rnd(30f, 60f), rnd(12f, 24f), 0xFF8D6E63.toInt()))
             }
@@ -1253,6 +1379,8 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
             b.alive = false
             bossKilled = true
             kills++
+            runGems += 10 * b.tier
+            texts.add(FloatText("+${10 * b.tier}♦", b.x, b.cy - b.h, 0xFFFF5252.toInt()).also { it.size = 60f; it.life = 2.2f })
             val main = when (b.tier) {
                 2 -> 0xFFC62828.toInt()
                 3 -> 0xFF4A148C.toInt()
@@ -1290,13 +1418,27 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
         val tier = boss?.tier ?: 1
         for (r in bossRocks) {
             if (!r.alive) continue
-            if (r.kind != 2) r.vy += G * dt
+            if (r.kind < 2) r.vy += G * dt
             r.x += r.vx * dt
             r.y += r.vy * dt
             r.rot += dt * 6f
             r.life -= dt
             if (r.kind == 1 && Random.nextFloat() < 0.6f) {
                 particles.add(Particle(r.x, r.y, rnd(-40f, 40f), rnd(-60f, 0f), 0.35f, 0.35f, rnd(6f, 12f), if (Random.nextBoolean()) 0xFFFF6D00.toInt() else 0xFFFFC400.toInt(), 0f, 1f))
+            }
+            if (r.kind == 3) {
+                // bunker bullet
+                if (hypot(r.x - c.x, r.y - c.y) < 70f) {
+                    r.alive = false
+                    if (c.shieldT <= 0f) bunkerDamage += r.dmg * (1f - armor)
+                    damageCar(r.dmg * (1f - armor))
+                    sparks(r.x, r.y)
+                    sfx.play(Sfx.S.HIT, 0.35f)
+                } else if (r.y > terrain.heightAt(r.x) || r.life <= 0f) {
+                    r.alive = false
+                    sparks(r.x, r.y)
+                }
+                continue
             }
             if (hypot(r.x - c.x, r.y - c.y) < 75f) {
                 r.alive = false
@@ -1386,6 +1528,12 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
                 stormX -= 400f
                 text("+5 GIÂY, BÃO LÙI!", it, 0xFFEA80FC.toInt())
             }
+            ItemType.GEM -> {
+                runGems++
+                texts.add(FloatText("+1♦", it.x, it.y - 30f, 0xFFFF5252.toInt()).also { t -> t.size = 36f })
+                sfx.play(Sfx.S.COIN, 0.9f)
+                return
+            }
             ItemType.CLONE -> {
                 c.cloneT = 10f
                 text("NHÂN BẢN: x2 MẠNG!", it, 0xFF64FFDA.toInt())
@@ -1427,7 +1575,14 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
         var tx = 0f
         var ty = 0f
         var best = Float.MAX_VALUE
-        for (z in zombies) {
+        // a pillbox shooting at us comes first
+        for (o in obstacles) {
+            if (!o.alive || o.type != ObstacleType.BUNKER) continue
+            val dx = o.x - c.x
+            if (dx < -150f || dx > st.range || abs(dx) > best) continue
+            best = abs(dx); tx = o.x; ty = o.y - o.type.h * 0.55f
+        }
+        if (best == Float.MAX_VALUE) for (z in zombies) {
             val dx = z.x - c.x
             if (dx < 60f || dx > st.range || dx > best) continue
             best = dx; tx = z.x; ty = z.y - z.type.h * 0.6f
@@ -1800,7 +1955,12 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
         fun b(id: String, label: String, x: Float, y: Float, w: Float, color: Int, enabled: Boolean = true) =
             Button(id, label, x - w / 2, y, x + w / 2, y + 86f, color, enabled)
         return when (state) {
-            State.MENU -> listOf(
+            State.MENU -> if (confirmReset) listOf(
+                Button("resetNo", "HỦY", W / 2 - 330f, H * 0.62f, W / 2 - 30f, H * 0.62f + 86f, grey),
+                Button("resetYes", "XÓA HẾT", W / 2 + 30f, H * 0.62f, W / 2 + 330f, H * 0.62f + 86f, 0xFFC62828.toInt()),
+            ) else listOf(
+                Button("story", "📖 CỐT TRUYỆN", W - 400f, 20f, W - 206f, 96f, 0xFF5D4037.toInt()),
+                Button("reset", "↺ CHƠI LẠI", W - 590f, 20f, W - 410f, 96f, 0xFF4E342E.toInt()),
                 Button("maps", "🗺  ẢI ${save.stageSel}: ${Themes.of(save.stageSel).name.uppercase()}", cx - 230f, 128f, cx + 230f, 214f, 0xFF6D4C41.toInt()),
                 b("play", "CHẠY!", cx, 262f, 460f, green),
                 b("garage", "GARA", cx, 360f, 460f, purple),
@@ -1810,9 +1970,12 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
             State.MAPS -> listOf(b("menu", "QUAY LẠI", W / 2, H - 84f, 360f, grey))
             State.GARAGE -> garageButtons(green, grey)
             State.PAUSED -> listOf(
-                b("resume", "TIẾP TỤC", W / 2, H * 0.36f, 420f, green),
-                b("quit", "BỎ CUỘC", W / 2, H * 0.36f + 110f, 420f, grey),
+                b("resume", "TIẾP TỤC", W / 2, H * 0.32f, 420f, green),
+                b("quit", "BỎ CUỘC", W / 2, H * 0.32f + 104f, 420f, grey),
+                Button("sound", if (save.sound) "🔊 HIỆU ỨNG: BẬT" else "🔇 HIỆU ỨNG: TẮT", W / 2 - 330f, H * 0.32f + 214f, W / 2 - 10f, H * 0.32f + 290f, if (save.sound) 0xFF00897B.toInt() else grey),
+                Button("music", if (save.music) "🎵 NHẠC: BẬT" else "🎵 NHẠC: TẮT", W / 2 + 10f, H * 0.32f + 214f, W / 2 + 330f, H * 0.32f + 290f, if (save.music) 0xFF00897B.toInt() else grey),
             )
+            State.STORY -> listOf(Button("skip", "BỎ QUA ›", W - 290f, H - 96f, W - 40f, H - 24f, grey))
             State.RESULT -> {
                 val l = ArrayList<Button>()
                 val ids = listOf("menu" to "MENU", "garage" to "GARA", "play" to "CHẠY TIẾP")
@@ -1840,7 +2003,9 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
         val gold = 0xFFF9A825.toInt()
         l.add(Button("menu", "MENU", W / 2 - 400f, H - 100f, W / 2 - 100f, H - 14f, grey))
         l.add(Button("play", "CHẠY!", W / 2 + 100f, H - 100f, W / 2 + 400f, H - 14f, green))
-        if (garageTab == 0) {
+        if (garageTab == 2) {
+            // upgrade cards are tapped directly
+        } else if (garageTab == 0) {
             val v = Vehicles.of(garageClass, garageVariant)
             val pr = previewRect()
             val (label, color, on) = when {
@@ -1872,6 +2037,27 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
             }
         }
         return l
+    }
+
+    /** Gem upgrade cards: 3 x 2 grid. */
+    fun upgradeCard(i: Int): FloatArray {
+        val cw = (W - 120f) / 3f
+        val col = i % 3
+        val row = i / 3
+        val l = 40f + col * (cw + 20f)
+        val t = 104f + row * 248f
+        return floatArrayOf(l, t, l + cw, t + 230f)
+    }
+
+    private fun buyUpgrade(u: Upgrade) {
+        val lv = save.level(u)
+        if (lv >= Upgrade.MAX_LEVEL) return
+        val cost = u.cost(lv)
+        if (save.gems < cost) return
+        save.gems -= cost
+        save.upgrades[u.ordinal]++
+        save.save()
+        sfx.play(Sfx.S.POWER)
     }
 
     /** Map cards: 5 per row, one row per region. */
@@ -1939,6 +2125,14 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
             return
         }
         if (stateTime < 0.4f) return
+        if (state == State.STORY) {
+            val skip = buttons().first()
+            if (!skip.contains(x, y) && stateTime > 0.35f) {
+                sfx.play(Sfx.S.CLICK)
+                nextStoryPage()
+                return
+            }
+        }
         if (state == State.MAPS) {
             for (i in 0 until STAGES) if (inRect(mapCard(i), x, y)) {
                 if (i + 1 <= maxStartStage()) {
@@ -1952,7 +2146,10 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
             }
         }
         if (state == State.GARAGE) {
-            for (i in 0..1) if (inRect(garageTabRect(i), x, y)) {
+            if (garageTab == 2) for (i in Upgrade.entries.indices) if (inRect(upgradeCard(i), x, y)) {
+                buyUpgrade(Upgrade.entries[i]); return
+            }
+            for (i in 0..2) if (inRect(garageTabRect(i), x, y)) {
                 sfx.play(Sfx.S.CLICK)
                 garageTab = i
                 return
@@ -1983,12 +2180,34 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
         if (!btn.enabled) return
         sfx.play(Sfx.S.CLICK)
         when (btn.id) {
-            "play" -> startRun()
+            "play" -> play()
             "garage" -> openGarage()
             "vehAct" -> pickVehicle(Vehicles.of(garageClass, garageVariant))
             "wpnAct" -> pickWeapon(garageWeapon)
             "wpnUp" -> upgradeWeapon(garageWeapon)
-            "menu" -> goMenu()
+            "menu" -> if (state == State.VICTORY && save.storySeen and (1 shl Story.ENDING_BIT) == 0) {
+                showStory(listOf(Story.ending)) {
+                    save.storySeen = save.storySeen or (1 shl Story.ENDING_BIT)
+                    goMenu()
+                }
+            } else {
+                goMenu()
+            }
+            "story" -> showStory(Story.unlocked(save.storySeen, save.bestStage)) { setState(State.MENU) }
+            "skip" -> afterStory()
+            "reset" -> confirmReset = true
+            "resetNo" -> confirmReset = false
+            "resetYes" -> {
+                confirmReset = false
+                save.resetAll()
+                save.stageSel = 1
+                loadStage(1)
+                showStory(Story.prologue) {
+                    save.storySeen = save.storySeen or (1 shl Story.PROLOGUE_BIT)
+                    save.save()
+                    setState(State.MENU)
+                }
+            }
             "resume" -> setState(State.PLAYING)
             "quit" -> endRun("Bỏ cuộc")
             "maps" -> setState(State.MAPS)

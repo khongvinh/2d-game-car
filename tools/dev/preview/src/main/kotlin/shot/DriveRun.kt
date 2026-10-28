@@ -14,6 +14,7 @@ fun main(args: Array<String>) {
         runN++
         val ctx = Context()
         val save = SaveData(ctx)
+        save.storySeen = 63
         save.bestStage = 20; save.stageSel = st
         save.ownedVehicles = -1; save.vehicle = Vehicles.of(VehicleClass.CAR, 2).id
         val g = Game(save, Sfx(ctx), Music())
@@ -26,9 +27,11 @@ fun main(args: Array<String>) {
         val fwd = g.controls().first { it.id == "leanFwd" }
         g.touchDown(1, gas.cx, gas.cy)
         var t = 0f
+        var hpLost = 0f
         var worstStall = 0f; var lastX = 0f; var stall = 0f; var stallAt = 0
         while (t < 240f && g.state == State.PLAYING) {
             val c = g.car
+            hpLost += c.maxHp - c.hp
             c.hp = c.maxHp; c.fuel = c.maxFuel; c.ammo = 50f
             // simple air control like a player: keep the nose level
             val a = c.angle
@@ -42,6 +45,6 @@ fun main(args: Array<String>) {
             lastX = c.x
             g.boss?.let { if (it.alive && kotlin.math.abs(it.x - c.x) < 900f) { it.hp = 0f; it.alive = false } }
         }
-        println("stage $st ${g.terrain.style.name}: state=${g.state} reason=${g.endReason} t=${"%.0f".format(t)}s dist=${g.distanceM.toInt()}/${g.goalM.toInt()} worstStall=${"%.1f".format(worstStall)}s at ${stallAt}m")
+        println("stage $st ${g.terrain.style.name}: state=${g.state} reason=${g.endReason} t=${"%.0f".format(t)}s dist=${g.distanceM.toInt()}/${g.goalM.toInt()} worstStall=${"%.1f".format(worstStall)}s at ${stallAt}m gems=${g.runGems} bunkers=${g.obstacles.count { it.type == ObstacleType.BUNKER }} hpLost=${"%.0f".format(hpLost)} bunkerDmg=${"%.0f".format(g.bunkerDamage)} maxHp=${g.car.maxHp.toInt()}")
     }
 }

@@ -10,6 +10,7 @@ fun bossMain(args: Array<String>) {
         val weak = run == 0
         val ctx = Context()
         val save = SaveData(ctx)
+        save.storySeen = 63
         save.bestStage = tier * 5 - 1
         save.stageSel = tier * 5
         // a realistic loadout for that point of the game

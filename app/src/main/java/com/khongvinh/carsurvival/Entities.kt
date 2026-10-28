@@ -2,7 +2,28 @@ package com.khongvinh.carsurvival
 
 import kotlin.math.min
 
-enum class State { MENU, MAPS, GARAGE, PLAYING, PAUSED, RESULT, STAGE_DONE, VICTORY }
+enum class State { MENU, MAPS, GARAGE, STORY, PLAYING, PAUSED, RESULT, STAGE_DONE, VICTORY }
+
+/**
+ * Tuning bought with red gems picked up on the road (not money). Twenty steps
+ * each; every step costs 20% more gems than the one before.
+ */
+enum class Upgrade(val title: String, val desc: String) {
+    ENGINE("Động cơ", "+2,5% tốc độ, +3% lực kéo mỗi cấp"),
+    FUEL("Bình xăng", "+5% xăng mỗi cấp"),
+    BOOST("Tên lửa đẩy", "+0,15 giây tên lửa mỗi cấp"),
+    ARMOR("Giáp & máu", "+4% máu, +1% giáp mỗi cấp"),
+    AMMO("Đạn dược", "+6 viên mỗi cấp"),
+    GRIP("Lốp xe", "+2% bám đường mỗi cấp");
+
+    /** Gems for the step from [level] to level + 1. */
+    fun cost(level: Int) = Math.round(BASE_GEMS * Math.pow(1.2, level.toDouble())).toInt()
+
+    companion object {
+        const val MAX_LEVEL = 20
+        const val BASE_GEMS = 5.0
+    }
+}
 
 enum class ItemType(val icon: String, val color: Int) {
     COIN("$", 0xFFFFC107.toInt()),
@@ -14,6 +35,9 @@ enum class ItemType(val icon: String, val color: Int) {
 
     /** Unlocked after clearing stage 5: one free revive for 10 s. */
     CLONE("👥", 0xFF00BFA5.toInt()),
+
+    /** Red gem: the currency for tuning upgrades. */
+    GEM("♦", 0xFFE53935.toInt()),
 }
 
 class Item(val type: ItemType, val x: Float, val y: Float) {
@@ -70,10 +94,19 @@ enum class ObstacleType(val w: Float, val h: Float, val mass: Float, val breakSp
     CRATE(62f, 62f, 0.22f, 260f, 2, 4f, 2),
     BARREL(46f, 64f, 0.15f, 0f, 1, 10f, 3),
     WRECK(170f, 70f, 0.9f, 720f, 8, 18f, 15),
+
+    /** Concrete pillbox with a machine gun that fires at the car. */
+    BUNKER(140f, 74f, 1.5f, 1e9f, 10, 16f, 30),
 }
 
 class Obstacle(val type: ObstacleType, var x: Float, var y: Float) {
     var hp = type.hp.toFloat()
+    var maxHp = type.hp.toFloat()
+
+    // bunker gun
+    var fireCd = 2f
+    var aim = 3.14f
+    var muzzleT = 0f
     var alive = true
     var flash = 0f
     var vy = 0f
@@ -86,7 +119,7 @@ class Obstacle(val type: ObstacleType, var x: Float, var y: Float) {
     var barT = 0f
 
     /** Bar fraction: the weaker of ramming durability and weapon damage. */
-    val barFrac get() = min(ramHp, if (type.hp > 0) hp / type.hp else 1f).coerceIn(0f, 1f)
+    val barFrac get() = min(ramHp, if (maxHp > 0f) hp / maxHp else 1f).coerceIn(0f, 1f)
 
     companion object {
         const val RAM_HIT = 0.25f
@@ -265,7 +298,8 @@ class Boss(val tier: Int, var x: Float, var y: Float) {
 }
 
 /** Boss projectile: [kind] 0 = boulder, 1 = fireball, 2 = plasma orb (flies straight). */
-class BossRock(var x: Float, var y: Float, var vx: Float, var vy: Float, val kind: Int = 0) {
+/** [kind] 3 = bunker bullet (flies straight, deals [dmg]). */
+class BossRock(var x: Float, var y: Float, var vx: Float, var vy: Float, val kind: Int = 0, val dmg: Float = 0f) {
     var alive = true
     var rot = 0f
     var life = 4f

@@ -8,6 +8,7 @@ fun themeMain(args: Array<String>) {
     out = File(args[0]).also { it.mkdirs() }
     val ctx = Context()
     val save = SaveData(ctx)
+    save.storySeen = 63
     save.bestStage = 19
     save.stageSel = 7
     save.best[1] = 700; save.best[2] = 450
@@ -17,6 +18,16 @@ fun themeMain(args: Array<String>) {
     g.resize(W.toFloat(), H.toFloat())
     tick(g, 1f)
     shot(g, "t_menu")
+    // reset confirmation
+    tap(g, "reset"); tick(g, 0.3f); shot(g, "t_reset"); tap(g, "resetNo"); tick(g, 0.5f)
+    // story: prologue on a fresh save
+    run {
+        val s2 = SaveData(Context())
+        val g2 = Game(s2, Sfx(Context()), Music())
+        g2.resize(W.toFloat(), H.toFloat())
+        tick(g2, 1f); shot(g2, "t_story0")
+        g2.touchDown(5, 300f, 300f); g2.touchUp(5); tick(g2, 1f); shot(g2, "t_story1")
+    }
     val mb = g.buttons().first { it.id == "maps" }
     g.touchDown(9, mb.cx, mb.cy); g.touchUp(9); tick(g, 1f)
     shot(g, "t_maps")
@@ -33,6 +44,20 @@ fun themeMain(args: Array<String>) {
             if (t >= 4f && g.zombies.count { kotlin.math.abs(it.x - g.car.x) < 900f } >= 2) break
         }
         shot(g, "t_stage$st")
+        if (st == 4) {
+            // a bunker firing at the car
+            val b = g.obstacles.firstOrNull { it.type == ObstacleType.BUNKER }
+            if (b != null) {
+                g.car.x = b.x - 700f; g.car.y = g.terrain.heightAt(g.car.x) - 60f; g.car.vx = 0f
+                g.zombies.removeAll { kotlin.math.abs(it.x - b.x) < 900f }
+                g.touchUp(1)
+                g.car.ammo = 0f
+                tick(g, 2.2f); shot(g, "t_bunker")
+            }
+            val pb = g.pauseBtn
+            g.touchDown(7, pb.cx, pb.cy); g.touchUp(7); tick(g, 0.6f); shot(g, "t_pause")
+            tap(g, "resume"); tick(g, 0.2f)
+        }
         g.touchUp(1)
         g.back(); tick(g, 0.3f); g.back(); tick(g, 1f)
         if (g.state != State.MENU) { g.back(); tick(g, 1f) }
