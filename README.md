@@ -44,7 +44,7 @@ hay thư viện ngoài, không cần file ảnh/âm thanh.
 Năm 2049, mưa thiên thạch đỏ biến loài người thành xác sống. Bạn — người thợ máy cuối cùng — lái chiến xa chạy trước cơn bão tím, tìm Trạm Cứu Hộ, hạ 4 trùm và phá tàu mẹ ngoài hành tinh. Đọc lại ở nút 📖 CỐT TRUYỆN.
 
 ### Xuống xe lục soát
-Dừng xe cạnh một ngôi nhà → **XUỐNG XE**, đi bộ tới cửa, **LỤC SOÁT** lấy tiền, ngọc, xăng, máu và mảnh xe. Tài xế tự bắn quái bằng súng ngắn; coi chừng bị cắn và cơn bão!
+Dừng xe (bất cứ đâu) → **XUỐNG XE**, đi bộ tới cửa, **LỤC SOÁT** lấy tiền, ngọc, xăng, máu và mảnh xe. Tài xế tự bắn quái bằng súng ngắn; coi chừng bị cắn và cơn bão! Xe nổ hay hết xăng thì tài xế vẫn chạy tiếp bằng chân.
 
 ### Lô cốt
 Lô cốt bê tông dọc đường tự xoay súng bắn vào xe. Phá bằng vũ khí hoặc tông có đà để lấy tiền và ngọc.

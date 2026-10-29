@@ -55,6 +55,7 @@ fun themeMain(args: Array<String>) {
                 tick(g, 2.2f); shot(g, "t_bunker")
             }
             // park by a building, get out and loot it
+            run run2@{
             val bld = g.buildings.firstOrNull()
             if (bld != null) {
                 g.zombies.removeAll { kotlin.math.abs(it.x - bld.x) < 1200f }
@@ -78,8 +79,27 @@ fun themeMain(args: Array<String>) {
                     tick(g, 1.6f)
                     shot(g, "t_loot_done")
                     println("parts=${g.runParts} gems=${g.runGems} driverHp=${g.driver.hp}")
+                    // back in, park right on the next door: the button must offer looting
+                    val act2 = g.controls().first { it.id == "act" }
+                    g.driver.x = g.car.x; g.touchDown(8, act2.cx, act2.cy); g.touchUp(8); tick(g, 0.2f)
+                    g.buildings.add(Building(g.car.x + 10f, 0))
+                    val ex2 = g.controls().firstOrNull { it.id == "exit" }
+                    if (ex2 != null) { g.touchDown(8, ex2.cx, ex2.cy); g.touchUp(8); tick(g, 0.1f) }
+                    println("parked on a door -> action=${g.driverAction()}")
+                    val act3 = g.controls().first { it.id == "act" }
+                    g.touchDown(8, act3.cx, act3.cy); g.touchUp(8); tick(g, 0.2f)
+                    g.touchDown(8, act3.cx, act3.cy); g.touchUp(8); tick(g, 0.2f)
+                    // the car blows up: the driver jumps clear and fights on
+                    g.car.hp = -1f; tick(g, 0.6f)
+                    shot(g, "t_bailout")
+                    println("after blast: state=${g.state} driverOut=${g.driver.out} wrecked=${g.wrecked}")
+                    g.driver.hp = 0f; tick(g, 2.2f)
+                    println("driver down: state=${g.state} reason=${g.endReason}")
+                    if (g.state != State.PLAYING) { g.back(); tick(g, 0.5f); return@run2 }
                 }
             }
+            }
+            if (g.state != State.PLAYING) continue
             val pb = g.pauseBtn
             g.touchDown(7, pb.cx, pb.cy); g.touchUp(7); tick(g, 0.6f); shot(g, "t_pause")
             tap(g, "resume"); tick(g, 0.2f)

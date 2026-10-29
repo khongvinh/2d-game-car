@@ -1452,7 +1452,21 @@ class Renderer(private val g: Game) {
         val y = d.y
         val f = d.face
         val swing = if (d.dir != 0f) sin(d.walk) * 9f else 0f
-        if (d.hurtT > 0f && (g.anim * 30f).toInt() % 2 == 0) return
+        if (d.hurtT > 0f && (g.anim * 30f).toInt() % 2 == 0 && g.dyingT <= 0f) return
+        if (g.dyingT > 0f) {
+            // fallen
+            c.save()
+            c.translate(x, y - 6f)
+            c.rotate(-90f * f)
+            c.translate(-x, -y)
+        } else {
+            c.save()
+        }
+        drawDriverBody(c, d, x, y, f, swing)
+        c.restore()
+    }
+
+    private fun drawDriverBody(c: Canvas, d: Driver, x: Float, y: Float, f: Float, swing: Float) {
         // shadow
         fill.color = 0x40000000
         c.drawOval(x - 20f, y - 4f, x + 20f, y + 4f, fill)
@@ -2163,7 +2177,7 @@ class Renderer(private val g: Game) {
         text.color = 0xFFB0BEC5.toInt()
         c.drawText("km/h", cx, cy - 22f, text)
 
-        if (g.state == State.PLAYING && !g.wrecked) for (b in g.controls()) drawButton(c, b, g.isHeld(b.id))
+        if (g.state == State.PLAYING && g.dyingT <= 0f && (!g.wrecked || g.driver.out)) for (b in g.controls()) drawButton(c, b, g.isHeld(b.id))
 
         if (g.state == State.PLAYING && g.phase == 2) {
             val n = ceil(g.phaseLeft).toInt().coerceAtLeast(1)

@@ -478,8 +478,7 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
     fun doorNear(x: Float, reach: Float) = buildings.firstOrNull { !it.looted && abs(it.x - x) < reach }
 
     /** Get out (when parked by a building) or back in. */
-    fun canLeaveCar() = !driver.out && dyingT <= 0f && abs(car.forwardSpeed) < 60f && (car.grounded[0] || car.grounded[1]) &&
-        doorNear(car.x, 320f) != null
+    fun canLeaveCar() = !driver.out && !wrecked && dyingT <= 0f && abs(car.forwardSpeed) < 80f
 
     private fun leaveCar() {
         val d = driver
@@ -494,6 +493,16 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
     }
 
     private fun enterCar() {
+        val c = car
+        if (cos(c.angle) < 0.5f) {
+            // the driver heaves an overturned car back onto its wheels
+            c.angle = 0f
+            c.spin = 0f
+            c.vx = 0f
+            c.vy = 0f
+            c.y = terrain.heightAt(c.x) - Car.WHEEL_Y - Car.WHEEL_R
+        }
+        c.flipT = 0f
         driver.out = false
         driver.looting = null
         pointers.clear()
@@ -504,8 +513,8 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
     /** What the action button does on foot: search a door, or get back in. */
     fun driverAction(): String? = when {
         !driver.out -> null
-        abs(driver.x - car.x) < 120f -> "car"
-        doorNear(driver.x, 70f) != null -> "loot"
+        doorNear(driver.x, 110f) != null -> "loot"
+        !wrecked && abs(driver.x - car.x) < 130f -> "car"
         else -> null
     }
 
@@ -530,7 +539,12 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
             d.x += d.dir * 240f * dt
             d.walk += dt * 10f
         }
-        d.x = d.x.coerceIn(c.x - 900f, c.x + 1400f)
+        val oldX = d.x - d.dir * 240f * dt
+        if (!wrecked) d.x = d.x.coerceIn(c.x - 900f, c.x + 1400f)
+        // crates, wrecks and pillboxes block the way on foot
+        for (o in obstacles) if (o.alive && abs(d.x - o.x) < o.type.w / 2 + 12f && abs(oldX - o.x) >= o.type.w / 2 + 12f) d.x = oldX
+        val bb = boss
+        if (bb != null && bb.alive && d.x > goalX - 140f) d.x = goalX - 140f
         d.y = terrain.heightAt(d.x)
         // searching a building
         d.looting?.let { b ->
@@ -553,6 +567,17 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
                 best = dd; tx = z.x; ty = z.y - z.fly - z.type.h * 0.55f
             }
         }
+        if (best >= 700f) {
+            // nothing alive near: shoot at what blocks the way
+            for (o in obstacles) {
+                if (!o.alive) continue
+                val dd = abs(o.x - d.x)
+                if (dd < 520f && dd < best && sign(o.x - d.x) == d.face) {
+                    best = dd; tx = o.x; ty = o.y - o.type.h * 0.5f
+                }
+            }
+            bb?.let { if (it.alive && it.engaged && abs(it.x - d.x) < 900f) { best = abs(it.x - d.x); tx = it.x; ty = it.cy } }
+        }
         if (best < 700f) {
             val gx = d.x
             val gy = d.y - 58f
@@ -570,10 +595,7 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
         }
         // the storm swallows people on foot too
         if (d.x < stormX) hurtDriver(45f * dt)
-        if (d.hp <= 0f) {
-            d.out = false
-            startDying("Tài xế bị quái vật hạ gục!")
-        }
+        if (d.hp <= 0f) driverDown(if (d.x < stormX) "Tài xế bị vòng bo nuốt chửng!" else "Tài xế bị quái vật hạ gục!")
     }
 
     /** Searching done: money, maybe gems, supplies and a part of the next car. */
@@ -912,9 +934,7 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
             damageCar(80f * dt, instant = false, ignoreShield = true)
             stormHurt = 0.2f
             if (Random.nextFloat() < 0.5f) particles.add(Particle(c.x + rnd(-60f, 60f), c.y + rnd(-30f, 30f), 0f, -100f, 0.5f, 0.5f, 7f, 0xFFE040FB.toInt()))
-            if (c.hp <= 0f && !tryRevive(true)) {
-                startDying("Bị vòng bo tiêu diệt!"); return
-            }
+            if (c.hp <= 0f && !wrecked && !tryRevive(true)) abandonCar(true)
         }
 
         // flipped / out of fuel
@@ -924,8 +944,11 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
         val wheelsOff = !c.grounded[0] && !c.grounded[1]
         if ((cos(c.angle) < 0.3f || (wheelsOff && cos(c.angle) < 0.6f)) && speed < 120f) {
             c.flipT += dt
-            if (c.flipT > 3f && !tryRevive(false)) {
-                endRun("Xe bị lật!"); return
+            if (c.flipT > 3f && !driver.out && !wrecked) {
+                // stuck on its roof: the driver crawls out and carries on
+                c.flipT = 0f
+                leaveCar()
+                texts.add(FloatText("LẬT XE! TÀI XẾ BÒ RA", c.x, c.y - 150f, 0xFFFFAB40.toInt()).also { it.life = 1.8f })
             }
         } else {
             c.flipT = 0f
@@ -942,17 +965,7 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
         } else {
             stuckX = c.x; stuckGasT = 0f
         }
-        if (c.fuel <= 0f && speed < 25f) {
-            c.stuckT += dt
-            if (c.stuckT > 2f) {
-                endRun("Hết xăng!"); return
-            }
-        } else {
-            c.stuckT = 0f
-        }
-        if (c.hp <= 0f && !tryRevive(false)) {
-            startDying("Xe bị phá hủy!"); return
-        }
+        if (c.hp <= 0f && !wrecked && !tryRevive(false)) abandonCar(true)
         if (c.y > terrain.heightAt(c.x) + 400f && !tryRevive(false)) {
             endRun("Rơi khỏi đường!"); return
         }
@@ -963,11 +976,56 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
             c.x = goalX - 140f
             if (c.vx > 0f) c.vx = -c.vx * 0.3f
         }
-        if (c.x >= goalX) {
+        if (c.x >= goalX && !driver.out) {
+            stageComplete(); return
+        }
+        if (driver.out && driver.x >= goalX) {
+            // made it to the station on foot
             stageComplete(); return
         }
 
         updateCamera(dt)
+    }
+
+    /**
+     * The car is lost (destroyed, or burnt by the storm): it blows up and the
+     * driver jumps clear to go on with the pistol.
+     */
+    private fun abandonCar(explodeIt: Boolean) {
+        val c = car
+        flushDamage()
+        wrecked = true
+        c.hp = 0f
+        c.boosting = false
+        if (explodeIt) {
+            explode(c.x, c.y - 10f, 0xFFFF6D00.toInt(), 80)
+            explode(c.x + 40f, c.y - 30f, 0xFFFFEA00.toInt(), 40)
+            repeat(7) {
+                debris.add(Debris(Debris.METAL, c.x + rnd(-60f, 60f), c.y - 20f, c.vx * 0.5f + rnd(-350f, 350f), -rnd(350f, 800f), 0f, rnd(-14f, 14f), rnd(24f, 50f), rnd(10f, 20f), vehicle.color))
+            }
+            c.vy -= 420f
+            c.vx *= 0.4f
+            shake = 0.8f
+            hurtFlash = 0.5f
+            texts.add(FloatText("BÙMMM!", c.x, c.y - 170f, 0xFFFFAB00.toInt()).also { it.size = 80f; it.life = 1.6f })
+            sfx.play(Sfx.S.BOOM)
+            sfx.play(Sfx.S.EXPLODE)
+        }
+        if (!driver.out) {
+            leaveCar()
+            driver.x = c.x - 90f
+            texts.add(FloatText("NHẢY KHỎI XE!", c.x - 60f, c.y - 110f, 0xFF80D8FF.toInt()).also { it.life = 1.8f; it.size = 46f })
+        }
+    }
+
+    /** The driver has fallen: a short beat, then the day ends. */
+    private fun driverDown(reason: String) {
+        dyingT = 1.6f
+        dyingReason = reason
+        pointers.clear()
+        updateControls()
+        bleed(driver.x, driver.y - 50f, 20)
+        sfx.play(Sfx.S.LOSE, 0.6f)
     }
 
     private var stuckX = 0f
@@ -1053,31 +1111,6 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
     }
 
     /** Car is destroyed: big explosion, the wreck flies up, then the result screen. */
-    private fun startDying(reason: String) {
-        val c = car
-        flushDamage()
-        dyingT = 2f
-        dyingReason = reason
-        wrecked = true
-        c.hp = 0f
-        c.boosting = false
-        pointers.clear()
-        updateControls()
-        explode(c.x, c.y - 10f, 0xFFFF6D00.toInt(), 80)
-        explode(c.x + 40f, c.y - 30f, 0xFFFFEA00.toInt(), 40)
-        repeat(7) {
-            debris.add(Debris(Debris.METAL, c.x + rnd(-60f, 60f), c.y - 20f, c.vx * 0.5f + rnd(-350f, 350f), -rnd(350f, 800f), 0f, rnd(-14f, 14f), rnd(24f, 50f), rnd(10f, 20f), vehicle.color))
-        }
-        c.vy -= 520f
-        c.vx *= 0.4f
-        c.spin += rnd(-5f, 5f)
-        shake = 0.9f
-        hurtFlash = 0.6f
-        texts.add(FloatText("BÙMMM!", c.x, c.y - 170f, 0xFFFFAB00.toInt()).also { it.size = 80f; it.life = 1.6f })
-        sfx.play(Sfx.S.BOOM)
-        sfx.play(Sfx.S.EXPLODE)
-    }
-
     /** Clone pickup: one free revive while active. */
     private fun tryRevive(storm: Boolean): Boolean {
         val c = car
@@ -1459,6 +1492,10 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
         b.dmgT += dt
         if (b.pendingDmg > 0f && b.dmgT > 0.5f) flushBossDamage(b)
         b.y = terrain.heightAt(b.x)
+        if (driver.out) {
+            bossVsDriver(b, dt)
+            return
+        }
         val dx = c.x - b.x
         if (!b.engaged) {
             if (dx > -1500f) {
@@ -1609,6 +1646,41 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
         }
     }
 
+    /** With the driver on foot the boss turns on them: closes in, throws, and hits up close. */
+    private fun bossVsDriver(b: Boss, dt: Float) {
+        val d = driver
+        val dx = d.x - b.x
+        if (!b.engaged) {
+            if (dx > -1500f) {
+                b.engaged = true
+                intense = true
+                sfx.play(Sfx.S.ROAR)
+            }
+            return
+        }
+        val dir = if (dx >= 0f) 1f else -1f
+        if (abs(dx) > 200f) b.x += dir * b.speed * dt
+        b.x = b.x.coerceIn(goalX - 1150f, goalX - 260f)
+        if (b.flying) b.lift += (120f - b.lift) * min(1f, dt * 2f)
+        b.throwCd -= dt
+        if (b.throwCd <= 0f && abs(dx) < 1100f) {
+            b.throwCd = 2.4f - b.tier * 0.2f
+            b.throwAnim = 0.4f
+            val x0 = b.x
+            val y0 = b.cy - b.h * 0.3f
+            val kind = when (b.tier) { 2 -> 1; 4 -> 2; else -> 0 }
+            if (kind == 2) {
+                val a = atan2(d.y - 50f - y0, d.x - x0)
+                bossRocks.add(BossRock(x0, y0, cos(a) * 560f, sin(a) * 560f, 2))
+            } else {
+                val t = (abs(d.x - x0) / 750f).coerceIn(0.6f, 1.4f)
+                bossRocks.add(BossRock(x0, y0, (d.x - x0) / t, (d.y - 40f - y0) / t - 0.5f * G * t, kind))
+            }
+        }
+        // up close it simply mauls the driver
+        if (abs(dx) < b.w / 2 + 24f && (!b.flying || b.lift < 160f)) hurtDriver((14f + 4f * b.tier) * dt)
+    }
+
     private fun hurtBoss(b: Boss, dmg: Float) {
         if (!b.alive || dmg <= 0f) return
         b.hp -= dmg
@@ -1683,6 +1755,13 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
                     r.alive = false
                     sparks(r.x, r.y)
                 }
+                continue
+            }
+            if (driver.out && abs(r.x - driver.x) < 36f && r.y > driver.y - 100f && r.y < driver.y + 10f) {
+                r.alive = false
+                hurtDriver(12f + 3f * tier)
+                explode(r.x, r.y, 0xFF8D6E63.toInt(), 14)
+                sfx.play(Sfx.S.HIT, 0.7f)
                 continue
             }
             if (hypot(r.x - c.x, r.y - c.y) < 75f) {
@@ -1819,6 +1898,8 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
     private fun updateWeapon(dt: Float) {
         val c = car
         c.fireCd -= dt
+        // nobody at the gun while the driver is out (or the car is a wreck)
+        if (driver.out || wrecked) return
         if (weapon == WeaponType.KNIFE) {
             updateKnife()
             return
@@ -1850,9 +1931,7 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
             }
         }
         if (best == Float.MAX_VALUE) {
-            val weak = st.damage < 2f && st.splash == 0f && weapon != WeaponType.FLAMER
             for (o in obstacles) {
-                if (o.type == ObstacleType.WRECK && weak) continue
                 val dx = o.x - c.x
                 if (dx < 100f || dx > min(st.range, 850f) || dx > best) continue
                 best = dx; tx = o.x; ty = o.y - o.type.h / 2
@@ -2400,7 +2479,7 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
                 "exit" -> if (canLeaveCar()) leaveCar()
                 "act" -> when (driverAction()) {
                     "car" -> enterCar()
-                    "loot" -> doorNear(driver.x, 70f)?.let {
+                    "loot" -> doorNear(driver.x, 110f)?.let {
                         driver.looting = it
                         sfx.play(Sfx.S.CLICK)
                     }

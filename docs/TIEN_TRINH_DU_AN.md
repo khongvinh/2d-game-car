@@ -1,6 +1,6 @@
 # TỔNG HỢP TIẾN TRÌNH DỰ ÁN "ĐUA XE SINH TỒN"
 
-Tài liệu bàn giao để tiếp tục làm việc ở phiên chat mới mà không bị thiếu sót. Cập nhật đến phiên bản v4.8 (ngày 29/10/2026).
+Tài liệu bàn giao để tiếp tục làm việc ở phiên chat mới mà không bị thiếu sót. Cập nhật đến phiên bản v4.9 (ngày 29/10/2026).
 
 ## 1. Thông tin chung
 
@@ -12,8 +12,8 @@ Tài liệu bàn giao để tiếp tục làm việc ở phiên chat mới mà k
 | Ngôn ngữ / công nghệ | Kotlin + Canvas (SurfaceView), không engine, không thư viện ngoài, không file ảnh/âm thanh |
 | Repo GitHub | khongvinh/2d-game-car |
 | Nhánh làm việc | claude/2d-driving-game-f0kpjk (chưa có Pull Request, chưa merge) |
-| Commit mới nhất | xem git log nhánh làm việc (v4.8: gara kiểu xưởng, cây kỹ năng, mảnh xe, tài xế xuống xe lục soát, ít zombie) |
-| Phiên bản hiện tại | v4.8 (versionCode 12) |
+| Commit mới nhất | xem git log nhánh làm việc (v4.9: xuống xe bất cứ lúc nào, xe nổ tài xế chạy tiếp, súng bắn cả xác xe) |
+| Phiên bản hiện tại | v4.9 (versionCode 13) |
 | Build tự động | GitHub Actions "Build APK" (.github/workflows/android.yml) — đang xanh, xuất artifact DuaXeSinhTon-apk |
 | Khóa ký | app/debug.keystore (cố định, mật khẩu android) nên các bản cài đè lên nhau được |
 
@@ -139,7 +139,7 @@ Tài liệu bàn giao để tiếp tục làm việc ở phiên chat mới mà k
 - Chương 4 — Hành tinh lạ: mưa đỏ là do tàu mẹ ngoài hành tinh gieo xuống để "dọn sạch" Trái Đất; hạ Quái Vật Ngoài Hành Tinh trong tàu mẹ.
 - Kết — Bình minh mới: tàu mẹ nổ, bão tan, người sống sót đón chiến xa; radio lại rè — còn vùng đất chưa giải phóng, gara có Xe Tăng, quay lại đường đua.
 
-### v4.8 — Gara kiểu xưởng (như Earn to Die 2), cây kỹ năng, mảnh xe, tài xế xuống xe lục soát & bắn quái, ít zombie (hiện tại)
+### v4.8 — Gara kiểu xưởng (như Earn to Die 2), cây kỹ năng, mảnh xe, tài xế xuống xe lục soát & bắn quái, ít zombie
 - Yêu cầu (kèm 3 ảnh mẫu: gara phòng gạch có nút tròn bên trái, xe "Locked — Find this car by looting buildings (0/5 parts found)", cây kỹ năng chuỗi nút +3/+12/+1 có nhánh lửa x2, thanh cấp ngôi sao + XP): làm các phần tương tự; thêm tài xế xuống xe đi lục đồ và bắn quái; zombie không quá nhiều.
 - Ít zombie: số zombie/vật cản mỗi 100m = min(9, 2 + màn trong ải (0..4) + ải/5) (trước: 3 + màn toàn cục, tối đa 20); quái đi kèm 12% (trước 35%). Ải 4: bot mất 77 máu thay vì 715.
 - Gara (Renderer.garageRoom/garageNav/garageTopBar): phòng tường gạch, ống nước, đèn treo chiếu sáng, cửa cuốn, sàn; 4 nút tròn bên trái (Nhà = menu, Xe, Vũ khí, Kỹ năng); thanh trên: ngôi sao cấp + thanh XP, ngọc ♦ và tiền $.
@@ -151,7 +151,16 @@ Tài liệu bàn giao để tiếp tục làm việc ở phiên chat mới mà k
 - Nhà để lục soát (Building, 1 + ải/6 cái mỗi ải, chỗ bằng phẳng, xa lô cốt, không trong hầm/cầu/khu trùm): Nhà dân, Tạp hóa (x1,5 tiền), Trạm xăng (luôn có xăng, có mái bơm), Gara (85% ra mảnh xe), Nhà thuốc (luôn hồi máu). Cửa chưa lục có ánh đèn vàng, đã lục thì cửa bị đạp tung.
 - Tài xế (Driver): dừng xe (< 60) gần nhà chưa lục → nút "XUỐNG XE". Đi bộ bằng ◀ ▶ (240/giây), súng ngắn tự ngắm bắn quái gần nhất trong 700 (1,5 sát thương, 0,32 giây/phát, không tốn đạn), máu 100. Ở cửa nhà: nút "LỤC SOÁT" (2,2 giây, đứng yên; bị cắn thì dừng), gần xe: "LÊN XE". Quái và lô cốt chuyển sang đuổi/bắn tài xế; bão cũng gây sát thương. Tài xế chết → "Tài xế bị quái vật hạ gục!". Chiến lợi phẩm: tiền (40 + 15 x ải) x 0,7..1,3; mảnh xe 50% (gara 85%, +20% kỹ năng); ngọc 3–6 (50%); xăng +35%, máu +30% (và hồi máu tài xế), +20 đạn theo xác suất. Bảng tổng kết có ô "mảnh xe" và thành tích "🔧 Tìm được n mảnh xe".
 
-## 3. Luật chơi hiện tại (v4.8)
+### v4.9 — Xuống xe bất cứ lúc nào, xe nổ/lật thì tài xế chạy tiếp, súng bắn cả xác xe (hiện tại)
+- Yêu cầu (kèm ảnh xe máy hết xăng đứng trước xác xe 75% mà súng không bắn): xe hết xăng còn đạn sao không bắn; cho xuống xe bất cứ lúc nào; xe đậu ngay nhà không xuống/không lục được; xe nổ thì tài xế nhảy xuống chạy tiếp, dùng súng lục bắn zombie hoặc lục soát nhà.
+- Nguyên nhân không bắn: súng yếu (sát thương < 2, không nổ) bị cài bỏ qua xác xe. Nay mọi vũ khí đều bắn xác xe/vật cản.
+- Nguyên nhân không lục được khi đậu sát cửa: nút hành động ưu tiên "LÊN XE" khi tài xế đứng cạnh xe. Nay ưu tiên "LỤC SOÁT" (tầm cửa 110), rồi mới "LÊN XE" (130).
+- Xuống xe: nút XUỐNG XE luôn có khi xe chạy dưới 80 (không cần gần nhà, kể cả lúc lật). Tháp súng trên xe không bắn khi không có người.
+- Xe hết xăng: không còn kết thúc lượt "Hết xăng!"; xuống xe đi tìm trạm xăng/lục nhà, hoặc đi bộ tới trạm (tới đích bằng chân vẫn tính vượt ải). Lượt chỉ kết thúc khi tài xế chết (quái, lô cốt, trùm, bão) hoặc rơi khỏi đường.
+- Xe bị phá hủy (hoặc cháy trong bão): nổ "BÙMMM!", tài xế "NHẢY KHỎI XE!" chạy tiếp bằng súng lục, không lên lại được xác xe. Xe lật quá 3 giây: tài xế bò ra; lên lại thì tài xế lật xe đứng lại. Tài xế chết: ngã xuống, 1,6 giây sau ra bảng tổng kết ("Tài xế bị quái vật hạ gục!" / "bị vòng bo nuốt chửng!").
+- Tài xế đi bộ bị vật cản chặn đường; khi không có quái gần, súng lục bắn vật cản / lô cốt phía trước (520) hoặc trùm (900). Trùm chuyển sang đánh tài xế: lại gần, ném đá/cầu lửa/plasma vào tài xế (12 + 3 x cấp), vả khi sát (14 + 4 x cấp mỗi giây).
+
+## 3. Luật chơi hiện tại (v4.9)
 
 ### Điều khiển
 | Nút | Tác dụng |
@@ -319,7 +328,7 @@ cd tools/dev/preview && gradle boss      # thử đánh trùm ải 5 và ải 20
 
 | Phiên | Tiêu đề | Phạm vi |
 |---|---|---|
-| #1 | Đua Xe Sinh Tồn #1 — v1.0→v4.8: tạo game, kiểu Earn to Die, bão 3 bo, nhạc, trùm cuối, 20 bản đồ, gara 25 xe, 20 kiểu đường, giao diện thép, tiếng động cơ, ngọc đỏ, lô cốt, cốt truyện, cây kỹ năng, tài xế lục soát | Từ đầu đến v4.8 + tài liệu bàn giao, công cụ tools/dev, quy tắc CLAUDE.md |
+| #1 | Đua Xe Sinh Tồn #1 — v1.0→v4.9: tạo game, kiểu Earn to Die, bão 3 bo, nhạc, trùm cuối, 20 bản đồ, gara 25 xe, 20 kiểu đường, giao diện thép, tiếng động cơ, ngọc đỏ, lô cốt, cốt truyện, cây kỹ năng, tài xế lục soát, xe nổ tài xế chạy tiếp | Từ đầu đến v4.9 + tài liệu bàn giao, công cụ tools/dev, quy tắc CLAUDE.md |
 
 - Quy tắc làm việc (đặt tiêu đề phiên, tự lưu tiến trình khi ngữ cảnh ≥ 90% rồi nhắc mở chat mới) nằm trong CLAUDE.md ở gốc repo.
 
