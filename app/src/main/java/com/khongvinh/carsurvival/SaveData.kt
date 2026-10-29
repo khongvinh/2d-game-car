@@ -48,6 +48,13 @@ class SaveData(context: Context) {
     /** Parts found for each vehicle (5 needed before it can be built). */
     val parts = IntArray(Vehicles.all.size) { prefs.getInt("pt$it", 0) }
 
+    /**
+     * Custom control positions (centre, in 1/1000 of the screen) for the slots
+     * brake, leanBack, leanFwd, boost, gas, exit; -1 = default place.
+     */
+    val ctlX = IntArray(6) { prefs.getInt("cx$it", -1) }
+    val ctlY = IntArray(6) { prefs.getInt("cy$it", -1) }
+
     /** Story pages already shown: bit 0 prologue, 1..4 region chapters, 5 ending. */
     var storySeen = prefs.getInt("story", 0)
 
@@ -181,6 +188,10 @@ class SaveData(context: Context) {
         e.putInt("xp", xp)
         parts.forEachIndexed { i, v -> e.putInt("pt$i", v) }
         e.putInt("story", storySeen)
+        for (i in 0 until 6) {
+            e.putInt("cx$i", ctlX[i])
+            e.putInt("cy$i", ctlY[i])
+        }
         e.apply()
     }
 }

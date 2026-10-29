@@ -52,6 +52,7 @@ class Renderer(private val g: Game) {
             State.MAPS -> drawMaps(c)
             State.GARAGE -> drawGarage(c)
             State.STORY -> drawStory(c)
+            State.LAYOUT -> drawLayout(c)
             State.PLAYING, State.PAUSED -> {
                 drawDamageOverlay(c)
                 drawHud(c)
@@ -295,7 +296,7 @@ class Renderer(private val g: Game) {
             c.drawText(t.text, t.x, t.y, text)
         }
         text.alpha = 255
-        if (g.state != State.MENU && g.state != State.MAPS && g.state != State.GARAGE && g.state != State.STORY) drawStorm(c)
+        if (g.state != State.MENU && g.state != State.MAPS && g.state != State.GARAGE && g.state != State.STORY && g.state != State.LAYOUT) drawStorm(c)
         c.restore()
     }
 
@@ -2080,7 +2081,7 @@ class Renderer(private val g: Game) {
         val warn = when {
             g.wrecked -> null
             gap in 0..25 -> "⚠ BÃO ĐANG ĐUỔI KỊP!"
-            car.fuel <= 0f -> "HẾT XĂNG!"
+            car.fuel <= 0f && !g.driver.out -> "HẾT XĂNG!"
             car.flipT > 0.3f -> "LẬT XE! Nhấn ↺ ↻ để lật lại"
             car.hp < car.maxHp * 0.15f -> "🔥 XE ĐANG CHÁY!"
             else -> null
@@ -2772,6 +2773,17 @@ class Renderer(private val g: Game) {
         c.drawCircle(W - 232f, 44f, 7f, fill)
         text.color = 0xFFFFD740.toInt()
         c.drawText("${s.money}$", W - 204f, 54f, text)
+    }
+
+    /** Drag the controls to new places over the live road. */
+    private fun drawLayout(c: Canvas) {
+        dim(c, 0x70)
+        title(c, "KÉO PHÍM ĐỂ ĐỔI VỊ TRÍ", g.W / 2, 92f, 0xFFFFD740.toInt(), 46f)
+        for (b in g.layoutButtons()) drawButton(c, b, false)
+        text.textAlign = Paint.Align.CENTER
+        text.color = 0xFFE0E0E0.toInt()
+        fitText(c, "Ô trái/phải: nghiêng xe • khi đi bộ: ◀ ▶ • tên lửa = NHẢY • GA = LỤC SOÁT/LÊN XE", g.W / 2, 236f, 22f, g.W - 80f)
+        drawMenuButtons(c)
     }
 
     private fun drawGarage(c: Canvas) {

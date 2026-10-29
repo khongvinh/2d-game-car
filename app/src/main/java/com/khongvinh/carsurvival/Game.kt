@@ -171,6 +171,7 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
     private var leanBack = false
     private var leanFwd = false
     private var boostHeld = false
+    private var jumpHeld = false
     private var wasBoosting = false
 
     private val renderer = Renderer(this)
@@ -485,6 +486,7 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
         d.out = true
         d.x = car.x - 20f
         d.y = terrain.heightAt(d.x)
+        d.vy = -300f
         d.face = 1f
         d.looting = null
         pointers.clear()
@@ -540,12 +542,36 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
             d.walk += dt * 10f
         }
         val oldX = d.x - d.dir * 240f * dt
-        if (!wrecked) d.x = d.x.coerceIn(c.x - 900f, c.x + 1400f)
-        // crates, wrecks and pillboxes block the way on foot
-        for (o in obstacles) if (o.alive && abs(d.x - o.x) < o.type.w / 2 + 12f && abs(oldX - o.x) >= o.type.w / 2 + 12f) d.x = oldX
+        // jumping and falling: the ground is the road or the top of a crate / wreck
+        fun support(x: Float): Float {
+            var top = terrain.heightAt(x)
+            for (o in obstacles) if (o.alive && abs(x - o.x) < o.type.w / 2 + 6f) {
+                val ot = o.y - o.type.h
+                if (d.y <= ot + 8f) top = min(top, ot)
+            }
+            return top
+        }
+        if (jumpHeld && d.air <= 0.5f && d.vy >= 0f) {
+            d.vy = -620f
+            d.air = 1f
+            sfx.play(Sfx.S.CLICK, 0.4f)
+        }
+        val feet0 = d.y
+        var feet = feet0 + d.vy * dt
+        d.vy += G * dt
+        val ground = support(d.x)
+        if (feet >= ground) {
+            feet = ground
+            d.vy = 0f
+        }
+        // crates, wrecks and pillboxes block the way unless jumped over
+        for (o in obstacles) if (o.alive && abs(d.x - o.x) < o.type.w / 2 + 12f && abs(oldX - o.x) >= o.type.w / 2 + 12f && feet > o.y - o.type.h + 4f) d.x = oldX
         val bb = boss
         if (bb != null && bb.alive && d.x > goalX - 140f) d.x = goalX - 140f
-        d.y = terrain.heightAt(d.x)
+        val g2 = support(d.x)
+        if (feet > g2) feet = g2
+        d.y = feet
+        d.air = max(0f, terrain.heightAt(d.x) - d.y)
         // searching a building
         d.looting?.let { b ->
             b.lootT += dt * (if (scavenger) 2f else 1f)
@@ -595,6 +621,7 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
         }
         // the storm swallows people on foot too
         if (d.x < stormX) hurtDriver(45f * dt)
+        if (d.y > terrain.heightAt(d.x) + 5f) d.y = terrain.heightAt(d.x)
         if (d.hp <= 0f) driverDown(if (d.x < stormX) "Tài xế bị vòng bo nuốt chửng!" else "Tài xế bị quái vật hạ gục!")
     }
 
@@ -780,8 +807,9 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
         if (hurtFlash > 0f) hurtFlash -= dt
         music.enabled = save.music
         when (state) {
-            State.MENU, State.MAPS, State.GARAGE, State.STORY -> music.play(Music.Track.CHILL, 1f)
-            State.PLAYING -> music.play(if (intense) Music.Track.INTENSE else Music.Track.CHILL, 1f)
+            State.MENU, State.MAPS, State.GARAGE, State.STORY, State.LAYOUT -> music.play(Music.Track.CHILL, 1f)
+            // kept low in a run so the engine and the action carry the sound
+            State.PLAYING -> music.play(if (intense) Music.Track.INTENSE else Music.Track.CHILL, 0.4f)
             State.PAUSED -> music.play(if (intense) Music.Track.INTENSE else Music.Track.CHILL, 0.3f)
             State.RESULT -> music.play(Music.Track.CHILL, 0.6f)
             State.STAGE_DONE, State.VICTORY -> music.play(Music.Track.VICTORY, 1f)
@@ -820,7 +848,7 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
             VehicleClass.ARMORED -> 0.8f
             VehicleClass.TANK -> 0.68f
         }
-        val vol = 0.14f + 0.2f * max(0f, c.throttle) + (if (c.boosting) 0.08f else 0f)
+        val vol = 0.45f + 0.4f * max(0f, c.throttle) + (if (c.boosting) 0.1f else 0f)
         sfx.engine(true, pitch * (0.62f + engineRev * 0.85f), vol)
     }
 
@@ -2270,21 +2298,72 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
     // --------------------------------------------------------------- input
 
     /** On-screen driving controls (screen coordinates). */
+    /** Movable control slots: brake, leanBack, leanFwd, boost, gas, exit. */
+    private val slotIds = arrayOf("brake", "leanBack", "leanFwd", "boost", "gas", "exit")
+
+    private fun slotDefault(i: Int): FloatArray = when (i) {
+        0 -> floatArrayOf(24f, H - 360f, 184f, H - 210f)
+        1 -> floatArrayOf(24f, H - 190f, 184f, H - 30f)
+        2 -> floatArrayOf(204f, H - 190f, 364f, H - 30f)
+        3 -> floatArrayOf(W - 384f, H - 190f, W - 224f, H - 30f)
+        4 -> floatArrayOf(W - 204f, H - 260f, W - 24f, H - 30f)
+        else -> floatArrayOf(W - 384f, H - 300f, W - 224f, H - 210f)
+    }
+
+    /** Where slot [i] sits now: its default rect moved to the saved centre, kept on screen. */
+    fun slotRect(i: Int): FloatArray {
+        val d = slotDefault(i)
+        if (save.ctlX[i] < 0) return d
+        val w = d[2] - d[0]
+        val h = d[3] - d[1]
+        val cx = (save.ctlX[i] / 1000f * W).coerceIn(w / 2 + 4f, W - w / 2 - 4f)
+        val cy = (save.ctlY[i] / 1000f * H).coerceIn(h / 2 + 100f, H - h / 2 - 4f)
+        return floatArrayOf(cx - w / 2, cy - h / 2, cx + w / 2, cy + h / 2)
+    }
+
+    private fun slotButton(i: Int, id: String, label: String, color: Int): Button {
+        val r = slotRect(i)
+        return Button(id, label, r[0], r[1], r[2], r[3], color)
+    }
+
     fun controls(): List<Button> = if (driver.out) listOf(
-        Button("leanBack", "◀", 24f, H - 190f, 184f, H - 30f, 0x55FFFFFF),
-        Button("leanFwd", "▶", 204f, H - 190f, 364f, H - 30f, 0x55FFFFFF),
-        Button("act", when (driverAction()) {
+        slotButton(1, "leanBack", "◀", 0x55FFFFFF),
+        slotButton(2, "leanFwd", "▶", 0x55FFFFFF),
+        slotButton(3, "jump", "NHẢY", 0x5529B6F6),
+        slotButton(4, "act", when (driverAction()) {
             "car" -> "LÊN XE"
             "loot" -> if (driver.looting != null) "ĐANG LỤC…" else "LỤC SOÁT"
             else -> "…"
-        }, W - 264f, H - 200f, W - 24f, H - 30f, if (driverAction() != null) 0x55FFC107 else 0x33FFFFFF),
+        }, if (driverAction() != null) 0x55FFC107 else 0x33FFFFFF),
     ) else listOf(
-        Button("brake", "PHANH", 24f, H - 360f, 184f, H - 210f, 0x55FF5252),
-        Button("leanBack", "↺", 24f, H - 190f, 184f, H - 30f, 0x55FFFFFF),
-        Button("leanFwd", "↻", 204f, H - 190f, 364f, H - 30f, 0x55FFFFFF),
-        Button("boost", "🚀", W - 384f, H - 190f, W - 224f, H - 30f, 0x55FF9800),
-        Button("gas", "GA", W - 204f, H - 260f, W - 24f, H - 30f, 0x5543A047),
-    ) + (if (canLeaveCar()) listOf(Button("exit", "XUỐNG XE", W - 384f, H - 300f, W - 224f, H - 210f, 0x5500BCD4)) else emptyList())
+        slotButton(0, "brake", "PHANH", 0x55FF5252),
+        slotButton(1, "leanBack", "↺", 0x55FFFFFF),
+        slotButton(2, "leanFwd", "↻", 0x55FFFFFF),
+        slotButton(3, "boost", "🚀", 0x55FF9800),
+        slotButton(4, "gas", "GA", 0x5543A047),
+    ) + (if (canLeaveCar()) listOf(slotButton(5, "exit", "XUỐNG XE", 0x5500BCD4)) else emptyList())
+
+    // ------------------------------------------------------- control layout
+
+    /** Where to go back after editing the layout. */
+    private var layoutBack = State.MENU
+    private var dragSlot = -1
+    private var dragId = -1
+
+    private fun openLayout() {
+        layoutBack = state
+        setState(State.LAYOUT)
+    }
+
+    /** All six slots, shown with their driving labels while editing. */
+    fun layoutButtons(): List<Button> = listOf(
+        slotButton(0, "brake", "PHANH", 0x88FF5252.toInt()),
+        slotButton(1, "leanBack", "↺ / ◀", 0x88FFFFFF.toInt()),
+        slotButton(2, "leanFwd", "↻ / ▶", 0x88FFFFFF.toInt()),
+        slotButton(3, "boost", "🚀 / NHẢY", 0x88FF9800.toInt()),
+        slotButton(4, "gas", "GA / LỤC", 0x8843A047.toInt()),
+        slotButton(5, "exit", "XUỐNG XE", 0x8800BCD4.toInt()),
+    )
 
     val pauseBtn get() = Button("pause", "II", W - 96f, 16f, W - 20f, 92f, 0x55FFFFFF)
 
@@ -2303,6 +2382,7 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
             ) else listOf(
                 Button("story", "📖 CỐT TRUYỆN", W - 400f, 20f, W - 206f, 96f, 0xFF5D4037.toInt()),
                 Button("reset", "↺ CHƠI LẠI", W - 590f, 20f, W - 410f, 96f, 0xFF4E342E.toInt()),
+                Button("layout", "🎮 PHÍM", W - 760f, 20f, W - 600f, 96f, 0xFF37474F.toInt()),
                 Button("maps", "🗺  ẢI ${save.stageSel}: ${Themes.of(save.stageSel).name.uppercase()}", cx - 230f, 128f, cx + 230f, 214f, 0xFF6D4C41.toInt()),
                 b("play", "CHẠY!", cx, 262f, 460f, green),
                 b("garage", "GARA", cx, 360f, 460f, purple),
@@ -2316,8 +2396,13 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
                 b("quit", "BỎ CUỘC", W / 2, H * 0.32f + 104f, 420f, grey),
                 Button("sound", if (save.sound) "🔊 HIỆU ỨNG: BẬT" else "🔇 HIỆU ỨNG: TẮT", W / 2 - 330f, H * 0.32f + 214f, W / 2 - 10f, H * 0.32f + 290f, if (save.sound) 0xFF00897B.toInt() else grey),
                 Button("music", if (save.music) "🎵 NHẠC: BẬT" else "🎵 NHẠC: TẮT", W / 2 + 10f, H * 0.32f + 214f, W / 2 + 330f, H * 0.32f + 290f, if (save.music) 0xFF00897B.toInt() else grey),
+                Button("layout", "🎮 ĐỔI VỊ TRÍ PHÍM", W / 2 - 330f, H * 0.32f + 304f, W / 2 + 330f, H * 0.32f + 376f, 0xFF37474F.toInt()),
             )
             State.STORY -> listOf(Button("skip", "BỎ QUA ›", W - 290f, H - 96f, W - 40f, H - 24f, grey))
+            State.LAYOUT -> listOf(
+                Button("layoutReset", "MẶC ĐỊNH", W / 2 - 330f, 120f, W / 2 - 20f, 196f, grey),
+                Button("layoutDone", "XONG", W / 2 + 20f, 120f, W / 2 + 330f, 196f, green),
+            )
             State.RESULT -> {
                 val l = ArrayList<Button>()
                 val ids = listOf("menu" to "MENU", "garage" to "GARA", "play" to "CHẠY TIẾP")
@@ -2491,6 +2576,20 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
             }
             return
         }
+        if (state == State.LAYOUT) {
+            val b = buttons().firstOrNull { it.contains(x, y) }
+            if (b == null) {
+                for (i in 5 downTo 0) {
+                    val r = slotRect(i)
+                    if (x in r[0]..r[2] && y in r[1]..r[3]) {
+                        dragSlot = i
+                        dragId = id
+                        return
+                    }
+                }
+                return
+            }
+        }
         if (stateTime < 0.4f) return
         if (state == State.STORY) {
             val skip = buttons().first()
@@ -2571,6 +2670,15 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
             }
             "story" -> showStory(Story.unlocked(save.storySeen, save.bestStage)) { setState(State.MENU) }
             "skip" -> afterStory()
+            "layout" -> openLayout()
+            "layoutDone" -> {
+                save.save()
+                setState(layoutBack)
+            }
+            "layoutReset" -> {
+                save.ctlX.fill(-1)
+                save.ctlY.fill(-1)
+            }
             "reset" -> confirmReset = true
             "resetNo" -> confirmReset = false
             "resetYes" -> {
@@ -2612,6 +2720,11 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
     }
 
     fun touchMove(id: Int, x: Float, y: Float) {
+        if (state == State.LAYOUT && id == dragId && dragSlot >= 0) {
+            save.ctlX[dragSlot] = (x / W * 1000f).toInt().coerceIn(0, 1000)
+            save.ctlY[dragSlot] = (y / H * 1000f).toInt().coerceIn(0, 1000)
+            return
+        }
         if (state != State.PLAYING || !pointers.containsKey(id)) return
         val c = controlAt(x, y)
         if (c != pointers[id]) {
@@ -2621,6 +2734,10 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
     }
 
     fun touchUp(id: Int) {
+        if (id == dragId) {
+            dragId = -1
+            dragSlot = -1
+        }
         pointers.remove(id)
         updateControls()
     }
@@ -2632,6 +2749,7 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
         leanBack = "leanBack" in v
         leanFwd = "leanFwd" in v
         boostHeld = "boost" in v
+        jumpHeld = "jump" in v
     }
 
     fun isHeld(id: String) = id in pointers.values

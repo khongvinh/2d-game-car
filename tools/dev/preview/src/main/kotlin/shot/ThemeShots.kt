@@ -18,6 +18,13 @@ fun themeMain(args: Array<String>) {
     g.resize(W.toFloat(), H.toFloat())
     tick(g, 1f)
     shot(g, "t_menu")
+    // control layout editor: drag the gas pedal to the middle
+    tap(g, "layout"); tick(g, 0.5f)
+    val gr = g.slotRect(4)
+    g.touchDown(3, (gr[0] + gr[2]) / 2, (gr[1] + gr[3]) / 2); g.touchMove(3, W * 0.55f, H * 0.6f); g.touchUp(3); tick(g, 0.1f)
+    shot(g, "t_layout")
+    tap(g, "layoutReset"); tap(g, "layoutDone"); tick(g, 0.5f)
+    println("layout back to ${g.state}")
     // reset confirmation
     tap(g, "reset"); tick(g, 0.3f); shot(g, "t_reset"); tap(g, "resetNo"); tick(g, 0.5f)
     // story: prologue on a fresh save
@@ -73,6 +80,10 @@ fun themeMain(args: Array<String>) {
                     var t = 0f
                     while (g.driverAction() != "loot" && t < 3f) { tick(g, 0.05f); t += 0.05f }
                     g.touchUp(9)
+                    // a jump
+                    val jb = g.controls().first { it.id == "jump" }
+                    g.touchDown(10, jb.cx, jb.cy); tick(g, 0.15f); shot(g, "t_jump"); g.touchUp(10); tick(g, 1f)
+                    println("jumped: air back to ${g.driver.air}")
                     val act = g.controls().first { it.id == "act" }
                     g.touchDown(8, act.cx, act.cy); g.touchUp(8); tick(g, 1.0f)
                     shot(g, "t_loot")
