@@ -586,7 +586,7 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
         addMoney(cash, tx, ty)
         var line = 0
         fun note(s: String, color: Int) {
-            texts.add(FloatText(s, tx, ty - 50f - line * 44f, color).also { it.life = 2.2f; it.size = 38f })
+            texts.add(FloatText(s, tx, ty - 60f - line * 62f, color).also { it.life = 2.4f; it.size = 32f })
             line++
         }
         val partChance = (if (b.kind == 3) 0.85f else 0.5f) + (if (scavenger) 0.2f else 0f)
