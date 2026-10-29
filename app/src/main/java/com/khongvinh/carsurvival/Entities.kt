@@ -4,27 +4,6 @@ import kotlin.math.min
 
 enum class State { MENU, MAPS, GARAGE, STORY, PLAYING, PAUSED, RESULT, STAGE_DONE, VICTORY }
 
-/**
- * Tuning bought with red gems picked up on the road (not money). Twenty steps
- * each; every step costs 20% more gems than the one before.
- */
-enum class Upgrade(val title: String, val desc: String) {
-    ENGINE("Động cơ", "+2,5% tốc độ, +3% lực kéo mỗi cấp"),
-    FUEL("Bình xăng", "+5% xăng mỗi cấp"),
-    BOOST("Tên lửa đẩy", "+0,15 giây tên lửa mỗi cấp"),
-    ARMOR("Giáp & máu", "+4% máu, +1% giáp mỗi cấp"),
-    AMMO("Đạn dược", "+6 viên mỗi cấp"),
-    GRIP("Lốp xe", "+2% bám đường mỗi cấp");
-
-    /** Gems for the step from [level] to level + 1. */
-    fun cost(level: Int) = Math.round(BASE_GEMS * Math.pow(1.2, level.toDouble())).toInt()
-
-    companion object {
-        const val MAX_LEVEL = 20
-        const val BASE_GEMS = 5.0
-    }
-}
-
 enum class ItemType(val icon: String, val color: Int) {
     COIN("$", 0xFFFFC107.toInt()),
     FUEL("⛽", 0xFFE53935.toInt()),
@@ -40,7 +19,7 @@ enum class ItemType(val icon: String, val color: Int) {
     GEM("♦", 0xFFE53935.toInt()),
 }
 
-class Item(val type: ItemType, val x: Float, val y: Float) {
+class Item(val type: ItemType, var x: Float, var y: Float) {
     var alive = true
 }
 
@@ -303,4 +282,36 @@ class BossRock(var x: Float, var y: Float, var vx: Float, var vy: Float, val kin
     var alive = true
     var rot = 0f
     var life = 4f
+}
+
+/**
+ * A building by the road the driver can loot. [kind]: 0 house, 1 shop,
+ * 2 gas station, 3 garage (car parts), 4 pharmacy.
+ */
+class Building(val x: Float, val kind: Int) {
+    var looted = false
+
+    /** Seconds of searching done (the driver must stay at the door). */
+    var lootT = 0f
+
+    companion object {
+        val NAMES = arrayOf("NHÀ DÂN", "TẠP HÓA", "TRẠM XĂNG", "GARA", "NHÀ THUỐC")
+        const val W = 280f
+    }
+}
+
+/** The driver on foot, out of the car to loot and fight. */
+class Driver {
+    var out = false
+    var x = 0f
+    var y = 0f
+    var dir = 0f
+    var face = 1f
+    var hp = 100f
+    val maxHp = 100f
+    var fireCd = 0f
+    var aim = 0f
+    var walk = 0f
+    var hurtT = 0f
+    var looting: Building? = null
 }

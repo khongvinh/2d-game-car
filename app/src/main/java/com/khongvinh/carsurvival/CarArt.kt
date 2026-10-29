@@ -35,6 +35,9 @@ class CarArt {
     /** Seconds since start, for spinning barrels and flickering lights. */
     var time = 0f
 
+    /** The motorbike rider is left out while the driver is on foot. */
+    var noRider = false
+
     private var bodyCol = 0
     private var acc = 0
     private var glass = 0
@@ -559,7 +562,7 @@ class CarArt {
             c.drawCircle(44f, -20f, 6f, fill)
             fill.color = 0xFFFF1744.toInt()
             c.drawRect(-82f, -10f, -76f, -4f, fill)
-            rider(c, k)
+            if (!noRider) rider(c, k)
         }
     }
 

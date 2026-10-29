@@ -243,6 +243,7 @@ class Renderer(private val g: Game) {
 
         for (d in g.terrain.decor) if (d.x in x0..x1) drawDecor(c, d)
         drawTunnels(c, x0 - 300f, x1 + 300f)
+        for (b in g.buildings) if (b.x in x0 - 200f..x1 + 200f) drawBuilding(c, b)
         drawTerrain(c)
         drawBridges(c, x0 - 200f, x1 + 200f)
         drawTunnelFront(c, x0 - 300f, x1 + 300f)
@@ -267,6 +268,7 @@ class Renderer(private val g: Game) {
         drawShots(c)
         for (rk in g.bossRocks) drawBossRock(c, rk)
         drawPlayerCar(c)
+        if (g.driver.out) drawDriver(c)
         for (p in g.particles) {
             val ratio = (p.life / p.maxLife).coerceIn(0f, 1f)
             fill.color = p.color
@@ -1118,7 +1120,9 @@ class Renderer(private val g: Game) {
             c.restore()
         }
         val hurt = car.hurtT > 0f && (g.anim * 20f).toInt() % 2 == 0
+        art.noRider = g.driver.out
         if (!hurt) art.draw(c, v, car.x, car.y, car.angle, car.wheelRot, car.aim, car.boosting, w, false, car.compress, g.wrecked, car.squat, car.slashT)
+        art.noRider = false
         if (car.shieldT > 0f) {
             val fade = if (car.shieldT < 1.5f && (g.anim * 8f).toInt() % 2 == 0) 0.4f else 1f
             fill.color = 0x3340C4FF
@@ -1313,6 +1317,182 @@ class Renderer(private val g: Game) {
             c.drawRect(l, t, l + w, t + h, fill)
         }
         if (o.barT > 0f || o.ramHp < 1f || (o.type == ObstacleType.BUNKER && o.hp < o.maxHp)) drawObstacleBar(c, o, t)
+    }
+
+    /** A roadside building to loot; its look depends on the kind. */
+    private fun drawBuilding(c: Canvas, b: Building) {
+        val gy = g.terrain.heightAt(b.x) + 26f
+        val w = Building.W
+        val l = b.x - w / 2
+        val rr = b.x + w / 2
+        val h = when (b.kind) { 0 -> 190f; 2 -> 150f; 3 -> 175f; else -> 200f }
+        val top = gy - h
+        val wall = when (b.kind) {
+            0 -> 0xFF8D6E63.toInt()
+            1 -> 0xFF9E8B6E.toInt()
+            2 -> 0xFFB0A89A.toInt()
+            3 -> 0xFF78858C.toInt()
+            else -> 0xFFD7D2C8.toInt()
+        }
+        if (b.kind == 2) {
+            // fuel canopy on two posts with a pump under it
+            fill.color = 0xFF616161.toInt()
+            c.drawRect(rr + 20f, gy - 170f, rr + 30f, gy, fill)
+            c.drawRect(rr + 150f, gy - 170f, rr + 160f, gy, fill)
+            fill.color = 0xFFD32F2F.toInt()
+            c.drawRect(rr, gy - 196f, rr + 180f, gy - 166f, fill)
+            fill.color = 0xFFFFFFFF.toInt()
+            c.drawRect(rr, gy - 184f, rr + 180f, gy - 178f, fill)
+            fill.color = 0xFF455A64.toInt()
+            c.drawRoundRect(rr + 70f, gy - 80f, rr + 104f, gy, 6f, 6f, fill)
+            fill.color = 0xFFFFC107.toInt()
+            c.drawRect(rr + 76f, gy - 70f, rr + 98f, gy - 52f, fill)
+        }
+        // walls
+        fill.color = wall
+        c.drawRect(l, top, rr, gy, fill)
+        fill.color = 0x30000000
+        c.drawRect(l, gy - 40f, rr, gy, fill)
+        fill.color = 0x22FFFFFF
+        c.drawRect(l, top, rr, top + 20f, fill)
+        // cracks and grime
+        stroke.color = 0x55000000
+        stroke.strokeWidth = 2f
+        c.drawLine(l + 30f, top + 40f, l + 52f, top + 90f, stroke)
+        c.drawLine(l + 52f, top + 90f, l + 44f, top + 120f, stroke)
+        c.drawLine(rr - 40f, top + 30f, rr - 60f, top + 70f, stroke)
+        when (b.kind) {
+            0 -> { // pitched roof
+                fill.color = 0xFF4E342E.toInt()
+                path.reset()
+                path.moveTo(l - 20f, top + 4f); path.lineTo(b.x, top - 80f); path.lineTo(rr + 20f, top + 4f); path.close()
+                c.drawPath(path, fill)
+                fill.color = 0xFF3E2723.toInt()
+                c.drawRect(rr - 70f, top - 70f, rr - 46f, top - 20f, fill)
+            }
+            1 -> { // striped awning
+                for (k in 0 until 7) {
+                    fill.color = if (k % 2 == 0) 0xFFC62828.toInt() else 0xFFEEEEEE.toInt()
+                    path.reset()
+                    val ax = l + k * w / 7f
+                    path.moveTo(ax, top + 60f); path.lineTo(ax + w / 7f, top + 60f); path.lineTo(ax + w / 7f + 6f, top + 92f); path.lineTo(ax + 6f, top + 92f); path.close()
+                    c.drawPath(path, fill)
+                }
+            }
+            3 -> { // corrugated metal
+                stroke.color = 0x33000000
+                stroke.strokeWidth = 3f
+                var x = l + 8f
+                while (x < rr) {
+                    c.drawLine(x, top, x, gy, stroke)
+                    x += 14f
+                }
+            }
+            4 -> { // green cross sign
+                fill.color = 0xFF2E7D32.toInt()
+                c.drawRect(rr - 70f, top + 20f, rr - 30f, top + 70f, fill)
+                fill.color = Color.WHITE
+                c.drawRect(rr - 56f, top + 26f, rr - 44f, top + 64f, fill)
+                c.drawRect(rr - 64f, top + 39f, rr - 36f, top + 51f, fill)
+            }
+        }
+        // boarded-up windows
+        for (wx in floatArrayOf(l + 24f, rr - 84f)) {
+            if (b.kind == 4 && wx > b.x) continue
+            fill.color = 0xFF1E1A18.toInt()
+            c.drawRect(wx, top + 104f, wx + 60f, top + 150f, fill)
+            fill.color = 0xFF8D6E63.toInt()
+            c.save()
+            c.translate(wx + 30f, top + 127f)
+            c.rotate(-12f)
+            c.drawRect(-36f, -5f, 36f, 4f, fill)
+            c.restore()
+        }
+        // door
+        val dl = b.x - 32f
+        val dt = gy - 112f
+        fill.color = 0xFF1A1512.toInt()
+        c.drawRect(dl, dt, dl + 64f, gy - 26f, fill)
+        if (!b.looted) {
+            // warm light leaking from inside
+            val p = 0.6f + 0.4f * sin(g.anim * 3f + b.x)
+            fill.color = Color.argb((90 * p).toInt(), 255, 214, 120)
+            c.drawRect(dl + 4f, dt + 4f, dl + 60f, gy - 30f, fill)
+            fill.color = 0xFF5D4037.toInt()
+            c.drawRect(dl + 4f, dt + 4f, dl + 30f, gy - 30f, fill)
+            fill.color = 0xFFFFC107.toInt()
+            c.drawCircle(dl + 24f, dt + 50f, 3f, fill)
+        } else {
+            // kicked open
+            fill.color = 0xFF5D4037.toInt()
+            path.reset()
+            path.moveTo(dl - 2f, dt + 4f); path.lineTo(dl - 22f, dt + 14f); path.lineTo(dl - 22f, gy - 22f); path.lineTo(dl - 2f, gy - 30f); path.close()
+            c.drawPath(path, fill)
+        }
+        // sign
+        fill.color = 0xFF2B2622.toInt()
+        c.drawRoundRect(b.x - 76f, top + 18f, b.x + 76f, top + 52f, 6f, 6f, fill)
+        text.textAlign = Paint.Align.CENTER
+        text.color = if (b.looted) 0xFF9E9E9E.toInt() else 0xFFFFE082.toInt()
+        fitText(c, Building.NAMES[b.kind], b.x, top + 44f, 22f, 140f)
+        // search progress
+        if (g.driver.looting === b) {
+            val f = (b.lootT / Game.LOOT_TIME).coerceIn(0f, 1f)
+            fill.color = 0xCC000000.toInt()
+            c.drawRoundRect(b.x - 70f, dt - 40f, b.x + 70f, dt - 16f, 8f, 8f, fill)
+            fill.color = 0xFFFFC107.toInt()
+            c.drawRoundRect(b.x - 66f, dt - 36f, b.x - 66f + 132f * f, dt - 20f, 6f, 6f, fill)
+        }
+    }
+
+    /** The driver on foot with a pistol that follows its aim. */
+    private fun drawDriver(c: Canvas) {
+        val d = g.driver
+        val x = d.x
+        val y = d.y
+        val f = d.face
+        val swing = if (d.dir != 0f) sin(d.walk) * 9f else 0f
+        if (d.hurtT > 0f && (g.anim * 30f).toInt() % 2 == 0) return
+        // shadow
+        fill.color = 0x40000000
+        c.drawOval(x - 20f, y - 4f, x + 20f, y + 4f, fill)
+        // legs
+        stroke.color = 0xFF283593.toInt()
+        stroke.strokeWidth = 9f
+        c.drawLine(x - 4f, y - 34f, x - 4f + swing, y - 2f, stroke)
+        c.drawLine(x + 4f, y - 34f, x + 4f - swing, y - 2f, stroke)
+        fill.color = 0xFF212121.toInt()
+        c.drawRect(x - 9f + swing, y - 6f, x + 3f + swing + 6f * f, y, fill)
+        c.drawRect(x - 3f - swing, y - 6f, x + 9f - swing + 6f * f, y, fill)
+        // torso
+        val jacket = 0xFF5D4037.toInt()
+        fill.color = jacket
+        c.drawRoundRect(x - 12f, y - 70f, x + 12f, y - 30f, 6f, 6f, fill)
+        fill.color = 0xFF3E2723.toInt()
+        c.drawRect(x - 12f, y - 40f, x + 12f, y - 34f, fill)
+        // head with a cap
+        fill.color = 0xFFE0B48C.toInt()
+        c.drawCircle(x, y - 82f, 11f, fill)
+        fill.color = 0xFFB71C1C.toInt()
+        c.drawRect(x - 12f, y - 94f, x + 11f, y - 85f, fill)
+        c.drawRect(x + (if (f > 0f) 4f else -18f), y - 88f, x + (if (f > 0f) 18f else -4f), y - 84f, fill)
+        // arm and pistol along the aim
+        c.save()
+        c.translate(x, y - 60f)
+        c.rotate(d.aim * 180f / PI.toFloat())
+        stroke.color = jacket
+        stroke.strokeWidth = 8f
+        c.drawLine(0f, 0f, 22f, 0f, stroke)
+        fill.color = 0xFF263238.toInt()
+        c.drawRect(20f, -6f, 38f, 0f, fill)
+        c.drawRect(20f, 0f, 26f, 8f, fill)
+        c.restore()
+        // health
+        val hf = (d.hp / d.maxHp).coerceIn(0f, 1f)
+        fill.color = 0xCC000000.toInt()
+        c.drawRoundRect(x - 30f, y - 118f, x + 30f, y - 106f, 4f, 4f, fill)
+        fill.color = if (hf > 0.35f) 0xFF66BB6A.toInt() else 0xFFE53935.toInt()
+        c.drawRoundRect(x - 28f, y - 116f, x - 28f + 56f * hf, y - 108f, 3f, 3f, fill)
     }
 
     /** Concrete pillbox: sandbags, a dome with a firing slit and a swinging machine gun. */
@@ -2333,47 +2513,6 @@ class Renderer(private val g: Game) {
         }
     }
 
-    /** Third garage tab: tuning paid with red gems, 20 steps each. */
-    private fun garageUpgrades(c: Canvas) {
-        val s = g.save
-        Upgrade.entries.forEachIndexed { i, u ->
-            val rc = g.upgradeCard(i)
-            val lv = s.level(u)
-            card(c, rc, false)
-            text.textAlign = Paint.Align.LEFT
-            text.color = Color.WHITE
-            fitText(c, u.title, rc[0] + 24f, rc[1] + 54f, 34f, rc[2] - rc[0] - 190f)
-            text.textAlign = Paint.Align.RIGHT
-            text.color = 0xFFE1BEE7.toInt()
-            fitText(c, "CẤP $lv/${Upgrade.MAX_LEVEL}", rc[2] - 24f, rc[1] + 52f, 24f, 130f)
-            text.textAlign = Paint.Align.LEFT
-            text.color = 0xFFB0BEC5.toInt()
-            fitText(c, u.desc, rc[0] + 24f, rc[1] + 90f, 21f, rc[2] - rc[0] - 48f)
-            // 20 notches
-            val n = Upgrade.MAX_LEVEL
-            val pw = ((rc[2] - rc[0]) - 48f - (n - 1) * 3f) / n
-            for (k in 0 until n) {
-                fill.color = if (k < lv) (if (k >= 15) 0xFFFF5252.toInt() else if (k >= 10) 0xFFFFC107.toInt() else 0xFF69F0AE.toInt()) else 0xFF455A64.toInt()
-                val l = rc[0] + 24f + k * (pw + 3f)
-                c.drawRoundRect(l, rc[1] + 108f, l + pw, rc[1] + 130f, 3f, 3f, fill)
-            }
-            val cost = u.cost(lv)
-            val maxed = lv >= Upgrade.MAX_LEVEL
-            text.textAlign = Paint.Align.CENTER
-            text.textSize = 32f
-            val (label, color) = when {
-                maxed -> "TỐI ĐA" to 0xFF69F0AE.toInt()
-                s.gems >= cost -> "NÂNG CẤP $cost" to 0xFFFF8A80.toInt()
-                else -> "$cost" to 0xFF9E9E9E.toInt()
-            }
-            val lw = text.measureText(label)
-            val mid = (rc[0] + rc[2]) / 2 + (if (maxed) 0f else 18f)
-            text.color = color
-            c.drawText(label, mid, rc[3] - 28f, text)
-            if (!maxed) drawGem(c, mid - lw / 2 - 26f, rc[3] - 40f, 0.8f)
-        }
-    }
-
     // ------------------------------------------------------------- story
 
     /** Word-wraps [s] into lines no wider than [maxW]; returns the y after the last line. */
@@ -2429,40 +2568,207 @@ class Renderer(private val g: Game) {
         drawMenuButtons(c)
     }
 
-    private fun drawGarage(c: Canvas) {
+    // ------------------------------------------------------------ garage
+
+    /** Brick-walled workshop: pipes, hanging lamps, a roller door and a concrete floor. */
+    private fun garageRoom(c: Canvas) {
+        val W = g.W
+        val H = g.H
+        fill.color = 0xFF2A1F1A.toInt()
+        c.drawRect(0f, 0f, W, H, fill)
+        // bricks
+        val bw = 64f
+        val bh = 26f
+        var row = 0
+        var y = 70f
+        while (y < H - 150f) {
+            var x = if (row % 2 == 0) 0f else -bw / 2
+            var k = 0
+            while (x < W) {
+                val h = hash(row * 131 + k)
+                val base = 0xFF6B4636.toInt()
+                fill.color = blend(base, if (h % 3 == 0) 0xFF4E342E.toInt() else 0xFF8D5A44.toInt(), (h % 100) / 260f)
+                c.drawRect(x + 2f, y + 2f, x + bw - 2f, y + bh - 2f, fill)
+                x += bw
+                k++
+            }
+            y += bh
+            row++
+        }
+        // grime and damp stains
+        fill.color = 0x40000000
+        c.drawRect(0f, 70f, W, 130f, fill)
+        for (k in 0 until 7) {
+            val h = hash(k * 71 + 3)
+            fill.color = 0x30000000
+            c.drawOval((h % 1000) / 1000f * W - 80f, 160f + (h % 300), (h % 1000) / 1000f * W + 90f, 260f + (h % 300), fill)
+        }
+        // pipes along the ceiling
+        fill.color = 0xFF4A3B33.toInt()
+        c.drawRect(0f, 0f, W, 70f, fill)
+        fill.color = 0xFF7A5C45.toInt()
+        c.drawRoundRect(0f, 78f, W, 100f, 10f, 10f, fill)
+        fill.color = 0x55FFFFFF
+        c.drawRect(0f, 80f, W, 85f, fill)
+        for (k in 0 until 6) {
+            fill.color = 0xFF3E2E25.toInt()
+            c.drawRect(k * W / 6f + 40f, 74f, k * W / 6f + 52f, 104f, fill)
+        }
+        // roller door behind the vehicle
+        val dx = g.showroomX()
+        fill.color = 0xFF4E4038.toInt()
+        c.drawRect(dx - 230f, 150f, dx + 230f, H - 150f, fill)
+        stroke.color = 0x55000000
+        stroke.strokeWidth = 3f
+        var sy = 160f
+        while (sy < H - 150f) {
+            c.drawLine(dx - 226f, sy, dx + 226f, sy, stroke)
+            sy += 22f
+        }
+        fill.color = 0x40834012
+        c.drawOval(dx - 160f, 260f, dx - 40f, 340f, fill)
+        c.drawOval(dx + 60f, 380f, dx + 190f, 450f, fill)
+        stroke.color = 0xFF2B211C.toInt()
+        stroke.strokeWidth = 10f
+        c.drawRect(dx - 236f, 144f, dx + 236f, H - 150f, stroke)
+        // floor
+        fill.color = 0xFF3B2F27.toInt()
+        c.drawRect(0f, H - 150f, W, H, fill)
+        fill.color = 0x30FFFFFF
+        c.drawRect(0f, H - 150f, W, H - 146f, fill)
+        // hanging lamps and their light
+        for (k in 0 until 4) {
+            val lx = g.garageL + 80f + k * (W - g.garageL - 160f) / 3f
+            stroke.color = 0xFF222222.toInt()
+            stroke.strokeWidth = 2f
+            c.drawLine(lx, 100f, lx, 128f, stroke)
+            fill.color = 0x16FFE082
+            path.reset()
+            path.moveTo(lx - 16f, 136f); path.lineTo(lx + 16f, 136f); path.lineTo(lx + 150f, H - 150f); path.lineTo(lx - 150f, H - 150f); path.close()
+            c.drawPath(path, fill)
+            fill.color = 0xFF5D4E44.toInt()
+            path.reset()
+            path.moveTo(lx - 22f, 140f); path.lineTo(lx - 8f, 126f); path.lineTo(lx + 8f, 126f); path.lineTo(lx + 22f, 140f); path.close()
+            c.drawPath(path, fill)
+            fill.color = 0xFFFFF3C4.toInt()
+            c.drawCircle(lx, 140f, 5f, fill)
+        }
+        // vignette
+        fill.alpha = 255
+        fill.shader = vignette
+        c.drawRect(0f, 0f, W, H, fill)
+        fill.shader = null
+    }
+
+    /** Round metal nav buttons down the left side: home, vehicles, weapons, skills. */
+    private fun garageNav(c: Canvas) {
+        for (i in 0..3) {
+            val rc = g.navRect(i)
+            val cx = (rc[0] + rc[2]) / 2
+            val cy = (rc[1] + rc[3]) / 2
+            val on = i > 0 && g.garageTab == i - 1
+            fill.color = 0x88000000.toInt()
+            c.drawCircle(cx + 3f, cy + 5f, 56f, fill)
+            fill.color = if (on) 0xFFC28A3C.toInt() else 0xFFB8B4AE.toInt()
+            c.drawCircle(cx, cy, 56f, fill)
+            fill.color = if (on) 0xFF8A5A22.toInt() else 0xFF8D8983.toInt()
+            c.drawCircle(cx, cy, 46f, fill)
+            fill.color = 0x40FFFFFF
+            c.drawCircle(cx - 8f, cy - 12f, 30f, fill)
+            stroke.color = 0xFF2B2622.toInt()
+            stroke.strokeWidth = 3f
+            c.drawCircle(cx, cy, 56f, stroke)
+            fill.color = Color.WHITE
+            stroke.color = Color.WHITE
+            stroke.strokeWidth = 5f
+            when (i) {
+                0 -> { // house
+                    path.reset()
+                    path.moveTo(cx - 24f, cy); path.lineTo(cx, cy - 22f); path.lineTo(cx + 24f, cy); path.close()
+                    c.drawPath(path, fill)
+                    c.drawRect(cx - 16f, cy, cx + 16f, cy + 22f, fill)
+                    fill.color = 0xFF8D8983.toInt()
+                    c.drawRect(cx - 5f, cy + 8f, cx + 5f, cy + 22f, fill)
+                }
+                1 -> { // car
+                    c.drawRoundRect(cx - 28f, cy - 4f, cx + 28f, cy + 10f, 4f, 4f, fill)
+                    c.drawRoundRect(cx - 16f, cy - 16f, cx + 12f, cy, 4f, 4f, fill)
+                    fill.color = if (on) 0xFF8A5A22.toInt() else 0xFF8D8983.toInt()
+                    c.drawCircle(cx - 15f, cy + 12f, 8f, fill)
+                    c.drawCircle(cx + 15f, cy + 12f, 8f, fill)
+                    fill.color = Color.WHITE
+                    c.drawCircle(cx - 15f, cy + 12f, 5f, fill)
+                    c.drawCircle(cx + 15f, cy + 12f, 5f, fill)
+                }
+                2 -> { // gun
+                    c.drawRect(cx - 26f, cy - 8f, cx + 22f, cy + 2f, fill)
+                    c.drawRect(cx - 22f, cy, cx - 10f, cy + 18f, fill)
+                    c.drawRect(cx + 18f, cy - 6f, cx + 30f, cy - 2f, fill)
+                }
+                else -> { // skill tree: star over three boxes
+                    star(c, cx, cy - 12f, 13f, Color.WHITE)
+                    for (k in -1..1) c.drawRoundRect(cx + k * 18f - 7f, cy + 10f, cx + k * 18f + 7f, cy + 22f, 3f, 3f, fill)
+                    c.drawLine(cx - 18f, cy + 6f, cx + 18f, cy + 6f, stroke)
+                }
+            }
+        }
+    }
+
+    private fun star(c: Canvas, x: Float, y: Float, r0: Float, color: Int) {
+        path.reset()
+        for (k in 0 until 10) {
+            val rr = if (k % 2 == 0) r0 else r0 * 0.45f
+            val a = -PI.toFloat() / 2 + k * PI.toFloat() / 5
+            if (k == 0) path.moveTo(x + cos(a) * rr, y + sin(a) * rr) else path.lineTo(x + cos(a) * rr, y + sin(a) * rr)
+        }
+        path.close()
+        fill.color = color
+        c.drawPath(path, fill)
+    }
+
+    /** Player rank star with an XP bar, and the money / gem counters. */
+    private fun garageTopBar(c: Canvas) {
         val W = g.W
         val s = g.save
-        dim(c, 0xC8)
-        title(c, "GARA", (790f + W - 260f) / 2, 76f, 0xFFE040FB.toInt(), 60f, 260f)
-        text.textAlign = Paint.Align.RIGHT
-        text.textSize = 30f
+        val (lv, into, need) = Rank.of(s.xp)
+        val l = g.garageL - 10f
+        fill.color = 0xCC1B1714.toInt()
+        c.drawRoundRect(l + 40f, 26f, l + 320f, 62f, 12f, 12f, fill)
+        fill.color = 0xFF1E88E5.toInt()
+        c.drawRoundRect(l + 44f, 30f, l + 44f + 272f * (into.toFloat() / need), 58f, 10f, 10f, fill)
+        text.textAlign = Paint.Align.CENTER
+        text.color = Color.WHITE
+        text.textSize = 22f
+        c.drawText("$into/$need XP", l + 190f, 52f, text)
+        star(c, l + 30f, 44f, 38f, 0xFFFFC107.toInt())
+        star(c, l + 30f, 44f, 28f, 0xFF1565C0.toInt())
+        text.textSize = 26f
+        c.drawText("$lv", l + 30f, 54f, text)
+        // resources
+        fill.color = 0xCC1B1714.toInt()
+        c.drawRoundRect(W - 470f, 22f, W - 24f, 66f, 14f, 14f, fill)
+        drawGem(c, W - 440f, 44f, 0.7f)
+        text.textAlign = Paint.Align.LEFT
+        text.textSize = 28f
+        text.color = 0xFFFF8A80.toInt()
+        c.drawText("${s.gems}", W - 416f, 54f, text)
+        fill.color = 0xFF43A047.toInt()
+        c.drawRoundRect(W - 250f, 32f, W - 214f, 56f, 4f, 4f, fill)
+        fill.color = 0xFF2E7D32.toInt()
+        c.drawCircle(W - 232f, 44f, 7f, fill)
         text.color = 0xFFFFD740.toInt()
-        c.drawText("${s.money}$", W - 40f, 50f, text)
-        text.color = 0xFFFF5252.toInt()
-        c.drawText("${s.gems} ♦", W - 40f, 86f, text)
-        val tabs = arrayOf("XE", "VŨ KHÍ", "NÂNG CẤP")
-        for (i in 0..2) {
-            val rc = g.garageTabRect(i)
-            val on = g.garageTab == i
-            r.set(rc[0], rc[1], rc[2], rc[3])
-            fill.color = if (on) 0xFF8E24AA.toInt() else 0xCC37474F.toInt()
-            c.drawRoundRect(r, 18f, 18f, fill)
-            fill.color = 0x30FFFFFF
-            c.drawRoundRect(rc[0] + 4f, rc[1] + 4f, rc[2] - 4f, (rc[1] + rc[3]) / 2, 14f, 14f, fill)
-            if (on) {
-                stroke.color = Color.WHITE
-                stroke.strokeWidth = 3f
-                c.drawRoundRect(r, 18f, 18f, stroke)
-            }
-            text.textAlign = Paint.Align.CENTER
-            text.color = if (on) Color.WHITE else 0xFFB0BEC5.toInt()
-            fitText(c, tabs[i], (rc[0] + rc[2]) / 2, rc[3] - 20f, 32f, rc[2] - rc[0] - 20f)
-        }
+        c.drawText("${s.money}$", W - 204f, 54f, text)
+    }
+
+    private fun drawGarage(c: Canvas) {
+        garageRoom(c)
         when (g.garageTab) {
             0 -> garageVehicles(c)
             1 -> garageWeapons(c)
-            else -> garageUpgrades(c)
+            else -> garageSkills(c)
         }
+        garageNav(c)
+        garageTopBar(c)
         drawMenuButtons(c)
     }
 
@@ -2470,93 +2776,319 @@ class Renderer(private val g: Game) {
         if (locked) c.saveLayerAlpha(null, 80) else c.save()
     }
 
+    /** The showroom: one vehicle on the floor, arrows to browse, family chips, stats. */
     private fun garageVehicles(c: Canvas) {
         val s = g.save
-        for (cl in VehicleClass.entries) {
-            val rc = g.classRect(cl.ordinal)
-            val unlocked = s.classUnlocked(cl)
-            card(c, rc, g.garageClass == cl)
-            val owned = (0 until Vehicles.PER_CLASS).count { s.ownsVehicle(Vehicles.of(cl, it).id) }
-            val best = (Vehicles.PER_CLASS - 1 downTo 0).firstOrNull { s.ownsVehicle(Vehicles.of(cl, it).id) } ?: 0
-            c.save()
-            c.translate(rc[0] + 62f, rc[1] + 52f)
-            c.scale(0.4f, 0.4f)
-            lockedLayer(c, !unlocked)
-            art.draw(c, Vehicles.of(cl, best), 0f, 0f, 0f, 0f, 0f, false, s.weaponType, false)
-            c.restore()
-            c.restore()
-            text.textAlign = Paint.Align.LEFT
-            text.color = if (unlocked) Color.WHITE else 0xFF9E9E9E.toInt()
-            fitText(c, cl.title.uppercase(), rc[0] + 118f, rc[1] + 40f, 28f, rc[2] - rc[0] - 128f)
-            text.color = if (unlocked) 0xFF69F0AE.toInt() else 0xFFFFAB40.toInt()
-            fitText(c, if (unlocked) "$owned/${Vehicles.PER_CLASS} phiên bản" else "🔒 Qua ải ${cl.unlockStage}", rc[0] + 118f, rc[1] + 70f, 20f, rc[2] - rc[0] - 128f)
-        }
-
-        val v = Vehicles.of(g.garageClass, g.garageVariant)
+        val W = g.W
+        val H = g.H
+        val v = Vehicles.of(g.showVeh)
         val cur = s.vehicleType
-        val pr = g.previewRect()
-        card(c, pr, false)
         val unlocked = s.classUnlocked(v.cls)
-        fill.color = 0x26FFFFFF
-        c.drawOval(pr[0] + 40f, pr[1] + 196f, pr[0] + 360f, pr[1] + 222f, fill)
+        val owned = s.ownsVehicle(v.id)
+        val cx = g.showroomX()
+        // name banner
+        fill.color = 0xDD141210.toInt()
+        c.drawRoundRect(cx - 280f, 118f, cx + 280f, 178f, 14f, 14f, fill)
+        title(c, v.title, cx, 164f, Color.WHITE, 42f, 520f)
+        val status = when {
+            s.vehicle == v.id -> "Đang dùng"
+            owned -> "Đã có"
+            else -> "Khóa"
+        }
+        text.textAlign = Paint.Align.CENTER
+        text.color = if (owned) 0xFF69F0AE.toInt() else Color.WHITE
+        fitText(c, status, cx, 222f, 34f, 400f)
+        // floor spot and the vehicle
+        val floorY = H - 160f
+        fill.color = 0x40000000
+        c.drawOval(cx - 230f, floorY - 14f, cx + 230f, floorY + 14f, fill)
         c.save()
-        c.translate(pr[0] + 200f, pr[1] + 132f)
-        c.scale(1.3f, 1.3f)
-        lockedLayer(c, !unlocked)
-        art.draw(c, v, 0f, 0f, 0f, g.anim * 2f, -0.25f, false, s.weaponType, false)
+        c.translate(cx, floorY - 54f * 1.55f)
+        c.scale(1.55f, 1.55f)
+        lockedLayer(c, !owned)
+        art.draw(c, v, 0f, 0f, 0f, g.anim * 1.5f, -0.2f, false, s.weaponType, false)
         c.restore()
         c.restore()
-        val tx = pr[0] + 400f
-        text.textAlign = Paint.Align.LEFT
+        if (!owned) {
+            // padlock over a vehicle not yet built
+            val ly = floorY - 110f
+            fill.color = 0xFF2B2B2B.toInt()
+            stroke.color = 0xFF9E9E9E.toInt()
+            stroke.strokeWidth = 9f
+            r.set(cx - 24f, ly - 54f, cx + 24f, ly)
+            c.drawArc(r, 180f, 180f, false, stroke)
+            fill.color = 0xFF8D8983.toInt()
+            c.drawRoundRect(cx - 38f, ly - 28f, cx + 38f, ly + 34f, 8f, 8f, fill)
+            fill.color = 0xFF2B2B2B.toInt()
+            c.drawCircle(cx, ly, 8f, fill)
+            c.drawRect(cx - 3f, ly, cx + 3f, ly + 18f, fill)
+        }
+        // browse arrows
+        for (right in listOf(false, true)) {
+            val rc = g.arrowRect(right)
+            val ax = (rc[0] + rc[2]) / 2
+            val ay = (rc[1] + rc[3]) / 2
+            fill.color = 0xAA000000.toInt()
+            c.drawCircle(ax, ay, 40f, fill)
+            fill.color = Color.WHITE
+            path.reset()
+            val d = if (right) 1f else -1f
+            path.moveTo(ax - 10f * d, ay - 20f); path.lineTo(ax + 16f * d, ay); path.lineTo(ax - 10f * d, ay + 20f); path.close()
+            c.drawPath(path, fill)
+        }
+        // how to get it
+        val how = when {
+            owned -> "${v.cls.title} • phiên bản ${v.variant + 1}/${Vehicles.PER_CLASS}"
+            !unlocked -> "Mở dòng ${v.cls.title} khi qua ải ${v.cls.unlockStage}"
+            !s.hasAllParts(v) -> "Tìm xe này bằng cách lục soát nhà (${s.parts[v.id]}/${SaveData.PARTS_NEEDED} mảnh)"
+            else -> "Đủ mảnh! Lắp ráp với ${v.cost}$"
+        }
+        text.textAlign = Paint.Align.CENTER
         text.color = Color.WHITE
-        fitText(c, v.title.uppercase(), tx, pr[1] + 46f, 36f, pr[2] - tx - 24f)
-        text.color = 0xFFB0BEC5.toInt()
-        fitText(c, "${v.cls.title} • Phiên bản ${v.variant + 1}/${Vehicles.PER_CLASS}", tx, pr[1] + 78f, 22f, pr[2] - tx - 24f)
+        text.style = Paint.Style.STROKE
+        text.strokeWidth = 5f
+        text.color = 0xCC000000.toInt()
+        fitText(c, how, cx, H - 122f, 26f, W - 420f - g.garageL)
+        text.style = Paint.Style.FILL
+        text.color = if (!owned && unlocked) 0xFFFFE082.toInt() else Color.WHITE
+        fitText(c, how, cx, H - 122f, 26f, W - 420f - g.garageL)
+        // family chips
+        for (cl in VehicleClass.entries) {
+            val rc = g.classChip(cl.ordinal)
+            val on = v.cls == cl
+            val open = s.classUnlocked(cl)
+            fill.color = if (on) 0xEE8A5A22.toInt() else 0xCC1B1714.toInt()
+            c.drawRoundRect(rc[0], rc[1], rc[2], rc[3], 14f, 14f, fill)
+            c.save()
+            c.translate((rc[0] + rc[2]) / 2, rc[1] + 34f)
+            c.scale(0.3f, 0.3f)
+            lockedLayer(c, !open)
+            art.draw(c, Vehicles.of(cl, 0), 0f, 0f, 0f, 0f, 0f, false, WeaponType.PISTOL, false)
+            c.restore()
+            c.restore()
+            text.textAlign = Paint.Align.CENTER
+            text.color = if (open) Color.WHITE else 0xFF9E9E9E.toInt()
+            fitText(c, if (open) cl.title else "🔒 ${cl.title}", (rc[0] + rc[2]) / 2, rc[3] - 10f, 20f, rc[2] - rc[0] - 10f)
+        }
+        // stats
+        val pl = W - 370f
+        metalPanel(c, pl, 92f, W - 24f, H - 204f, 16f)
+        text.textAlign = Paint.Align.LEFT
+        text.color = 0xFFFFD740.toInt()
+        fitText(c, "CHỈ SỐ", pl + 24f, 128f, 24f, 300f)
         val rows = listOf(
             Triple("Máu", v.maxHp / 850f to cur.maxHp / 850f, "${v.maxHp.toInt()}"),
             Triple("Tốc độ", v.topSpeed / 1450f to cur.topSpeed / 1450f, "${(v.topSpeed / Game.METER * 3.6f).toInt()} km/h"),
             Triple("Lực kéo", v.engineAcc / 1800f to cur.engineAcc / 1800f, "${(v.engineAcc / 5.2f).toInt()}%"),
             Triple("Giáp", v.totalArmor / 0.7f to cur.totalArmor / 0.7f, "${(v.totalArmor * 100).toInt()}%"),
-            Triple("Xăng", v.fuelTime / 80f to cur.fuelTime / 80f, "${v.fuelTime.toInt()} giây ga"),
-            Triple("Bám đường", v.traction / 2.4f to cur.traction / 2.4f, "${(v.traction * 100).toInt()}%"),
-            Triple("Tên lửa đẩy", v.boostTime / 7.5f to cur.boostTime / 7.5f, "%.1f giây".format(v.boostTime)),
-            Triple("Đạn", v.ammo / 120f to cur.ammo / 120f, "${v.ammo} viên"),
+            Triple("Xăng", v.fuelTime / 80f to cur.fuelTime / 80f, "${v.fuelTime.toInt()}s"),
+            Triple("Bám", v.traction / 2.4f to cur.traction / 2.4f, "${(v.traction * 100).toInt()}%"),
+            Triple("Tên lửa", v.boostTime / 7.5f to cur.boostTime / 7.5f, "%.1fs".format(v.boostTime)),
+            Triple("Đạn", v.ammo / 120f to cur.ammo / 120f, "${v.ammo}"),
             Triple("Sức húc", v.ram / 2.9f to cur.ram / 2.9f, "${(v.ram * 100).toInt()}%"),
         )
-        statRows(c, rows, tx, pr[2] - 24f, pr[1] + 100f, 21f)
+        statRows(c, rows, pl + 22f, W - 44f, 158f, (H - 204f - 180f) / 9f, 100f, 74f)
+    }
 
-        for (k in 0 until Vehicles.PER_CLASS) {
-            val vv = Vehicles.of(g.garageClass, k)
-            val rc = g.variantRect(k)
-            card(c, rc, k == g.garageVariant)
-            val owned = s.ownsVehicle(vv.id)
+    /** Horizontal skill line like a workshop board: stat nodes on top, flame perks below. */
+    private fun garageSkills(c: Canvas) {
+        val s = g.save
+        val W = g.W
+        val H = g.H
+        val bits = s.skills
+        text.textAlign = Paint.Align.CENTER
+        text.color = Color.WHITE
+        title(c, "CÂY KỸ NĂNG — VÒNG ${g.skillPage + 1}/${Skills.ROUNDS}", (g.garageL + W) / 2, 132f, 0xFFFFD740.toInt(), 40f, W - g.garageL - 60f)
+        val page = Skills.nodes.filter { it.page == g.skillPage }
+        // links first
+        for (n in page) {
+            val rc = g.skillRect(n)
             val cx = (rc[0] + rc[2]) / 2
-            c.save()
-            c.translate(cx, rc[1] + 70f)
-            c.scale(0.56f, 0.56f)
-            lockedLayer(c, !unlocked)
-            art.draw(c, vv, 0f, 0f, 0f, 0f, 0f, false, s.weaponType, false)
-            c.restore()
-            c.restore()
-            text.textAlign = Paint.Align.CENTER
-            text.color = Color.WHITE
-            fitText(c, vv.title, cx, rc[1] + 140f, 20f, rc[2] - rc[0] - 16f)
-            val (label, color) = when {
-                s.vehicle == vv.id -> "ĐANG DÙNG" to 0xFF69F0AE.toInt()
-                owned -> "ĐÃ CÓ" to Color.WHITE
-                !unlocked -> "🔒 Ải ${vv.cls.unlockStage}" to 0xFF9E9E9E.toInt()
-                s.money >= vv.cost -> "${vv.cost}$" to 0xFFFFD740.toInt()
-                else -> "${vv.cost}$" to 0xFF9E9E9E.toInt()
+            if (n.perk != null) {
+                val p = Skills.nodes[n.parent]
+                val pr = g.skillRect(p)
+                stroke.color = if (Skills.owned(bits, n.parent)) 0xFF4FC3F7.toInt() else 0xFF2B2B2B.toInt()
+                stroke.strokeWidth = 10f
+                c.drawLine(cx, pr[3], cx, rc[1], stroke)
+            } else if (n.slot < 6) {
+                val nx = Skills.nodes[n.id + 1]
+                val nr = g.skillRect(nx)
+                stroke.color = if (Skills.owned(bits, nx.id)) 0xFF4FC3F7.toInt() else 0xFF2B2B2B.toInt()
+                stroke.strokeWidth = 14f
+                c.drawLine(rc[2], (rc[1] + rc[3]) / 2, nr[0], (rc[1] + rc[3]) / 2, stroke)
             }
-            text.color = color
-            fitText(c, label, cx, rc[3] - 16f, 22f, rc[2] - rc[0] - 16f)
+        }
+        for (n in page) {
+            val rc = g.skillRect(n)
+            val cx = (rc[0] + rc[2]) / 2
+            val cy = (rc[1] + rc[3]) / 2
+            val owned = Skills.owned(bits, n.id)
+            val avail = Skills.available(bits, n)
+            val base = when {
+                n.perk != null && owned -> 0xFFFF7043.toInt()
+                n.stat != null && owned -> n.stat.color
+                else -> 0xFFB0ACA6.toInt()
+            }
+            fill.color = 0x88000000.toInt()
+            c.drawRoundRect(rc[0] + 4f, rc[1] + 6f, rc[2] + 4f, rc[3] + 6f, 16f, 16f, fill)
+            fill.color = 0xFF2B2622.toInt()
+            c.drawRoundRect(rc[0], rc[1], rc[2], rc[3], 16f, 16f, fill)
+            fill.color = base
+            c.drawRoundRect(rc[0] + 6f, rc[1] + 6f, rc[2] - 6f, rc[3] - 6f, 12f, 12f, fill)
+            fill.color = 0x38FFFFFF
+            c.drawRoundRect(rc[0] + 8f, rc[1] + 8f, rc[2] - 8f, cy - 4f, 10f, 10f, fill)
+            if (g.skillSel == n.id) {
+                stroke.color = 0xFFFFEB3B.toInt()
+                stroke.strokeWidth = 5f
+                c.drawRoundRect(rc[0] - 5f, rc[1] - 5f, rc[2] + 5f, rc[3] + 5f, 18f, 18f, stroke)
+            }
+            skillIcon(c, n, cx, cy, if (owned) Color.WHITE else 0xFF5C5853.toInt())
+            if (avail) {
+                // a red arrow marks what can be opened next
+                fill.color = 0xFFE53935.toInt()
+                path.reset()
+                path.moveTo(rc[2] - 22f, rc[1] - 2f); path.lineTo(rc[2] - 4f, rc[1] - 22f); path.lineTo(rc[2] + 14f, rc[1] - 2f); path.close()
+                c.drawPath(path, fill)
+                c.drawRect(rc[2] - 10f, rc[1] - 4f, rc[2] + 2f, rc[1] + 8f, fill)
+            }
+            text.textAlign = Paint.Align.CENTER
+            if (n.stat != null) {
+                text.style = Paint.Style.STROKE
+                text.strokeWidth = 6f
+                text.color = 0xFF000000.toInt()
+                fitText(c, Skills.label(n), cx, rc[1] - 14f, 32f, 160f)
+                text.style = Paint.Style.FILL
+                text.color = Color.WHITE
+                fitText(c, Skills.label(n), cx, rc[1] - 14f, 32f, 160f)
+            } else {
+                fill.color = 0xFF111111.toInt()
+                c.drawRoundRect(cx - 64f, rc[1] - 46f, cx + 64f, rc[1] - 8f, 8f, 8f, fill)
+                text.color = Color.WHITE
+                fitText(c, n.perk!!.title, cx, rc[1] - 19f, 22f, 120f)
+            }
+        }
+        // page arrows
+        for (right in listOf(false, true)) {
+            if ((right && g.skillPage >= Skills.ROUNDS - 1) || (!right && g.skillPage == 0)) continue
+            val rc = g.skillArrow(right)
+            val ax = (rc[0] + rc[2]) / 2
+            val ay = (rc[1] + rc[3]) / 2
+            fill.color = 0xAA000000.toInt()
+            c.drawCircle(ax, ay, 34f, fill)
+            fill.color = Color.WHITE
+            val d = if (right) 1f else -1f
+            path.reset()
+            path.moveTo(ax - 8f * d, ay - 16f); path.lineTo(ax + 14f * d, ay); path.lineTo(ax - 8f * d, ay + 16f); path.close()
+            c.drawPath(path, fill)
+        }
+        // description of the selected node
+        val n = Skills.nodes[g.skillSel]
+        metalPanel(c, g.garageL, H - 196f, W - 390f, H - 22f, 16f)
+        text.textAlign = Paint.Align.LEFT
+        text.color = 0xFFFFD740.toInt()
+        val head = n.perk?.title ?: "${n.stat!!.title} ${Skills.label(n)}"
+        fitText(c, head.uppercase(), g.garageL + 26f, H - 148f, 30f, W - 440f - g.garageL)
+        text.color = Color.WHITE
+        val desc = n.perk?.desc ?: when (n.stat!!) {
+            SkillStat.BOOST -> "Thêm ${Skills.label(n)} tên lửa đẩy cho mọi xe"
+            SkillStat.HP -> "Thêm ${Skills.label(n)} máu cho mọi xe"
+            SkillStat.ARMOR -> "Thêm ${Skills.label(n)} giáp"
+            SkillStat.ENGINE -> "Động cơ mạnh hơn: tốc độ và lực kéo ${Skills.label(n)}"
+            SkillStat.FUEL -> "Bình xăng lớn hơn ${Skills.label(n)}"
+            SkillStat.AMMO -> "Thêm ${Skills.label(n)} viên đạn mỗi lượt"
+            SkillStat.GRIP -> "Lốp bám đường hơn ${Skills.label(n)}"
+        }
+        fitText(c, desc, g.garageL + 26f, H - 108f, 24f, W - 440f - g.garageL)
+        text.color = 0xFFB0BEC5.toInt()
+        fitText(c, "Đã mở ${Skills.count(bits)}/${Skills.nodes.size} nút • mỗi nút sau cần nhiều ngọc hơn 20%", g.garageL + 26f, H - 66f, 20f, W - 440f - g.garageL)
+    }
+
+    private fun skillIcon(c: Canvas, n: SkillNode, x: Float, y: Float, col: Int) {
+        fill.color = col
+        stroke.color = col
+        stroke.strokeWidth = 6f
+        if (n.perk != null) {
+            // flame
+            path.reset()
+            path.moveTo(x, y - 34f)
+            path.quadTo(x + 30f, y - 4f, x + 22f, y + 18f)
+            path.quadTo(x + 12f, y + 34f, x, y + 32f)
+            path.quadTo(x - 22f, y + 32f, x - 24f, y + 12f)
+            path.quadTo(x - 26f, y - 8f, x - 8f, y - 16f)
+            path.quadTo(x - 4f, y - 4f, x + 2f, y - 2f)
+            path.quadTo(x + 6f, y - 18f, x, y - 34f)
+            path.close()
+            c.drawPath(path, fill)
+            return
+        }
+        when (n.stat!!) {
+            SkillStat.HP -> {
+                c.drawCircle(x - 12f, y - 8f, 14f, fill)
+                c.drawCircle(x + 12f, y - 8f, 14f, fill)
+                path.reset()
+                path.moveTo(x - 26f, y - 2f); path.lineTo(x, y + 26f); path.lineTo(x + 26f, y - 2f); path.close()
+                c.drawPath(path, fill)
+            }
+            SkillStat.ARMOR -> {
+                path.reset()
+                path.moveTo(x - 24f, y - 24f); path.lineTo(x + 24f, y - 24f); path.lineTo(x + 22f, y + 4f)
+                path.quadTo(x + 14f, y + 22f, x, y + 30f); path.quadTo(x - 14f, y + 22f, x - 22f, y + 4f); path.close()
+                c.drawPath(path, stroke)
+                c.drawLine(x, y - 24f, x, y + 28f, stroke)
+            }
+            SkillStat.BOOST -> {
+                c.save()
+                c.translate(x, y)
+                c.rotate(-35f)
+                c.drawRoundRect(-26f, -10f, 18f, 10f, 10f, 10f, fill)
+                path.reset()
+                path.moveTo(18f, -10f); path.lineTo(32f, 0f); path.lineTo(18f, 10f); path.close()
+                c.drawPath(path, fill)
+                path.reset()
+                path.moveTo(-26f, -6f); path.lineTo(-40f, 0f); path.lineTo(-26f, 6f); path.close()
+                c.drawPath(path, fill)
+                c.restore()
+            }
+            SkillStat.ENGINE -> { // lightning bolt
+                path.reset()
+                path.moveTo(x + 6f, y - 30f); path.lineTo(x - 18f, y + 4f); path.lineTo(x - 2f, y + 4f)
+                path.lineTo(x - 8f, y + 30f); path.lineTo(x + 18f, y - 6f); path.lineTo(x + 2f, y - 6f); path.close()
+                c.drawPath(path, fill)
+            }
+            SkillStat.FUEL -> { // jerrycan
+                c.drawRoundRect(x - 18f, y - 20f, x + 18f, y + 26f, 6f, 6f, fill)
+                c.drawRect(x + 6f, y - 30f, x + 16f, y - 20f, fill)
+            }
+            SkillStat.AMMO -> { // bullets
+                for (k in -1..1) {
+                    c.drawRoundRect(x + k * 14f - 5f, y - 16f, x + k * 14f + 5f, y + 24f, 4f, 4f, fill)
+                    c.drawCircle(x + k * 14f, y - 18f, 5f, fill)
+                }
+            }
+            SkillStat.GRIP -> { // tyre
+                c.drawCircle(x, y, 22f, stroke)
+                c.drawCircle(x, y, 8f, fill)
+                for (k in 0 until 8) {
+                    val a = k * 0.785f
+                    c.drawCircle(x + cos(a) * 26f, y + sin(a) * 26f, 4f, fill)
+                }
+            }
         }
     }
 
     /** Label, bar (value and a white tick for what is in use now) and value text. */
-    private fun statRows(c: Canvas, rows: List<Triple<String, Pair<Float, Float>, String>>, x0: Float, x1: Float, y0: Float, step: Float) {
-        val bx0 = x0 + 140f
-        val bx1 = x1 - 150f
+    private fun statRows(
+        c: Canvas,
+        rows: List<Triple<String, Pair<Float, Float>, String>>,
+        x0: Float,
+        x1: Float,
+        y0: Float,
+        step: Float,
+        labelW: Float = 140f,
+        valueW: Float = 150f,
+    ) {
+        val bx0 = x0 + labelW
+        val bx1 = x1 - valueW
         rows.forEachIndexed { i, (label, frac, value) ->
             val y = y0 + i * step
             text.textAlign = Paint.Align.LEFT
@@ -2663,6 +3195,7 @@ class Renderer(private val g: Game) {
             Triple("💥", "${g.smashed}", "vật cản"),
             Triple("💰", "+${g.distMoney + g.runMoney + g.stageBonus}$", "tiền"),
             Triple("♦", "+${g.runGems}", "ngọc đỏ"),
+            Triple("🔧", "+${g.runParts}", "mảnh xe"),
         )
         when (g.state) {
             State.PAUSED -> {

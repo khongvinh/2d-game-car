@@ -54,6 +54,32 @@ fun themeMain(args: Array<String>) {
                 g.car.ammo = 0f
                 tick(g, 2.2f); shot(g, "t_bunker")
             }
+            // park by a building, get out and loot it
+            val bld = g.buildings.firstOrNull()
+            if (bld != null) {
+                g.zombies.removeAll { kotlin.math.abs(it.x - bld.x) < 1200f }
+                g.obstacles.removeAll { kotlin.math.abs(it.x - bld.x) < 600f }
+                g.zombies.add(Zombie(ZombieType.WALKER, bld.x + 500f, g.terrain.heightAt(bld.x + 500f)))
+                g.car.x = bld.x - 160f; g.car.y = g.terrain.heightAt(g.car.x) - 60f; g.car.vx = 0f; g.car.vy = 0f; g.car.angle = 0f
+                tick(g, 1.0f)
+                val ex = g.controls().firstOrNull { it.id == "exit" }
+                println("exit button: ${ex != null}")
+                shot(g, "t_park")
+                if (ex != null) {
+                    g.touchDown(8, ex.cx, ex.cy); g.touchUp(8); tick(g, 0.2f)
+                    val right = g.controls().first { it.id == "leanFwd" }
+                    g.touchDown(9, right.cx, right.cy)
+                    var t = 0f
+                    while (g.driverAction() != "loot" && t < 3f) { tick(g, 0.05f); t += 0.05f }
+                    g.touchUp(9)
+                    val act = g.controls().first { it.id == "act" }
+                    g.touchDown(8, act.cx, act.cy); g.touchUp(8); tick(g, 1.0f)
+                    shot(g, "t_loot")
+                    tick(g, 1.6f)
+                    shot(g, "t_loot_done")
+                    println("parts=${g.runParts} gems=${g.runGems} driverHp=${g.driver.hp}")
+                }
+            }
             val pb = g.pauseBtn
             g.touchDown(7, pb.cx, pb.cy); g.touchUp(7); tick(g, 0.6f); shot(g, "t_pause")
             tap(g, "resume"); tick(g, 0.2f)

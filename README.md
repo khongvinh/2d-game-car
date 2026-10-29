@@ -43,6 +43,9 @@ hay thư viện ngoài, không cần file ảnh/âm thanh.
 ### Cốt truyện
 Năm 2049, mưa thiên thạch đỏ biến loài người thành xác sống. Bạn — người thợ máy cuối cùng — lái chiến xa chạy trước cơn bão tím, tìm Trạm Cứu Hộ, hạ 4 trùm và phá tàu mẹ ngoài hành tinh. Đọc lại ở nút 📖 CỐT TRUYỆN.
 
+### Xuống xe lục soát
+Dừng xe cạnh một ngôi nhà → **XUỐNG XE**, đi bộ tới cửa, **LỤC SOÁT** lấy tiền, ngọc, xăng, máu và mảnh xe. Tài xế tự bắn quái bằng súng ngắn; coi chừng bị cắn và cơn bão!
+
 ### Lô cốt
 Lô cốt bê tông dọc đường tự xoay súng bắn vào xe. Phá bằng vũ khí hoặc tông có đà để lấy tiền và ngọc.
 
@@ -61,9 +64,9 @@ Quái Vật Ngoài Hành Tinh. Cổng trạm chỉ mở khi trùm gục.
 ### Vật phẩm trên đường
 `$` tiền · `⛽` xăng · `✚` sửa xe · `🛡` lá chắn 6 giây · `🎯` +15 đạn · `⏱` +5 giây & đẩy bão lùi · `👥` nhân bản
 
-### Gara (3 tab: Xe · Vũ khí · Nâng cấp)
+### Gara (xưởng gạch, nút tròn: Nhà · Xe · Vũ khí · Kỹ năng)
 **5 dòng xe, mỗi dòng 5 phiên bản** (25 xe): Xe máy (có sẵn) → Xe hơi (qua ải 5) → Bán tải (qua ải 10)
-→ Bọc thép (qua ải 15) → Xe tăng (qua ải 20). Phiên bản sau khỏe hơn (máu, động cơ, xăng, tên lửa, đạn đều tăng theo xe), giá cao hơn (780$ → 58.500$). Tab **Nâng cấp**: 6 loại x 20 cấp, trả bằng **ngọc đỏ ♦** nhặt trên đường (mỗi cấp đắt hơn 20%).
+→ Bọc thép (qua ải 15) → Xe tăng (qua ải 20). Phiên bản sau khỏe hơn (máu, động cơ, xăng, tên lửa, đạn đều tăng theo xe), giá cao hơn (780$ → 58.500$). Xe mới cần **5 mảnh** tìm được khi **lục soát nhà** rồi trả tiền lắp ráp. **Cây kỹ năng**: 21 nút chỉ số + 6 kỹ năng đặc biệt, mở bằng **ngọc đỏ ♦** (mỗi nút sau đắt hơn 20%). Ngôi sao cấp người chơi tăng theo XP.
 
 **10 vũ khí, mỗi loại nâng 5 cấp:** Súng lục, Dao chém (không tốn đạn), Súng máy, Nỏ, Súng hoa cải,
 Máy ném đá, Súng phun lửa, Tên lửa tự dẫn, Súng laser, Súng nòng xoay. Mỗi vũ khí có sát thương,

@@ -6,6 +6,7 @@ import android.content.Context
 class SaveData(context: Context) {
     companion object {
         const val MAX_RECORDS = 10
+        const val PARTS_NEEDED = 5
     }
 
     private val prefs = context.getSharedPreferences("car_survival_v3", Context.MODE_PRIVATE)
@@ -37,7 +38,15 @@ class SaveData(context: Context) {
 
     /** Red gems for tuning upgrades, and the level of each upgrade. */
     var gems = prefs.getInt("gems", 0)
-    val upgrades = IntArray(Upgrade.entries.size) { prefs.getInt("ug$it", 0) }
+
+    /** Bought skill-tree nodes (bit per [Skills.nodes] id). */
+    var skills = prefs.getInt("skills", 0)
+
+    /** Experience for the player level shown in the garage. */
+    var xp = prefs.getInt("xp", 0)
+
+    /** Parts found for each vehicle (5 needed before it can be built). */
+    val parts = IntArray(Vehicles.all.size) { prefs.getInt("pt$it", 0) }
 
     /** Story pages already shown: bit 0 prologue, 1..4 region chapters, 5 ending. */
     var storySeen = prefs.getInt("story", 0)
@@ -72,7 +81,19 @@ class SaveData(context: Context) {
      */
     private fun migrateGarage() {
         val v = prefs.getInt("garageV", 0)
-        if (v >= 3) return
+        if (v >= 4) return
+        if (v == 3) {
+            // v4.8: the 6 x 20 gem upgrades became the skill tree; give the gems back
+            val e = prefs.edit()
+            for (i in 0 until 6) {
+                val lv = prefs.getInt("ug$i", 0)
+                for (l in 0 until lv) gems += Math.round(5.0 * Math.pow(1.2, l.toDouble())).toInt()
+                e.remove("ug$i")
+            }
+            e.putInt("garageV", 4).apply()
+            save()
+            return
+        }
         // v4.6: the upgrade shop is gone (vehicles carry their own tuning): refund it
         val upBase = intArrayOf(150, 120, 180, 140, 100, 110)
         val e0 = prefs.edit()
@@ -81,7 +102,7 @@ class SaveData(context: Context) {
             for (l in 0 until lv) money += (upBase[i] * (l + 1) * 1.5f).toInt() + 100 * l * l
             e0.remove("up$i")
         }
-        e0.putInt("garageV", 3).apply()
+        e0.putInt("garageV", 4).apply()
         if (v >= 2) {
             save()
             return
@@ -96,11 +117,16 @@ class SaveData(context: Context) {
             for (i in 0..2) if (oldW and (1 shl i) != 0) ownedWeapons = ownedWeapons or (1 shl map[i])
             weapon = map[prefs.getInt("weapon", 0).coerceIn(0, 2)]
         }
-        prefs.edit().putInt("garageV", 3).remove("ownedCars").remove("car").remove("ownedWeapons").remove("weapon").apply()
+        prefs.edit().putInt("garageV", 4).remove("ownedCars").remove("car").remove("ownedWeapons").remove("weapon").apply()
         save()
     }
 
-    fun level(u: Upgrade) = upgrades[u.ordinal]
+    /** The vehicle that looted parts go to: the cheapest unfinished one of an open family. */
+    fun partTarget(): Vehicle? = Vehicles.all
+        .filter { it.id != 0 && !ownsVehicle(it.id) && parts[it.id] < PARTS_NEEDED && classUnlocked(it.cls) }
+        .minByOrNull { it.cost }
+
+    fun hasAllParts(v: Vehicle) = v.id == 0 || parts[v.id] >= PARTS_NEEDED
 
     /** Wipes all progress (sound settings stay) so the player can start over. */
     fun resetAll() {
@@ -117,7 +143,9 @@ class SaveData(context: Context) {
         bestScore = 0
         records.clear()
         gems = 0
-        upgrades.fill(0)
+        skills = 0
+        xp = 0
+        parts.fill(0)
         storySeen = 0
         save()
     }
@@ -149,7 +177,9 @@ class SaveData(context: Context) {
         e.putInt("bestScore", bestScore)
         e.putString("runs", records.joinToString(";") { it.joinToString(",") })
         e.putInt("gems", gems)
-        upgrades.forEachIndexed { i, v -> e.putInt("ug$i", v) }
+        e.putInt("skills", skills)
+        e.putInt("xp", xp)
+        parts.forEachIndexed { i, v -> e.putInt("pt$i", v) }
         e.putInt("story", storySeen)
         e.apply()
     }

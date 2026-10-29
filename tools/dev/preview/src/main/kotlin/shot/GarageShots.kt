@@ -57,22 +57,18 @@ fun garageMain(args: Array<String>) {
         tick(g, 1f)
         tap(g, "garage"); tick(g, 0.5f)
         shotAt(g, "g_${w}_veh_car", w)
-        for (cl in listOf(VehicleClass.MOTO, VehicleClass.ARMORED, VehicleClass.TANK)) {
-            val rc = g.classRect(cl.ordinal)
-            tapAt(g, (rc[0] + rc[2]) / 2, (rc[1] + rc[3]) / 2); tick(g, 0.2f)
-            shotAt(g, "g_${w}_veh_${cl.name.lowercase()}", w)
-            if (w != W) break
-        }
-        val tr = g.garageTabRect(1)
-        tapAt(g, (tr[0] + tr[2]) / 2, (tr[1] + tr[3]) / 2); tick(g, 0.2f)
+        // a locked vehicle with parts found
+        save.parts[12] = 2
+        g.showVeh = 12; tick(g, 0.2f)
+        shotAt(g, "g_${w}_veh_locked", w)
+        fun nav(i: Int) { val r = g.navRect(i); tapAt(g, (r[0] + r[2]) / 2, (r[1] + r[3]) / 2); tick(g, 0.2f) }
+        nav(2)
         shotAt(g, "g_${w}_wpn", w)
-        val rr = g.weaponRect(WeaponType.ROCKET.ordinal)
-        tapAt(g, (rr[0] + rr[2]) / 2, (rr[1] + rr[3]) / 2); tick(g, 0.2f)
-        shotAt(g, "g_${w}_wpn_rocket", w)
-        save.gems = 420; save.upgrades[0] = 12; save.upgrades[3] = 17; save.upgrades[4] = 20; save.upgrades[1] = 3
-        val ur = g.garageTabRect(2)
-        tapAt(g, (ur[0] + ur[2]) / 2, (ur[1] + ur[3]) / 2); tick(g, 0.2f)
-        shotAt(g, "g_${w}_upg", w)
+        save.gems = 420; save.skills = 0b1111 or (1 shl 21)
+        nav(3)
+        shotAt(g, "g_${w}_skills", w)
+        g.skillPage = 1; tick(g, 0.2f)
+        shotAt(g, "g_${w}_skills2", w)
     }
     // vehicles and weapons in action
     val combos = listOf(

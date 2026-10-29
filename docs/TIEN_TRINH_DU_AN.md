@@ -1,6 +1,6 @@
 # TỔNG HỢP TIẾN TRÌNH DỰ ÁN "ĐUA XE SINH TỒN"
 
-Tài liệu bàn giao để tiếp tục làm việc ở phiên chat mới mà không bị thiếu sót. Cập nhật đến phiên bản v4.7 (ngày 28/10/2026).
+Tài liệu bàn giao để tiếp tục làm việc ở phiên chat mới mà không bị thiếu sót. Cập nhật đến phiên bản v4.8 (ngày 29/10/2026).
 
 ## 1. Thông tin chung
 
@@ -12,8 +12,8 @@ Tài liệu bàn giao để tiếp tục làm việc ở phiên chat mới mà k
 | Ngôn ngữ / công nghệ | Kotlin + Canvas (SurfaceView), không engine, không thư viện ngoài, không file ảnh/âm thanh |
 | Repo GitHub | khongvinh/2d-game-car |
 | Nhánh làm việc | claude/2d-driving-game-f0kpjk (chưa có Pull Request, chưa merge) |
-| Commit mới nhất | xem git log nhánh làm việc (v4.7: nâng cấp bằng ngọc đỏ, lô cốt, xóa dữ liệu, cốt truyện) |
-| Phiên bản hiện tại | v4.7 (versionCode 11) |
+| Commit mới nhất | xem git log nhánh làm việc (v4.8: gara kiểu xưởng, cây kỹ năng, mảnh xe, tài xế xuống xe lục soát, ít zombie) |
+| Phiên bản hiện tại | v4.8 (versionCode 12) |
 | Build tự động | GitHub Actions "Build APK" (.github/workflows/android.yml) — đang xanh, xuất artifact DuaXeSinhTon-apk |
 | Khóa ký | app/debug.keystore (cố định, mật khẩu android) nên các bản cài đè lên nhau được |
 
@@ -119,7 +119,7 @@ Tài liệu bàn giao để tiếp tục làm việc ở phiên chat mới mà k
 - Lưu dữ liệu garageV = 3: hoàn tiền mọi cấp nâng cấp đã mua (công thức base x (cấp+1) x 1,5 + 100 x cấp², base 150/120/180/140/100/110) rồi xóa khóa up0..up5.
 - Tiếng động cơ: mẫu lặp 0,4 giây tổng hợp (trục 50 Hz, 2 kỳ nổ mỗi vòng, tiếng rè ống xả, lặp liền không tiếng tách), phát lặp qua SoundPool (Sfx.engine), cao độ theo tốc độ (lên ga khi bay), to theo ga, +to khi bật tên lửa; mỗi dòng xe một giọng (xe máy cao 1,35, xe hơi 1,05, bán tải 0,92, bọc thép 0,8, xe tăng 0,68). Tắt ở menu/tạm dừng/xe nổ và khi ứng dụng xuống nền.
 
-### v4.7 — Nâng cấp bằng ngọc đỏ (20 cấp), lô cốt bắn trả, xóa dữ liệu, âm thanh khi tạm dừng, cốt truyện (hiện tại)
+### v4.7 — Nâng cấp bằng ngọc đỏ (20 cấp), lô cốt bắn trả, xóa dữ liệu, âm thanh khi tạm dừng, cốt truyện
 - Yêu cầu (kèm ảnh menu, màn tạm dừng, tab Nâng cấp cũ của v4.5): nút reset dữ liệu ở màn hình chính; bật/tắt âm thanh trong menu tạm dừng; nâng cấp nhiều mức, trả bằng ngọc đỏ nhặt trên đường (không dùng tiền), "nâng 1 vạch cần 20% ngọc" — hiểu là mỗi cấp đắt hơn cấp trước 20%; lô cốt bắn trả gây mất máu; xây dựng cốt truyện mạt thế zombie sinh tồn trên chiến xa.
 - Ngọc đỏ (ItemType.GEM, vẽ viên ngọc giác cạnh đỏ): mỗi 100m có 1 + ải/6 + (0..1) viên, 40% treo cao 170–290 (phải nhảy); phá lô cốt +3, hạ trùm +10 x cấp. Ngọc nhặt trong lượt (runGems) cộng vào kho khi lượt kết thúc (cả khi chết). HUD hiện "+tiền$ +ngọc♦"; bảng tổng kết có ô ngọc đỏ; menu có chip ♦.
 - Nâng cấp quay lại thành tab NÂNG CẤP trong gara (3 tab), 6 loại x 20 cấp, giá cấp n = round(5 x 1,2^n) ngọc (5, 6, 7, 9 … 160; tổng 934 ngọc/loại). Tác dụng mỗi cấp (cộng thêm vào chỉ số của xe): Động cơ +2,5% tốc độ +3% lực kéo; Bình xăng +5%; Tên lửa +0,15 giây; Giáp & máu +4% máu +1% giáp (tổng tối đa 75%); Đạn +6 viên; Lốp +2% bám. Lưu ở khóa ug0..ug5, gems. Thanh 20 nấc (xanh 1–10, vàng 11–15, đỏ 16–20).
@@ -139,7 +139,19 @@ Tài liệu bàn giao để tiếp tục làm việc ở phiên chat mới mà k
 - Chương 4 — Hành tinh lạ: mưa đỏ là do tàu mẹ ngoài hành tinh gieo xuống để "dọn sạch" Trái Đất; hạ Quái Vật Ngoài Hành Tinh trong tàu mẹ.
 - Kết — Bình minh mới: tàu mẹ nổ, bão tan, người sống sót đón chiến xa; radio lại rè — còn vùng đất chưa giải phóng, gara có Xe Tăng, quay lại đường đua.
 
-## 3. Luật chơi hiện tại (v4.7)
+### v4.8 — Gara kiểu xưởng (như Earn to Die 2), cây kỹ năng, mảnh xe, tài xế xuống xe lục soát & bắn quái, ít zombie (hiện tại)
+- Yêu cầu (kèm 3 ảnh mẫu: gara phòng gạch có nút tròn bên trái, xe "Locked — Find this car by looting buildings (0/5 parts found)", cây kỹ năng chuỗi nút +3/+12/+1 có nhánh lửa x2, thanh cấp ngôi sao + XP): làm các phần tương tự; thêm tài xế xuống xe đi lục đồ và bắn quái; zombie không quá nhiều.
+- Ít zombie: số zombie/vật cản mỗi 100m = min(9, 2 + màn trong ải (0..4) + ải/5) (trước: 3 + màn toàn cục, tối đa 20); quái đi kèm 12% (trước 35%). Ải 4: bot mất 77 máu thay vì 715.
+- Gara (Renderer.garageRoom/garageNav/garageTopBar): phòng tường gạch, ống nước, đèn treo chiếu sáng, cửa cuốn, sàn; 4 nút tròn bên trái (Nhà = menu, Xe, Vũ khí, Kỹ năng); thanh trên: ngôi sao cấp + thanh XP, ngọc ♦ và tiền $.
+  - Tab Xe (showroom): 1 xe lớn giữa phòng, băng tên đen, trạng thái Đang dùng / Đã có / Khóa (xe mờ + ổ khóa), mũi tên ◀ ▶ duyệt 25 xe, 5 chip dòng xe, bảng 9 chỉ số bên phải, nút CHỌN XE / LẮP RÁP giá$ / THIẾU MẢNH x/5 / QUA ẢI n, nút CHẠY!.
+  - Mở xe: cần đủ 5 mảnh (SaveData.parts, khóa pt0..pt24; PARTS_NEEDED = 5) rồi trả tiền lắp ráp (giá cũ). Xe Cub có sẵn; xe đã mua giữ nguyên. Mảnh luôn đi vào xe rẻ nhất chưa đủ mảnh của dòng đã mở (partTarget).
+  - Tab Vũ khí: như cũ, dời sang phải cho vừa thanh nút.
+  - Tab Kỹ năng (Skills.kt): 3 vòng x 7 nút chỉ số (Tên lửa +0,4s, Máu +12, Giáp +2%, Động cơ +4% tốc độ/lực kéo, Xăng +8%, Đạn +12, Lốp +4%; vòng 2 x1,25, vòng 3 x1,5) + 6 nút lửa (kỹ năng): Đạn lửa (+25% sát thương), Thu hoạch (+25% tiền), Nam châm (hút vật phẩm 300), Giáp gai (sức húc x1,5), Tự sửa chữa (+1,5 máu/giây), Lục soát nhanh (nhanh x2, +20% ra mảnh). Mua theo thứ tự; nút lửa mở khi nút cha đã mua. Giá nút thứ n (đếm số nút đã mua) = round(5 x 1,2^n) ngọc, tổng ~3.400 ngọc. Lưu khóa skills (bit). Ngọc đã tiêu cho 6x20 nâng cấp v4.7 được hoàn lại (garageV 4).
+  - Cấp người chơi (Rank): XP mỗi lượt = mét/25 + số quái + 30 x ải nếu tới đích; cấp n cần 60 x n XP; mỗi lần lên cấp +10 ngọc (thành tích "⭐ Lên cấp").
+- Nhà để lục soát (Building, 1 + ải/6 cái mỗi ải, chỗ bằng phẳng, xa lô cốt, không trong hầm/cầu/khu trùm): Nhà dân, Tạp hóa (x1,5 tiền), Trạm xăng (luôn có xăng, có mái bơm), Gara (85% ra mảnh xe), Nhà thuốc (luôn hồi máu). Cửa chưa lục có ánh đèn vàng, đã lục thì cửa bị đạp tung.
+- Tài xế (Driver): dừng xe (< 60) gần nhà chưa lục → nút "XUỐNG XE". Đi bộ bằng ◀ ▶ (240/giây), súng ngắn tự ngắm bắn quái gần nhất trong 700 (1,5 sát thương, 0,32 giây/phát, không tốn đạn), máu 100. Ở cửa nhà: nút "LỤC SOÁT" (2,2 giây, đứng yên; bị cắn thì dừng), gần xe: "LÊN XE". Quái và lô cốt chuyển sang đuổi/bắn tài xế; bão cũng gây sát thương. Tài xế chết → "Tài xế bị quái vật hạ gục!". Chiến lợi phẩm: tiền (40 + 15 x ải) x 0,7..1,3; mảnh xe 50% (gara 85%, +20% kỹ năng); ngọc 3–6 (50%); xăng +35%, máu +30% (và hồi máu tài xế), +20 đạn theo xác suất. Bảng tổng kết có ô "mảnh xe" và thành tích "🔧 Tìm được n mảnh xe".
+
+## 3. Luật chơi hiện tại (v4.8)
 
 ### Điều khiển
 | Nút | Tác dụng |
@@ -192,7 +204,7 @@ Tài liệu bàn giao để tiếp tục làm việc ở phiên chat mới mà k
 | Đạn dược | 100 | 20 + 20 viên/cấp |
 | Lốp xe | 110 | Độ bám 1,0 + 0,15/cấp |
 
-### Gara (mở từ đầu, 3 tab Xe / Vũ khí / Nâng cấp bằng ngọc đỏ) — 5 dòng xe x 5 phiên bản, giá đã +30%
+### Gara (v4.8: phòng xưởng, nút tròn Nhà/Xe/Vũ khí/Kỹ năng; xe mở bằng 5 mảnh + tiền; cây kỹ năng bằng ngọc đỏ) — 5 dòng xe x 5 phiên bản, giá đã +30%
 - Dòng xe mở khóa theo ải đã vượt: Xe máy (có sẵn), Xe hơi (qua ải 5), Bán tải (qua ải 10), Bọc thép (qua ải 15), Xe tăng (qua ải 20).
 - Chỉ số gốc của dòng (máu / tốc độ / lực kéo / giáp / xăng / bám / sức húc): Xe máy 0,75/1,04/0,95/0%/0,85/1,05/0,6; Xe hơi 1,0/1,10/1,05/5%/1,0/1,0/0,9; Bán tải 1,3/1,02/1,15/10%/1,2/1,08/1,15; Bọc thép 1,8/1,0/1,3/22%/1,3/1,1/1,45; Xe tăng 2,4/0,96/1,5/32%/1,45/1,25/2,0.
 - Phiên bản k (0..4): máu +10%·k, tốc độ +3%·k, lực kéo +5%·k, giáp +2,5%·k, xăng +6%·k, bám +3%·k, sức húc +10%·k.
@@ -238,6 +250,7 @@ Vũ khí (10 loại, mỗi loại nâng 5 cấp: +18% sát thương, -6% thời 
 | Themes.kt | 4 vùng (Region) và 20 bản đồ (MapTheme): tên, màu trời/núi/đất/cỏ, kiểu đường chân trời |
 | Renderer.kt | Vẽ toàn bộ: nền theo bản đồ (trời/núi/thành phố/núi lửa/lâu đài/tháp ngoài hành tinh), màn chọn bản đồ, quái theo vùng, 4 kiểu trùm, địa hình, xe, zombie, trùm + đá ném + cổng trạm, vật cản + thanh độ bền, bão, HUD (cả thanh máu trùm), menu, cửa hàng, gara, bảng tổng kết |
 | Garage.kt | 5 dòng xe x 5 phiên bản (Vehicles), 10 vũ khí (WeaponType) + chỉ số theo cấp, giá +30% |
+| Skills.kt | Cây kỹ năng (SkillStat, Perk, SkillNode, Skills) và cấp người chơi (Rank) |
 | Story.kt | Cốt truyện: lời mở đầu, 4 chương theo vùng, kết thúc; trang đã mở |
 | CarArt.kt | Vẽ 25 xe (có người lái xe máy, xích xe tăng) và 10 vũ khí, dùng cho trận đấu và gara |
 | Entities.kt | Kiểu dữ liệu: State, Upgrade, ItemType, Zombie, Obstacle, Boss, BossRock, Debris, Projectile, Particle, FloatText, Car... |
@@ -306,7 +319,7 @@ cd tools/dev/preview && gradle boss      # thử đánh trùm ải 5 và ải 20
 
 | Phiên | Tiêu đề | Phạm vi |
 |---|---|---|
-| #1 | Đua Xe Sinh Tồn #1 — v1.0→v4.7: tạo game, kiểu Earn to Die, bão 3 bo, nhạc, trùm cuối, 20 bản đồ, gara 25 xe, 20 kiểu đường, giao diện thép, tiếng động cơ, ngọc đỏ, lô cốt, cốt truyện | Từ đầu đến v4.7 + tài liệu bàn giao, công cụ tools/dev, quy tắc CLAUDE.md |
+| #1 | Đua Xe Sinh Tồn #1 — v1.0→v4.8: tạo game, kiểu Earn to Die, bão 3 bo, nhạc, trùm cuối, 20 bản đồ, gara 25 xe, 20 kiểu đường, giao diện thép, tiếng động cơ, ngọc đỏ, lô cốt, cốt truyện, cây kỹ năng, tài xế lục soát | Từ đầu đến v4.8 + tài liệu bàn giao, công cụ tools/dev, quy tắc CLAUDE.md |
 
 - Quy tắc làm việc (đặt tiêu đề phiên, tự lưu tiến trình khi ngữ cảnh ≥ 90% rồi nhắc mở chat mới) nằm trong CLAUDE.md ở gốc repo.
 
