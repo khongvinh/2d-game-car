@@ -1,6 +1,6 @@
 # TỔNG HỢP TIẾN TRÌNH DỰ ÁN "ĐUA XE SINH TỒN"
 
-Tài liệu bàn giao để tiếp tục làm việc ở phiên chat mới mà không bị thiếu sót. Cập nhật đến phiên bản v5.0 (ngày 29/10/2026).
+Tài liệu bàn giao để tiếp tục làm việc ở phiên chat mới mà không bị thiếu sót. Cập nhật đến phiên bản v5.1 (ngày 29/10/2026).
 
 ## 1. Thông tin chung
 
@@ -12,8 +12,8 @@ Tài liệu bàn giao để tiếp tục làm việc ở phiên chat mới mà k
 | Ngôn ngữ / công nghệ | Kotlin + Canvas (SurfaceView), không engine, không thư viện ngoài, không file ảnh/âm thanh |
 | Repo GitHub | khongvinh/2d-game-car |
 | Nhánh làm việc | claude/2d-driving-game-f0kpjk (chưa có Pull Request, chưa merge) |
-| Commit mới nhất | xem git log nhánh làm việc (v5.0: đi bộ không giới hạn + nhảy, động cơ to hơn nhạc, đổi vị trí phím) |
-| Phiên bản hiện tại | v5.0 (versionCode 14) |
+| Commit mới nhất | xem git log nhánh làm việc (v5.1: lá chắn khi đi bộ, HUD theo tài xế, 3 thanh âm lượng, vào nhà đánh zombie, kho vũ khí phụ) |
+| Phiên bản hiện tại | v5.1 (versionCode 15) |
 | Build tự động | GitHub Actions "Build APK" (.github/workflows/android.yml) — đang xanh, xuất artifact DuaXeSinhTon-apk |
 | Khóa ký | app/debug.keystore (cố định, mật khẩu android) nên các bản cài đè lên nhau được |
 
@@ -160,14 +160,36 @@ Tài liệu bàn giao để tiếp tục làm việc ở phiên chat mới mà k
 - Xe bị phá hủy (hoặc cháy trong bão): nổ "BÙMMM!", tài xế "NHẢY KHỎI XE!" chạy tiếp bằng súng lục, không lên lại được xác xe. Xe lật quá 3 giây: tài xế bò ra; lên lại thì tài xế lật xe đứng lại. Tài xế chết: ngã xuống, 1,6 giây sau ra bảng tổng kết ("Tài xế bị quái vật hạ gục!" / "bị vòng bo nuốt chửng!").
 - Tài xế đi bộ bị vật cản chặn đường; khi không có quái gần, súng lục bắn vật cản / lô cốt phía trước (520) hoặc trùm (900). Trùm chuyển sang đánh tài xế: lại gần, ném đá/cầu lửa/plasma vào tài xế (12 + 3 x cấp), vả khi sát (14 + 4 x cấp mỗi giây).
 
-### v5.0 — Đi bộ không giới hạn + nhảy, tiếng động cơ to hơn nhạc, đổi vị trí phím (hiện tại)
+### v5.0 — Đi bộ không giới hạn + nhảy, tiếng động cơ to hơn nhạc, đổi vị trí phím
 - Yêu cầu (kèm ảnh tài xế đi bộ vẫn hiện "HẾT XĂNG!"): đi bộ vẫn báo hết xăng; đi một lúc không cho đi tiếp; nhạc/tiếng game lớn hơn tiếng động cơ; khi đi bộ cho di chuyển/nhảy; thêm tính năng đổi vị trí phím di chuyển/ga/phanh/lật ở màn hình chính và menu khi chơi.
 - Bỏ giới hạn tài xế cách xe -900..+1400 (nguyên nhân "không cho đi nữa"); cảnh báo HẾT XĂNG chỉ hiện khi đang ngồi xe.
 - Âm lượng: nhạc nền khi đang chạy 0,4 (trước 1,0); động cơ 0,45 + 0,4 x ga (+0,1 tên lửa) (trước 0,14 + 0,2 x ga).
 - Đi bộ: nút NHẢY (ô tên lửa) bật -620, rơi theo trọng lực; đứng được trên nóc thùng/xác xe/lô cốt; vật cản chỉ chặn khi chân thấp hơn nóc (nhảy qua được). Rời xe có cú nhảy nhỏ.
 - Đổi vị trí phím (State.LAYOUT): nút "🎮 PHÍM" ở màn hình chính và "🎮 ĐỔI VỊ TRÍ PHÍM" trong menu tạm dừng; kéo 6 ô (PHANH, ↺/◀, ↻/▶, 🚀/NHẢY, GA/LỤC, XUỐNG XE) tới chỗ mới; MẶC ĐỊNH / XONG. Lưu tâm ô theo phần nghìn màn hình ở khóa cx0..cx5, cy0..cy5 (-1 = chỗ mặc định); ô dùng chung cho lúc lái xe và lúc đi bộ.
 
-## 3. Luật chơi hiện tại (v5.0)
+### v5.1 — Lá chắn khi đi bộ, bão khi đi bộ, 3 thanh âm lượng, vào nhà đánh zombie, kho vũ khí phụ (hiện tại)
+- Yêu cầu: (1) đi bộ nhặt lá chắn không có tác dụng; (2) bão chạy qua lúc đi bộ mà không mất máu, tới vạch đích mới chết; (3) nhạc và hiệu ứng vẫn to hơn động cơ → thanh kéo chỉnh riêng 3 loại âm thanh; (4) lục soát nhà: thay vì đứng ở cửa thì vào một map riêng trong nhà, nhận vật phẩm và đánh zombie bằng vũ khí phụ; làm kho vũ khí phụ (súng lục, cung tên, giáo, phi tiêu…).
+- Lá chắn / sửa xe / nhân bản khi đi bộ: tác dụng lên tài xế (Driver.shieldT, cloneT). Lá chắn 6 giây chặn mọi sát thương trừ bão, quái chạm vào bị hất văng và mất 1,5 máu (dơi nổ); có bong bóng xanh quanh tài xế và 🛡 trên HUD. Sửa xe khi đi bộ hồi 40% máu tài xế. Nhân bản: tài xế gục thì sống lại 60% máu (gục vì bão thì được đặt lên trước bão 600).
+- Bão khi đi bộ: thực ra tài xế vẫn mất máu, nhưng HUD (thanh máu, "Bão cách …m", quãng đường, màn, chấm tiến độ) đều tính theo CHIẾC XE bỏ lại nên người chơi tưởng không mất máu. Nay HUD theo tài xế khi đi bộ (Game.playerX; thanh máu ♥ màu xanh dương là máu tài xế, ẩn đồng hồ tốc độ), màn hình chớp tím + hạt tím khi ở trong bão, cảnh báo "⚠ ĐANG Ở TRONG BÃO!".
+- Âm thanh: State.SOUND "ÂM THANH" với 3 thanh kéo 0–100% (Nhạc nền, Hiệu ứng, Động cơ xe); mở bằng nút "🔊 ÂM THANH" ở màn hình chính (thay 2 nút 🔊 🎵 cũ) và "🔊 CHỈNH ÂM THANH" trong menu tạm dừng (thay 2 nút bật/tắt). Thả thanh Hiệu ứng phát tiếng xu để nghe thử; giữ thanh Động cơ thì nghe tiếng máy. Mặc định nhạc 50, hiệu ứng 65, động cơ 100 (bản cũ đã tắt thì về 0). Lưu khóa volMusic, volSfx, volEngine; Sfx.fxVol, Sfx.engineMaster, Music.master.
+- Vào nhà (Interior.kt): đến cửa nhà chưa lục bấm "VÀO NHÀ" → màn trong nhà riêng: 2–4 phòng (rộng 900, trần 560) tùy loại nhà, tên phòng (phòng khách, bếp, kho hàng, xưởng sửa…), tường giấy dán/gạch men/gạch, cửa sổ đóng ván nhìn ra ngoài, đèn treo nhấp nháy, cửa "LỐI RA". Đồ đạc (bàn, kệ, sofa, quầy, cầu nâng xe, tủ lạnh, giường) đứng lên được (nhảy lên từ dưới). Rương: mỗi phòng 1 (tủ, thùng, hộp đồ nghề, tủ lạnh, tủ thuốc, két sắt) + 1 trên nóc kệ (phải nhảy). Bấm "LỤC" 1,1 giây (kỹ năng lục soát nhanh x2), bị cắn thì phải lục lại. Zombie trong nhà min(9, 1 + số phòng + ải/4) theo vùng (không có dơi), ngủ đến khi tài xế cách 650, cắn 7 + 0,6 x ải máu/giây; mở rương 45% có zombie phục kích (tối đa 1 + ải/6 lần).
+- Đồ trong rương: tiền (25 + 10 x ải) x 0,7..1,3 (tạp hóa x1,5, két x3); mảnh xe 22% (gara 45%, hộp đồ nghề +20%, kỹ năng +15%); ngọc 35% 2–4 (két luôn 4–8); xăng (trạm xăng rương đầu, còn lại 15%); máu (tủ lạnh/tủ thuốc, nhà thuốc rương đầu, còn lại 15%; hồi tài xế 40% hoặc đầy + xe 15/30%); +15 đạn 25%; 6% (két 25%) nhặt được vũ khí phụ chưa có. Lục sạch +2♦, nhà thành "đã lục"; ra ngoài sớm thì vào lại tiếp được (biển "RƯƠNG x/y" trên nhà).
+- Khi ở trong nhà: ngoài đường đứng yên trừ bão; bão tràn qua nhà thì trong nhà có màu tím và tài xế mất 45 máu/giây ("⚠ BÃO TRÀN VÀO NHÀ! RA NGOÀI CHẠY!"); xe đậu ngoài bị bão đốt cháy hỏng. HUD trên: "🏠 TÊN NHÀ — TÊN PHÒNG • RƯƠNG x/y • 🧟 n".
+- Kho vũ khí phụ (SideWeapons.kt, tab thứ 5 trong gara — nút tròn hình cung + giáo): mua bằng tiền, trang bị 1 món, dùng khi đi bộ ngoài đường và trong nhà, tự nhắm, không tốn đạn. Lưu khóa ownedSide (bit), side.
+
+| Vũ khí phụ | Mở ở ải | Giá | Sát thương | Nạp (giây) | Tầm | Đặc biệt |
+|---|---|---|---|---|---|---|
+| Súng lục | có sẵn | 0 | 1,5 | 0,32 | 700 | — |
+| Phi tiêu | có sẵn | 520 | 1,1 | 0,17 | 560 | Bay cong (trọng lực 520) |
+| Giáo | 1 | 1100 | 3,4 | 0,5 | 175 | Cận chiến, trúng mọi con trong tầm, đẩy lùi |
+| Cung tên | 2 | 1600 | 3,6 | 0,62 | 950 | Bay cong, xuyên 2 |
+| Rìu chiến | 4 | 2900 | 6,5 | 0,72 | 125 | Cận chiến, hất văng mạnh |
+| Súng săn | 6 | 4500 | 1,15 x 5 | 0,8 | 460 | Chùm 5 viên |
+| Tiểu liên | 9 | 7800 | 1,0 | 0,1 | 700 | — |
+
+- Kiểm tra (tools/dev/preview `gradle inside`): bot vào nhà ở ải 1/7/12/18, mở hết 3–4 rương (cả rương trên kệ), hạ 4–10 zombie, ra ngoài, nhà thành đã lục; `gradle walk`: tài xế đứng yên bị bão nuốt sau ~12 giây; `gradle drive` ải 5/10/20 vẫn tới đích.
+
+## 3. Luật chơi hiện tại (v5.1)
 
 ### Điều khiển
 | Nút | Tác dụng |
@@ -178,6 +200,7 @@ Tài liệu bàn giao để tiếp tục làm việc ở phiên chat mới mà k
 | 🚀 | Tên lửa đẩy, có bình riêng |
 | Vũ khí trên nóc | Tự bắn zombie/vật cản phía trước khi còn đạn |
 | II (phải trên) | Tạm dừng; nút Back cũng tạm dừng |
+| XUỐNG XE | Khi xe chạy dưới 80; đi bộ bằng ◀ ▶, ô 🚀 thành NHẢY, ô GA thành VÀO NHÀ / LỤC / RA NGOÀI / LÊN XE; vũ khí phụ tự đánh |
 
 ### Vòng chơi
 - Mỗi lần chạy là một ngày. Ván kết thúc khi: hết xăng và đứng yên 2 giây, xe bị phá hủy (nổ), lật/kẹt quá 3 giây, rơi khỏi đường, bị bão nuốt, hoặc bỏ cuộc.
@@ -270,6 +293,8 @@ Vũ khí (10 loại, mỗi loại nâng 5 cấp: +18% sát thương, -6% thời 
 | Story.kt | Cốt truyện: lời mở đầu, 4 chương theo vùng, kết thúc; trang đã mở |
 | CarArt.kt | Vẽ 25 xe (có người lái xe máy, xích xe tăng) và 10 vũ khí, dùng cho trận đấu và gara |
 | Entities.kt | Kiểu dữ liệu: State, Upgrade, ItemType, Zombie, Obstacle, Boss, BossRock, Debris, Projectile, Particle, FloatText, Car... |
+| Interior.kt | Màn trong nhà: phòng, đồ đạc đứng lên được (Platform), rương (Chest), zombie trong nhà, đạn vũ khí phụ trong nhà |
+| SideWeapons.kt | 7 vũ khí phụ của tài xế (SideWeapon): giá, ải mở, sát thương, tốc độ, tầm, cận chiến/bay cong |
 | Sfx.kt | Hiệu ứng âm thanh tổng hợp ra WAV (cache theo phiên bản), phát bằng SoundPool khi đã nạp xong, có ưu tiên và giãn cách |
 | Music.kt | 3 bài nhạc tổng hợp (chill 90 BPM La thứ, kịch tính 140 BPM Rê thứ, chiến thắng Đô trưởng), phát bằng AudioTrack có vòng lặp, chuyển bài mượt |
 | SaveData.kt | SharedPreferences "car_survival_v3": tiền, ngày, ải đã vượt, ải chọn, kỷ lục từng ải, nâng cấp, xe/vũ khí sở hữu, âm thanh, nhạc, điểm cao nhất |
@@ -299,6 +324,8 @@ cd tools/dev/preview && gradle shots     # chụp ảnh màn hình + xuất nh�
 cd tools/dev/preview && gradle sim       # mô phỏng vật lý trên các ải
 cd tools/dev/preview && gradle ram       # thử tông xác xe 4 lần
 cd tools/dev/preview && gradle boss      # thử đánh trùm ải 5 và ải 20
+cd tools/dev/preview && gradle inside    # vào nhà ở 4 ải, lục rương, đánh zombie + ảnh màn âm thanh, tab vũ khí phụ
+cd tools/dev/preview && gradle walk      # tài xế đứng yên khi bão đi qua (WALK=1: vừa đi vừa chạy bão)
 ```
 - tools/dev/preview chạy chính mã game trên JVM với lớp giả lập android.graphics/media/content bằng Java2D (emoji hiện ô vuông, trên điện thoại hiện bình thường).
 - Sign.java: đóng gói lại APK (resources.arsc không nén, căn lề 4 byte), thêm classes.dex, ký v2/v3 bằng app/debug.keystore.
@@ -335,6 +362,7 @@ cd tools/dev/preview && gradle boss      # thử đánh trùm ải 5 và ải 20
 
 | Phiên | Tiêu đề | Phạm vi |
 |---|---|---|
+| #2 | Đua Xe Sinh Tồn #2 — v5.0→v5.1: lá chắn đi bộ, bão khi đi bộ, thanh âm lượng, map trong nhà + vũ khí phụ | v5.1 + bài thử preview `inside`, `walk` |
 | #1 | Đua Xe Sinh Tồn #1 — v1.0→v5.0: tạo game, kiểu Earn to Die, bão 3 bo, nhạc, trùm cuối, 20 bản đồ, gara 25 xe, 20 kiểu đường, giao diện thép, tiếng động cơ, ngọc đỏ, lô cốt, cốt truyện, cây kỹ năng, tài xế lục soát, xe nổ tài xế chạy tiếp, nhảy, đổi vị trí phím | Từ đầu đến v5.0 + tài liệu bàn giao, công cụ tools/dev, quy tắc CLAUDE.md |
 
 - Quy tắc làm việc (đặt tiêu đề phiên, tự lưu tiến trình khi ngữ cảnh ≥ 90% rồi nhắc mở chat mới) nằm trong CLAUDE.md ở gốc repo.

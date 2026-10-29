@@ -15,3 +15,5 @@ tasks.register<JavaExec>("themes") { classpath = sourceSets["main"].runtimeClass
 tasks.register<JavaExec>("garage") { classpath = sourceSets["main"].runtimeClasspath; mainClass.set("shot.GarageRunKt"); jvmArgs("-Djava.awt.headless=true"); args(outDir) }
 tasks.register<JavaExec>("roads") { classpath = sourceSets["main"].runtimeClasspath; mainClass.set("shot.RoadRunKt"); jvmArgs("-Djava.awt.headless=true"); args(outDir) }
 tasks.register<JavaExec>("drive") { classpath = sourceSets["main"].runtimeClasspath; mainClass.set("shot.DriveRunKt"); jvmArgs("-Djava.awt.headless=true"); args((project.findProperty("st") ?: "").toString().split(" ").filter { it.isNotEmpty() }) }
+tasks.register<JavaExec>("walk") { classpath = sourceSets["main"].runtimeClasspath; mainClass.set("shot.WalkTestKt"); jvmArgs("-Djava.awt.headless=true") }
+tasks.register<JavaExec>("inside") { classpath = sourceSets["main"].runtimeClasspath; mainClass.set("shot.InsideTestKt"); jvmArgs("-Djava.awt.headless=true") }

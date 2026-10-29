@@ -2,7 +2,7 @@ package com.khongvinh.carsurvival
 
 import kotlin.math.min
 
-enum class State { MENU, MAPS, GARAGE, STORY, LAYOUT, PLAYING, PAUSED, RESULT, STAGE_DONE, VICTORY }
+enum class State { MENU, MAPS, GARAGE, STORY, LAYOUT, SOUND, PLAYING, PAUSED, RESULT, STAGE_DONE, VICTORY }
 
 enum class ItemType(val icon: String, val color: Int) {
     COIN("$", 0xFFFFC107.toInt()),
@@ -149,6 +149,10 @@ class Projectile(
     var life = 1.4f
     var age = 0f
     val hit = HashSet<Any>()
+
+    /** Thrown / fired by the driver's hand weapon (drawn differently, may drop). */
+    var side: SideWeapon? = null
+    var grav = 0f
 }
 
 /** Laser beam drawn for a moment after it fires. */
@@ -294,6 +298,9 @@ class Building(val x: Float, val kind: Int) {
     /** Seconds of searching done (the driver must stay at the door). */
     var lootT = 0f
 
+    /** The rooms inside, made on the first visit and kept if the driver leaves early. */
+    var interior: Interior? = null
+
     companion object {
         val NAMES = arrayOf("NHÀ DÂN", "TẠP HÓA", "TRẠM XĂNG", "GARA", "NHÀ THUỐC")
         const val W = 280f
@@ -318,4 +325,11 @@ class Driver {
     var air = 0f
     var vy = 0f
     var looting: Building? = null
+
+    /** Bubble from a shield pickup, a spare life from a clone pickup. */
+    var shieldT = 0f
+    var cloneT = 0f
+
+    /** Melee swing animation. */
+    var atkT = 0f
 }

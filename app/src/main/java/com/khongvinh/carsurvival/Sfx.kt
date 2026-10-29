@@ -39,6 +39,13 @@ class Sfx(context: Context) {
     @Volatile
     var enabled = true
 
+    /** Slider volumes (0..1) for the effects and for the engine loop. */
+    @Volatile
+    var fxVol = 1f
+
+    @Volatile
+    var engineMaster = 1f
+
     /** Released once every effect has been generated and handed to SoundPool. */
     val ready = CountDownLatch(1)
 
@@ -66,8 +73,9 @@ class Sfx(context: Context) {
         }.apply { priority = Thread.NORM_PRIORITY + 1 }.start()
     }
 
-    fun play(s: S, volume: Float = 1f) {
-        if (!enabled) return
+    fun play(s: S, volume0: Float = 1f) {
+        val volume = (volume0 * fxVol).coerceIn(0f, 1f)
+        if (!enabled || volume <= 0.005f) return
         val i = s.ordinal
         val id = ids[i]
         if (id == 0) return
@@ -95,7 +103,7 @@ class Sfx(context: Context) {
      * [on] = false to silence it (menus, pause, wreck).
      */
     fun engine(on: Boolean, rate: Float = 1f, volume: Float = 0.3f) {
-        if (!on || !enabled) {
+        if (!on || !enabled || engineMaster <= 0.005f) {
             stopEngine()
             return
         }
@@ -103,7 +111,7 @@ class Sfx(context: Context) {
         val id = ids[i]
         if (id == 0 || !(loaded[i] || loadedIds.contains(id))) return
         val r = rate.coerceIn(0.5f, 2f)
-        val v = volume.coerceIn(0f, 1f)
+        val v = (volume * engineMaster).coerceIn(0f, 1f)
         if (engineStream == 0) {
             engineStream = pool.play(id, v, v, 3, -1, r)
             engineRate = r

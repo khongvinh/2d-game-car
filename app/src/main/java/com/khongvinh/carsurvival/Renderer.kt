@@ -40,19 +40,25 @@ class Renderer(private val g: Game) {
 
     fun render(c: Canvas) {
         art.time = g.anim
-        drawBackground(c)
-        drawWorld(c)
-        drawAtmosphere(c)
-        fill.alpha = 255 // a paint's alpha also fades its shader
-        fill.shader = vignette
-        c.drawRect(0f, 0f, g.W, g.H, fill)
-        fill.shader = null
+        val inn = g.interior
+        if (inn != null && g.state != State.MENU && g.state != State.MAPS && g.state != State.GARAGE && g.state != State.STORY) {
+            drawInterior(c, inn)
+        } else {
+            drawBackground(c)
+            drawWorld(c)
+            drawAtmosphere(c)
+            fill.alpha = 255 // a paint's alpha also fades its shader
+            fill.shader = vignette
+            c.drawRect(0f, 0f, g.W, g.H, fill)
+            fill.shader = null
+        }
         when (g.state) {
             State.MENU -> drawMenu(c)
             State.MAPS -> drawMaps(c)
             State.GARAGE -> drawGarage(c)
             State.STORY -> drawStory(c)
             State.LAYOUT -> drawLayout(c)
+            State.SOUND -> drawSound(c)
             State.PLAYING, State.PAUSED -> {
                 drawDamageOverlay(c)
                 drawHud(c)
@@ -1143,7 +1149,8 @@ class Renderer(private val g: Game) {
     // ------------------------------------------------------------- zombies
 
     private fun drawZombie(c: Canvas, z: Zombie) {
-        val dir = sign(g.car.x - z.x).let { if (it == 0f) -1f else it }
+        val px = if (g.driver.out) g.driver.x else g.car.x
+        val dir = sign(px - z.x).let { if (it == 0f) -1f else it }
         c.save()
         c.translate(z.x, z.y)
         when (z.type) {
@@ -1436,13 +1443,13 @@ class Renderer(private val g: Game) {
         text.textAlign = Paint.Align.CENTER
         text.color = if (b.looted) 0xFF9E9E9E.toInt() else 0xFFFFE082.toInt()
         fitText(c, Building.NAMES[b.kind], b.x, top + 44f, 22f, 140f)
-        // search progress
-        if (g.driver.looting === b) {
-            val f = (b.lootT / Game.LOOT_TIME).coerceIn(0f, 1f)
+        // chests searched so far, once the driver has been in
+        val inn = b.interior
+        if (inn != null && !b.looted) {
             fill.color = 0xCC000000.toInt()
-            c.drawRoundRect(b.x - 70f, dt - 40f, b.x + 70f, dt - 16f, 8f, 8f, fill)
-            fill.color = 0xFFFFC107.toInt()
-            c.drawRoundRect(b.x - 66f, dt - 36f, b.x - 66f + 132f * f, dt - 20f, 6f, 6f, fill)
+            c.drawRoundRect(b.x - 70f, dt - 44f, b.x + 70f, dt - 12f, 8f, 8f, fill)
+            text.color = 0xFFFFC107.toInt()
+            fitText(c, "RƯƠNG ${inn.chests.count { it.opened }}/${inn.chests.size}", b.x, dt - 20f, 20f, 130f)
         }
     }
 
@@ -1491,17 +1498,40 @@ class Renderer(private val g: Game) {
         fill.color = 0xFFB71C1C.toInt()
         c.drawRect(x - 12f, y - 94f, x + 11f, y - 85f, fill)
         c.drawRect(x + (if (f > 0f) 4f else -18f), y - 88f, x + (if (f > 0f) 18f else -4f), y - 84f, fill)
-        // arm and pistol along the aim
+        // arm and hand weapon along the aim (melee weapons swing)
+        val w = g.save.sideWeapon
         c.save()
         c.translate(x, y - 60f)
-        c.rotate(d.aim * 180f / PI.toFloat())
+        var rot = d.aim * 180f / PI.toFloat()
+        if (w.melee && d.atkT > 0f) {
+            val t = d.atkT / 0.25f
+            rot += if (w == SideWeapon.AXE) (t - 0.5f) * -140f * f else 0f
+            if (w == SideWeapon.SPEAR) c.translate(cos(d.aim) * 30f * sin(t * PI.toFloat()), sin(d.aim) * 30f * sin(t * PI.toFloat()))
+        }
+        c.rotate(rot)
         stroke.color = jacket
         stroke.strokeWidth = 8f
         c.drawLine(0f, 0f, 22f, 0f, stroke)
-        fill.color = 0xFF263238.toInt()
-        c.drawRect(20f, -6f, 38f, 0f, fill)
-        c.drawRect(20f, 0f, 26f, 8f, fill)
+        c.translate(22f, 0f)
+        if (abs(rot % 360f) > 90f && abs(rot % 360f) < 270f) c.scale(1f, -1f)
+        handWeapon(c, w, 1f)
         c.restore()
+        // shield bubble / clone glow
+        if (d.shieldT > 0f) {
+            val pulse = 0.5f + 0.5f * sin(g.anim * 8f)
+            fill.color = 0x3382B1FF
+            c.drawCircle(x, y - 50f, 72f, fill)
+            stroke.color = 0xFF82B1FF.toInt()
+            stroke.strokeWidth = 4f
+            stroke.alpha = if (d.shieldT < 1.5f && (g.anim * 10f).toInt() % 2 == 0) 80 else (170 + 80 * pulse).toInt()
+            c.drawCircle(x, y - 50f, 72f, stroke)
+            stroke.alpha = 255
+        }
+        if (d.cloneT > 0f) {
+            stroke.color = 0xAA64FFDA.toInt()
+            stroke.strokeWidth = 3f
+            c.drawOval(x - 30f, y - 10f, x + 30f, y + 6f, stroke)
+        }
         // health
         val hf = (d.hp / d.maxHp).coerceIn(0f, 1f)
         fill.color = 0xCC000000.toInt()
@@ -1836,6 +1866,10 @@ class Renderer(private val g: Game) {
 
     private fun drawShots(c: Canvas) {
         for (s in g.shots) {
+            if (s.side != null) {
+                sideShot(c, s)
+                continue
+            }
             val l = hypot(s.vx, s.vy).coerceAtLeast(1f)
             val ux = s.vx / l
             val uy = s.vy / l
@@ -1994,8 +2028,10 @@ class Renderer(private val g: Game) {
 
         // left: health, fuel, boost, ammo
         glassPanel(c, 12f, 12f, 330f, 176f)
-        val hpF = car.hp / car.maxHp
-        bar(c, 22f, 22f, 270f, hpF, if (hpF > 0.3f) 0xFF43A047.toInt() else 0xFFE53935.toInt(), "✚")
+        val d = g.driver
+        // on foot the health bar is the driver's own
+        val hpF = if (d.out) d.hp / d.maxHp else car.hp / car.maxHp
+        bar(c, 22f, 22f, 270f, hpF, if (d.out) (if (hpF > 0.3f) 0xFF29B6F6.toInt() else 0xFFE53935.toInt()) else if (hpF > 0.3f) 0xFF43A047.toInt() else 0xFFE53935.toInt(), if (d.out) "♥" else "✚")
         val fuelLow = car.fuel / car.maxFuel < 0.2f && (g.anim * 4f).toInt() % 2 == 0
         bar(c, 22f, 58f, 270f, car.fuel / car.maxFuel, if (fuelLow) 0xFFFF5252.toInt() else 0xFFFF9800.toInt(), "⛽")
         bar(c, 22f, 94f, 270f, car.boost / car.maxBoost, 0xFF29B6F6.toInt(), "🚀")
@@ -2004,14 +2040,16 @@ class Renderer(private val g: Game) {
         text.color = Color.WHITE
         c.drawText("${g.weapon.icon} ${if (g.weapon == WeaponType.KNIFE) "∞" else car.ammo.toInt().toString()}", 26f, 158f, text)
         var sx = 150f
-        if (car.shieldT > 0f) {
+        val shieldT = if (d.out) d.shieldT else car.shieldT
+        val cloneT = if (d.out) d.cloneT else car.cloneT
+        if (shieldT > 0f) {
             text.color = 0xFF82B1FF.toInt()
-            c.drawText("🛡${car.shieldT.toInt() + 1}", sx, 158f, text)
+            c.drawText("🛡${shieldT.toInt() + 1}", sx, 158f, text)
             sx += 80f
         }
-        if (car.cloneT > 0f) {
+        if (cloneT > 0f) {
             text.color = 0xFF64FFDA.toInt()
-            c.drawText("👥${car.cloneT.toInt() + 1}", sx, 158f, text)
+            c.drawText("👥${cloneT.toInt() + 1}", sx, 158f, text)
         }
         text.textAlign = Paint.Align.CENTER
 
@@ -2053,7 +2091,9 @@ class Renderer(private val g: Game) {
         text.textSize = 30f
         c.drawText("🏁", pr + 30f, py + 10f, text)
         text.color = Color.WHITE
-        fitText(c, "${g.distanceM.toInt()}m / ${g.goalM.toInt()}m  •  ẢI ${g.stage} — MÀN ${g.levelInStage}/${Game.LEVELS_PER_STAGE}  •  NGÀY ${g.save.day}", W / 2 + 17f, py + 44f, 24f, pr - pl + 70f)
+        val inn = g.interior
+        if (inn != null) fitText(c, "🏠 ${Building.NAMES[inn.b.kind]} — ${inn.roomName(d.x)}  •  RƯƠNG ${inn.chests.count { it.opened }}/${inn.chests.size}  •  🧟 ${inn.zombiesLeft}", W / 2 + 17f, py + 44f, 24f, pr - pl + 70f)
+        else fitText(c, "${g.distanceM.toInt()}m / ${g.goalM.toInt()}m  •  ẢI ${g.stage} — MÀN ${g.levelInStage}/${Game.LEVELS_PER_STAGE}  •  NGÀY ${g.save.day}", W / 2 + 17f, py + 44f, 24f, pr - pl + 70f)
 
         val closed = g.phase >= Game.PHASE_TIME.size
         val secs = ceil(g.phaseLeft).toInt()
@@ -2062,7 +2102,7 @@ class Renderer(private val g: Game) {
             g.phase == 2 -> "BO 3: $secs"
             else -> "BO ${g.phase + 1}  ${secs / 60}:${(secs % 60).toString().padStart(2, '0')}"
         }
-        val gap = ((car.x - Car.HALF_LEN - g.stormX) / Game.METER).toInt()
+        val gap = ((g.playerX - (if (d.out) 0f else Car.HALF_LEN) - g.stormX) / Game.METER).toInt()
         text.color = if (closed || g.phase == 2) 0xFFFF5252.toInt() else 0xFFEA80FC.toInt()
         fitText(c, "🌪 $timer   •   Bão cách ${max(0, gap)}m", W / 2 + 17f, py + 84f, 28f, pr - pl + 70f)
 
@@ -2080,6 +2120,7 @@ class Renderer(private val g: Game) {
         // warnings
         val warn = when {
             g.wrecked -> null
+            gap < 0 && d.out -> if (g.interior != null) "⚠ BÃO TRÀN VÀO NHÀ! RA NGOÀI CHẠY!" else "⚠ ĐANG Ở TRONG BÃO!"
             gap in 0..25 -> "⚠ BÃO ĐANG ĐUỔI KỊP!"
             car.fuel <= 0f && !g.driver.out -> "HẾT XĂNG!"
             car.flipT > 0.3f -> "LẬT XE! Nhấn ↺ ↻ để lật lại"
@@ -2124,6 +2165,11 @@ class Renderer(private val g: Game) {
             }
         }
 
+        if (g.state == State.PLAYING && g.dyingT <= 0f && d.out) for (b in g.controls()) drawButton(c, b, g.isHeld(b.id))
+        if (d.out) {
+            drawCountdown(c)
+            return
+        }
         // speedometer
         val kmh = abs(car.forwardSpeed) / Game.METER * 3.6f
         val cx = W / 2
@@ -2180,12 +2226,17 @@ class Renderer(private val g: Game) {
 
         if (g.state == State.PLAYING && g.dyingT <= 0f && (!g.wrecked || g.driver.out)) for (b in g.controls()) drawButton(c, b, g.isHeld(b.id))
 
+        drawCountdown(c)
+    }
+
+    /** Bo 3: the big 5-4-3-2-1. */
+    private fun drawCountdown(c: Canvas) {
         if (g.state == State.PLAYING && g.phase == 2) {
             val n = ceil(g.phaseLeft).toInt().coerceAtLeast(1)
             val frac = (g.phaseLeft - (n - 1)).coerceIn(0f, 1f)
             text.textSize = 180f + 60f * frac
             text.color = Color.argb((80 + 120 * frac).toInt(), 255, 82, 82)
-            c.drawText(n.toString(), W / 2, H * 0.6f, text)
+            c.drawText(n.toString(), g.W / 2, g.H * 0.6f, text)
         }
     }
 
@@ -2677,22 +2728,23 @@ class Renderer(private val g: Game) {
 
     /** Round metal nav buttons down the left side: home, vehicles, weapons, skills. */
     private fun garageNav(c: Canvas) {
-        for (i in 0..3) {
+        for (i in 0..4) {
             val rc = g.navRect(i)
             val cx = (rc[0] + rc[2]) / 2
             val cy = (rc[1] + rc[3]) / 2
             val on = i > 0 && g.garageTab == i - 1
+            val rad = (rc[2] - rc[0]) / 2
             fill.color = 0x88000000.toInt()
-            c.drawCircle(cx + 3f, cy + 5f, 56f, fill)
+            c.drawCircle(cx + 3f, cy + 5f, rad, fill)
             fill.color = if (on) 0xFFC28A3C.toInt() else 0xFFB8B4AE.toInt()
-            c.drawCircle(cx, cy, 56f, fill)
+            c.drawCircle(cx, cy, rad, fill)
             fill.color = if (on) 0xFF8A5A22.toInt() else 0xFF8D8983.toInt()
-            c.drawCircle(cx, cy, 46f, fill)
+            c.drawCircle(cx, cy, rad - 10f, fill)
             fill.color = 0x40FFFFFF
             c.drawCircle(cx - 8f, cy - 12f, 30f, fill)
             stroke.color = 0xFF2B2622.toInt()
             stroke.strokeWidth = 3f
-            c.drawCircle(cx, cy, 56f, stroke)
+            c.drawCircle(cx, cy, rad, stroke)
             fill.color = Color.WHITE
             stroke.color = Color.WHITE
             stroke.strokeWidth = 5f
@@ -2719,6 +2771,19 @@ class Renderer(private val g: Game) {
                     c.drawRect(cx - 26f, cy - 8f, cx + 22f, cy + 2f, fill)
                     c.drawRect(cx - 22f, cy, cx - 10f, cy + 18f, fill)
                     c.drawRect(cx + 18f, cy - 6f, cx + 30f, cy - 2f, fill)
+                }
+                4 -> { // hand weapons: a bow over a spear
+                    c.save()
+                    c.translate(cx - 20f, cy + 18f)
+                    c.rotate(-40f)
+                    handWeapon(c, SideWeapon.SPEAR, 0.55f)
+                    c.restore()
+                    stroke.color = Color.WHITE
+                    stroke.strokeWidth = 4f
+                    r.set(cx - 6f, cy - 24f, cx + 26f, cy + 24f)
+                    c.drawArc(r, -90f, 180f, false, stroke)
+                    stroke.strokeWidth = 2f
+                    c.drawLine(cx + 10f, cy - 24f, cx + 10f, cy + 24f, stroke)
                 }
                 else -> { // skill tree: star over three boxes
                     star(c, cx, cy - 12f, 13f, Color.WHITE)
@@ -2791,6 +2856,7 @@ class Renderer(private val g: Game) {
         when (g.garageTab) {
             0 -> garageVehicles(c)
             1 -> garageWeapons(c)
+            3 -> garageSide(c)
             else -> garageSkills(c)
         }
         garageNav(c)
@@ -4048,4 +4114,569 @@ class Renderer(private val g: Game) {
         c.restore()
     }
 
+    // ------------------------------------------------------- hand weapons
+
+    /** A hand weapon held at the origin, pointing along +x. */
+    private fun handWeapon(c: Canvas, w: SideWeapon, s: Float) {
+        c.save()
+        c.scale(s, s)
+        when (w) {
+            SideWeapon.PISTOL -> {
+                fill.color = 0xFF78909C.toInt()
+                c.drawRect(-2f, -6f, 18f, 0f, fill)
+                c.drawRect(-2f, 0f, 4f, 9f, fill)
+            }
+            SideWeapon.DART -> {
+                c.save()
+                c.translate(8f, -2f)
+                c.rotate(g.anim * 200f)
+                star(c, 0f, 0f, 10f, 0xFFB0BEC5.toInt())
+                c.restore()
+            }
+            SideWeapon.SPEAR -> {
+                stroke.color = 0xFF8D6E63.toInt()
+                stroke.strokeWidth = 4f
+                c.drawLine(-26f, 0f, 62f, 0f, stroke)
+                fill.color = 0xFFCFD8DC.toInt()
+                path.reset()
+                path.moveTo(60f, -6f); path.lineTo(84f, 0f); path.lineTo(60f, 6f); path.close()
+                c.drawPath(path, fill)
+                fill.color = 0xFFD32F2F.toInt()
+                c.drawRect(54f, -4f, 58f, 4f, fill)
+            }
+            SideWeapon.BOW -> {
+                stroke.color = 0xFF6D4C41.toInt()
+                stroke.strokeWidth = 4f
+                r.set(-14f, -30f, 14f, 30f)
+                c.drawArc(r, -90f, 180f, false, stroke)
+                stroke.color = 0xFFECEFF1.toInt()
+                stroke.strokeWidth = 1.5f
+                c.drawLine(0f, -30f, 0f, 30f, stroke)
+            }
+            SideWeapon.AXE -> {
+                stroke.color = 0xFF8D6E63.toInt()
+                stroke.strokeWidth = 5f
+                c.drawLine(-6f, 0f, 48f, 0f, stroke)
+                fill.color = 0xFF90A4AE.toInt()
+                path.reset()
+                path.moveTo(36f, -2f); path.lineTo(52f, -20f); path.quadTo(62f, -6f, 56f, 6f); path.lineTo(36f, 4f); path.close()
+                c.drawPath(path, fill)
+                fill.color = 0xFFECEFF1.toInt()
+                c.drawRect(52f, -16f, 56f, 4f, fill)
+            }
+            SideWeapon.SHOTGUN -> {
+                fill.color = 0xFF5D4037.toInt()
+                c.drawRoundRect(-14f, -5f, 6f, 5f, 3f, 3f, fill)
+                fill.color = 0xFF78909C.toInt()
+                c.drawRect(4f, -6f, 44f, -1f, fill)
+                c.drawRect(4f, 0f, 34f, 3f, fill)
+            }
+            SideWeapon.SMG -> {
+                fill.color = 0xFF78909C.toInt()
+                c.drawRect(-4f, -7f, 26f, 1f, fill)
+                c.drawRect(24f, -5f, 36f, -2f, fill)
+                c.drawRect(6f, 1f, 12f, 14f, fill)
+                c.drawRect(-4f, 1f, 2f, 9f, fill)
+            }
+        }
+        c.restore()
+    }
+
+    /** Bullets, darts and arrows from the driver's hand weapon. */
+    private fun sideShot(c: Canvas, s: Projectile) {
+        val l = hypot(s.vx, s.vy).coerceAtLeast(1f)
+        val ux = s.vx / l
+        val uy = s.vy / l
+        when (s.side) {
+            SideWeapon.DART -> {
+                c.save()
+                c.translate(s.x, s.y)
+                c.rotate(s.age * 1400f)
+                star(c, 0f, 0f, 11f, 0xFFCFD8DC.toInt())
+                c.restore()
+            }
+            SideWeapon.BOW -> {
+                stroke.color = 0xFF8D6E63.toInt()
+                stroke.strokeWidth = 4f
+                c.drawLine(s.x, s.y, s.x - ux * 46f, s.y - uy * 46f, stroke)
+                stroke.color = 0xFFEF5350.toInt()
+                stroke.strokeWidth = 3f
+                c.drawLine(s.x - ux * 40f, s.y - uy * 40f, s.x - ux * 48f - uy * 6f, s.y - uy * 48f + ux * 6f, stroke)
+                c.drawLine(s.x - ux * 40f, s.y - uy * 40f, s.x - ux * 48f + uy * 6f, s.y - uy * 48f - ux * 6f, stroke)
+                fill.color = 0xFFB0BEC5.toInt()
+                c.drawCircle(s.x, s.y, 5f, fill)
+            }
+            else -> {
+                val len = if (s.side == SideWeapon.SHOTGUN) 16f else 24f
+                stroke.color = 0x66FFAB00
+                stroke.strokeWidth = 7f
+                c.drawLine(s.x, s.y, s.x - ux * len, s.y - uy * len, stroke)
+                stroke.color = 0xFFFFF176.toInt()
+                stroke.strokeWidth = 3f
+                c.drawLine(s.x, s.y, s.x - ux * len, s.y - uy * len, stroke)
+            }
+        }
+    }
+
+    /** Garage tab: the driver's hand weapons, bought with money. */
+    private fun garageSide(c: Canvas) {
+        val s = g.save
+        for (w in SideWeapon.entries) {
+            val rc = g.weaponRect(w.ordinal)
+            val unlocked = s.sideUnlocked(w) || s.ownsSide(w)
+            val owned = s.ownsSide(w)
+            card(c, rc, g.garageSide == w)
+            val cx = (rc[0] + rc[2]) / 2
+            c.save()
+            c.translate(cx - 30f, rc[1] + 50f)
+            lockedLayer(c, !unlocked)
+            handWeapon(c, w, 1.4f)
+            c.restore()
+            c.restore()
+            text.textAlign = Paint.Align.CENTER
+            text.color = if (unlocked) Color.WHITE else 0xFF9E9E9E.toInt()
+            fitText(c, w.title, cx, rc[1] + 84f, 22f, rc[2] - rc[0] - 14f)
+            val (label, color) = when {
+                s.side == w.ordinal -> "ĐANG DÙNG" to 0xFF69F0AE.toInt()
+                owned -> "ĐÃ CÓ" to Color.WHITE
+                !unlocked -> "🔒 Ải ${w.unlockStage}" to 0xFF9E9E9E.toInt()
+                s.money >= w.cost -> "${w.cost}$" to 0xFFFFD740.toInt()
+                else -> "${w.cost}$" to 0xFF9E9E9E.toInt()
+            }
+            text.color = color
+            fitText(c, label, cx, rc[3] - 10f, 19f, rc[2] - rc[0] - 14f)
+        }
+        val w = g.garageSide
+        val pr = g.weaponPanelRect()
+        card(c, pr, false)
+        c.save()
+        c.translate(pr[0] + 60f, pr[1] + 110f)
+        lockedLayer(c, !(s.sideUnlocked(w) || s.ownsSide(w)))
+        handWeapon(c, w, 2.6f)
+        c.restore()
+        c.restore()
+        val tx = pr[0] + 290f
+        text.textAlign = Paint.Align.LEFT
+        text.color = Color.WHITE
+        fitText(c, w.title.uppercase(), tx, pr[1] + 44f, 34f, 420f)
+        text.color = 0xFFB0BEC5.toInt()
+        fitText(c, "${w.kind} • ${w.desc} Dùng khi đi bộ và trong nhà, không tốn đạn.", tx, pr[1] + 76f, 20f, pr[2] - 360f - tx)
+        fun fmt(f: Float) = if (f >= 10f) f.toInt().toString() else "%.1f".format(f)
+        val rows = listOf(
+            Triple("Sát thương", kotlin.math.sqrt(w.dps / 30f), "${fmt(w.dps)}/giây"),
+            Triple("Một đòn", min(1f, w.damage * w.pellets / 7f), fmt(w.damage * w.pellets)),
+            Triple("Tốc đánh", kotlin.math.sqrt((1f / w.interval) / 10f), fmt(1f / w.interval) + "/giây"),
+            Triple("Tầm", w.range / 1000f, "${(w.range / Game.METER).toInt()}m"),
+            Triple("Xuyên", min(1f, w.pierce / 5f), if (w.pierce >= 99) "∞" else "${w.pierce}"),
+        )
+        statRows(c, rows.map { (a, f, v) -> Triple(a, f to f, v) }, tx, pr[2] - 350f, pr[1] + 118f, 20f)
+    }
+
+    // ------------------------------------------------------- sound screen
+
+    private fun drawSound(c: Canvas) {
+        val W = g.W
+        dim(c, 0xC0)
+        metalPanel(c, W / 2 - 420f, 70f, W / 2 + 420f, g.H - 140f, 22f)
+        title(c, "ÂM THANH", W / 2, 140f, 0xFFFFD740.toInt(), 52f)
+        val names = arrayOf("🎵 Nhạc nền", "💥 Hiệu ứng", "🚗 Động cơ xe")
+        val cols = intArrayOf(0xFFAB47BC.toInt(), 0xFFFFA726.toInt(), 0xFF66BB6A.toInt())
+        for (i in 0..2) {
+            val rc = g.volSlider(i)
+            val v = g.volValue(i)
+            val f = v / 100f
+            text.textAlign = Paint.Align.LEFT
+            text.textSize = 28f
+            text.color = Color.WHITE
+            c.drawText(names[i], rc[0], rc[1] - 22f, text)
+            text.textAlign = Paint.Align.RIGHT
+            text.color = if (v == 0) 0xFFFF8A80.toInt() else 0xFFFFE082.toInt()
+            c.drawText(if (v == 0) "TẮT" else "$v%", rc[2], rc[1] - 22f, text)
+            fill.color = 0xCC111111.toInt()
+            c.drawRoundRect(rc[0], rc[1], rc[2], rc[3], 12f, 12f, fill)
+            fill.color = cols[i]
+            if (f > 0f) c.drawRoundRect(rc[0] + 3f, rc[1] + 3f, rc[0] + 3f + (rc[2] - rc[0] - 6f) * f, rc[3] - 3f, 9f, 9f, fill)
+            val kx = rc[0] + (rc[2] - rc[0]) * f
+            val ky = (rc[1] + rc[3]) / 2
+            fill.color = if (g.dragVol == i) 0xFFFFFFFF.toInt() else 0xFFE0E0E0.toInt()
+            c.drawCircle(kx, ky, if (g.dragVol == i) 26f else 22f, fill)
+            stroke.color = 0xFF2B2622.toInt()
+            stroke.strokeWidth = 3f
+            c.drawCircle(kx, ky, if (g.dragVol == i) 26f else 22f, stroke)
+        }
+        text.textAlign = Paint.Align.CENTER
+        text.color = 0xFFB0BEC5.toInt()
+        fitText(c, "Kéo thanh để chỉnh • thả thanh Hiệu ứng để nghe thử • giữ thanh Động cơ để nghe tiếng máy", W / 2, g.volSlider(2)[3] + 70f, 20f, 800f)
+        drawMenuButtons(c)
+    }
+
+    // ------------------------------------------------------- building interior
+
+    /** Rooms of the building the driver is searching (floor at y = 0). */
+    private fun drawInterior(c: Canvas, inn: Interior) {
+        val W = g.W
+        val H = g.H
+        val kind = inn.b.kind
+        fill.shader = null
+        fill.alpha = 255
+        fill.color = 0xFF0E0C0B.toInt()
+        c.drawRect(0f, 0f, W, H, fill)
+        c.save()
+        if (g.shake > 0f) {
+            val s = g.shake * 30f
+            c.translate((Random.nextFloat() - 0.5f) * s, (Random.nextFloat() - 0.5f) * s)
+        }
+        c.scale(Game.ZOOM, Game.ZOOM)
+        val camX = inn.camX
+        val camY = -g.viewH * 0.7f
+        c.translate(-camX, -camY)
+        val x0 = camX - 100f
+        val x1 = camX + g.viewW + 100f
+        val ceil = -Interior.CEIL
+        val walls = when (kind) {
+            0 -> intArrayOf(0xFF6D5A4B.toInt(), 0xFF5E6B5A.toInt(), 0xFF6A5670.toInt(), 0xFF5A534C.toInt())
+            1 -> intArrayOf(0xFF7A7058.toInt(), 0xFF6E6A5E.toInt(), 0xFF5F5A50.toInt(), 0xFF655A4A.toInt())
+            2 -> intArrayOf(0xFF7D7A72.toInt(), 0xFF6A6C70.toInt(), 0xFF5E5A54.toInt(), 0xFF6E655A.toInt())
+            3 -> intArrayOf(0xFF5E666B.toInt(), 0xFF55606A.toInt(), 0xFF5A5A5E.toInt(), 0xFF62605A.toInt())
+            else -> intArrayOf(0xFF9AA39E.toInt(), 0xFF8E9A9C.toInt(), 0xFF8A9088.toInt(), 0xFF8C8478.toInt())
+        }
+        val outside = when (g.region) {
+            Region.DESERT -> 0xFFE8B070.toInt()
+            Region.VOLCANO -> 0xFFB5482A.toInt()
+            Region.NIGHT -> 0xFF1E2A4A.toInt()
+            Region.ALIEN -> 0xFF5B3A8C.toInt()
+        }
+        for (room in 0 until inn.rooms) {
+            val l = room * Interior.ROOM_W
+            val rr = l + Interior.ROOM_W
+            if (rr < x0 || l > x1) continue
+            val wall = walls[room % walls.size]
+            fill.color = wall
+            c.drawRect(l, ceil, rr, 0f, fill)
+            // wallpaper: stripes at home, tiles in the shop / pharmacy, bricks in workshops
+            when (kind) {
+                0 -> {
+                    fill.color = shade(wall, 0.88f)
+                    var x = l
+                    while (x < rr) { c.drawRect(x, ceil, x + 26f, -120f, fill); x += 64f }
+                }
+                1, 4 -> {
+                    stroke.color = shade(wall, 0.82f)
+                    stroke.strokeWidth = 2f
+                    var y = -120f
+                    while (y > ceil) { c.drawLine(l, y, rr, y, stroke); y -= 60f }
+                    var x = l
+                    while (x < rr) { c.drawLine(x, ceil, x, -120f, stroke); x += 60f }
+                }
+                else -> {
+                    stroke.color = shade(wall, 0.8f)
+                    stroke.strokeWidth = 2f
+                    var y = -40f
+                    var row = 0
+                    while (y > ceil) {
+                        c.drawLine(l, y, rr, y, stroke)
+                        var x = l + (if (row % 2 == 0) 0f else 45f)
+                        while (x < rr) { c.drawLine(x, y, x, y - 40f, stroke); x += 90f }
+                        y -= 40f; row++
+                    }
+                }
+            }
+            // wainscot
+            fill.color = shade(wall, 0.7f)
+            c.drawRect(l, -120f, rr, 0f, fill)
+            fill.color = shade(wall, 0.55f)
+            c.drawRect(l, -126f, rr, -118f, fill)
+            // a boarded window looking out at the road
+            val wx = l + 380f
+            fill.color = 0xFF2B2420.toInt()
+            c.drawRect(wx - 8f, -420f, wx + 168f, -228f, fill)
+            fill.color = if (g.stormX > inn.b.x - Building.W / 2) 0xFF7B1FA2.toInt() else outside
+            c.drawRect(wx, -412f, wx + 160f, -236f, fill)
+            fill.color = 0x30FFFFFF
+            c.drawRect(wx, -412f, wx + 70f, -236f, fill)
+            fill.color = 0xFF6D4C41.toInt()
+            c.save()
+            c.translate(wx + 80f, -330f); c.rotate(-8f); c.translate(-(wx + 80f), -(-330f))
+            c.drawRect(wx - 16f, -370f, wx + 176f, -350f, fill)
+            c.restore()
+            c.save()
+            c.translate(wx + 80f, -290f); c.rotate(6f); c.translate(-(wx + 80f), -(-290f))
+            c.drawRect(wx - 16f, -300f, wx + 176f, -280f, fill)
+            c.restore()
+            // stains and cracks
+            fill.color = 0x22000000
+            c.drawOval(l + 120f, -470f, l + 260f, -380f, fill)
+            stroke.color = 0x55000000
+            stroke.strokeWidth = 2f
+            c.drawLine(l + 700f, -520f, l + 730f, -440f, stroke)
+            c.drawLine(l + 730f, -440f, l + 715f, -380f, stroke)
+            // hanging lamp, flickering
+            val lx = l + Interior.ROOM_W / 2
+            val on = (g.anim * 7f + room * 3f).toInt() % 23 != 0
+            stroke.color = 0xFF222222.toInt()
+            stroke.strokeWidth = 2f
+            c.drawLine(lx, ceil, lx, ceil + 70f, stroke)
+            fill.color = 0xFF37474F.toInt()
+            path.reset()
+            path.moveTo(lx - 30f, ceil + 92f); path.lineTo(lx - 12f, ceil + 70f); path.lineTo(lx + 12f, ceil + 70f); path.lineTo(lx + 30f, ceil + 92f); path.close()
+            c.drawPath(path, fill)
+            if (on) {
+                fill.color = 0xFFFFF59D.toInt()
+                c.drawCircle(lx, ceil + 94f, 8f, fill)
+                fill.color = 0x22FFF59D
+                path.reset()
+                path.moveTo(lx - 30f, ceil + 92f); path.lineTo(lx - 260f, 0f); path.lineTo(lx + 260f, 0f); path.lineTo(lx + 30f, ceil + 92f); path.close()
+                c.drawPath(path, fill)
+            }
+            // doorway into the next room
+            if (room < inn.rooms - 1) {
+                fill.color = 0xFF3E2E24.toInt()
+                c.drawRect(rr - 70f, -330f, rr + 70f, 0f, fill)
+                fill.color = 0xFF120E0C.toInt()
+                c.drawRect(rr - 56f, -316f, rr + 56f, 0f, fill)
+            }
+            // room name plate
+            text.textAlign = Paint.Align.CENTER
+            text.textSize = 24f
+            text.color = 0x66FFFFFF
+            c.drawText(inn.roomName(l + 10f), l + 200f, ceil + 50f, text)
+        }
+        // solid walls at both ends, ceiling beam and floor
+        fill.color = 0xFF2A211B.toInt()
+        c.drawRect(-400f, ceil - 100f, 0f, 300f, fill)
+        c.drawRect(inn.width, ceil - 100f, inn.width + 400f, 300f, fill)
+        fill.color = 0xFF3B2F27.toInt()
+        c.drawRect(x0, ceil - 100f, x1, ceil, fill)
+        fill.color = 0xFF2B221C.toInt()
+        c.drawRect(x0, ceil - 8f, x1, ceil + 6f, fill)
+        val floorCol = when (kind) { 3 -> 0xFF4A4F52.toInt(); 1, 4 -> 0xFF8C8578.toInt(); else -> 0xFF6B4A33.toInt() }
+        fill.color = floorCol
+        c.drawRect(x0, 0f, x1, 300f, fill)
+        fill.color = shade(floorCol, 1.15f)
+        c.drawRect(x0, 0f, x1, 8f, fill)
+        stroke.color = shade(floorCol, 0.8f)
+        stroke.strokeWidth = 2f
+        var fx = floor(x0 / 120f) * 120f
+        while (fx < x1) { c.drawLine(fx, 8f, fx - 40f, 300f, stroke); fx += 120f }
+        if (kind == 3) {
+            fill.color = 0x55000000
+            c.drawOval(1000f, 10f, 1200f, 40f, fill)
+        }
+        // the way out, with daylight beyond and an EXIT sign
+        val ex = inn.exitX
+        fill.color = 0xFF4E342E.toInt()
+        c.drawRect(ex - 70f, -330f, ex + 70f, 0f, fill)
+        fill.color = if (g.stormX > inn.b.x - Building.W / 2) 0xFF8E24AA.toInt() else outside
+        c.drawRect(ex - 56f, -316f, ex + 56f, 0f, fill)
+        fill.color = 0x40FFFFFF
+        c.drawRect(ex - 56f, -316f, ex - 10f, 0f, fill)
+        fill.color = 0xFF1B5E20.toInt()
+        c.drawRoundRect(ex - 70f, -400f, ex + 70f, -350f, 8f, 8f, fill)
+        text.textAlign = Paint.Align.CENTER
+        text.textSize = 26f
+        text.color = 0xFFB9F6CA.toInt()
+        c.drawText("LỐI RA", ex, -365f, text)
+
+        for (p in inn.platforms) if (p.r > x0 && p.l < x1) drawFurniture(c, p)
+        for (ch in inn.chests) if (ch.x in x0..x1) drawChest(c, ch)
+        for (z in inn.zombies) if (z.x in x0..x1) {
+            fill.color = 0x40000000
+            c.drawOval(z.x - z.type.w * 0.8f, -6f, z.x + z.type.w * 0.8f, 6f, fill)
+            drawZombie(c, z)
+        }
+        drawDriver(c)
+        for (s in inn.shots) sideShot(c, s)
+        for (p in g.particles) {
+            val ratio = (p.life / p.maxLife).coerceIn(0f, 1f)
+            fill.color = p.color
+            fill.alpha = (255 * ratio * (if (p.grow > 0f) 0.55f else 1f)).toInt().coerceIn(0, 255)
+            c.drawCircle(p.x, p.y, p.size * (1f + p.grow * (1f - ratio)), fill)
+        }
+        fill.alpha = 255
+        // search progress over the chest being opened
+        inn.chests.firstOrNull { it.openT > 0f && !it.opened }?.let { ch ->
+            val f = (ch.openT / Interior.OPEN_TIME).coerceIn(0f, 1f)
+            val ty = -ch.y - 130f
+            fill.color = 0xCC000000.toInt()
+            c.drawRoundRect(ch.x - 60f, ty, ch.x + 60f, ty + 22f, 8f, 8f, fill)
+            fill.color = 0xFFFFC107.toInt()
+            c.drawRoundRect(ch.x - 56f, ty + 4f, ch.x - 56f + 112f * f, ty + 18f, 6f, 6f, fill)
+        }
+        for (t in g.texts) {
+            val a = (255 * min(1f, t.life)).toInt()
+            text.textAlign = Paint.Align.CENTER
+            text.textSize = t.size * (1f + max(0f, t.life - 1.1f) * 1.2f)
+            text.style = Paint.Style.STROKE
+            text.strokeWidth = 7f
+            text.color = 0xFF1A1A1A.toInt()
+            text.alpha = a
+            c.drawText(t.text, t.x, t.y, text)
+            text.style = Paint.Style.FILL
+            text.color = t.color
+            text.alpha = a
+            c.drawText(t.text, t.x, t.y, text)
+        }
+        text.alpha = 255
+        c.restore()
+        // gloom, and the storm leaking in
+        fill.color = 0x30000000
+        c.drawRect(0f, 0f, W, H, fill)
+        if (g.stormX > inn.b.x - Building.W / 2) {
+            fill.color = Color.argb((60 + 30 * sin(g.anim * 5f)).toInt(), 140, 30, 170)
+            c.drawRect(0f, 0f, W, H, fill)
+        }
+    }
+
+    private fun drawFurniture(c: Canvas, p: Platform) {
+        val l = p.l
+        val rr = p.r
+        val t = -p.top
+        val wood = 0xFF6D4C41.toInt()
+        when (p.kind) {
+            0 -> { // table
+                fill.color = wood
+                c.drawRect(l, t, rr, t + 14f, fill)
+                fill.color = shade(wood, 0.75f)
+                c.drawRect(l + 10f, t + 14f, l + 22f, 0f, fill)
+                c.drawRect(rr - 22f, t + 14f, rr - 10f, 0f, fill)
+                fill.color = 0xFFB0BEC5.toInt()
+                c.drawRect(l + 40f, t - 18f, l + 60f, t, fill)
+                fill.color = 0xFFFFCC80.toInt()
+                c.drawOval(rr - 70f, t - 8f, rr - 30f, t, fill)
+            }
+            1 -> { // shelf: three boards on posts, with junk
+                fill.color = shade(wood, 0.7f)
+                c.drawRect(l, t, l + 10f, 0f, fill)
+                c.drawRect(rr - 10f, t, rr, 0f, fill)
+                for (k in 0..2) {
+                    val y = t + k * (p.top / 3f)
+                    fill.color = wood
+                    c.drawRect(l, y, rr, y + 10f, fill)
+                    for (j in 0..3) {
+                        fill.color = Zombie.SHIRTS[(j + k + l.toInt() / 7) % Zombie.SHIRTS.size]
+                        val bx = l + 20f + j * ((rr - l - 40f) / 4f)
+                        if (k > 0) c.drawRect(bx, y - 30f + (j % 2) * 8f, bx + 26f, y, fill)
+                    }
+                }
+            }
+            2 -> { // sofa
+                val col = 0xFF7B3F3F.toInt()
+                fill.color = shade(col, 0.8f)
+                c.drawRoundRect(l, t - 40f, rr, t + 20f, 16f, 16f, fill)
+                fill.color = col
+                c.drawRoundRect(l, t, rr, 0f, 12f, 12f, fill)
+                fill.color = shade(col, 0.7f)
+                c.drawRoundRect(l - 10f, t - 10f, l + 24f, 0f, 10f, 10f, fill)
+                c.drawRoundRect(rr - 24f, t - 10f, rr + 10f, 0f, 10f, 10f, fill)
+            }
+            3 -> { // counter
+                val col = if (g.interior?.b?.kind == 4) 0xFFE0E0E0.toInt() else 0xFF8D6E63.toInt()
+                fill.color = col
+                c.drawRect(l, t, rr, 0f, fill)
+                fill.color = shade(col, 0.8f)
+                c.drawRect(l, t, rr, t + 12f, fill)
+                fill.color = 0xFF455A64.toInt()
+                c.drawRect(l + 30f, t - 34f, l + 80f, t, fill)
+                fill.color = 0xFF80CBC4.toInt()
+                c.drawRect(l + 36f, t - 28f, l + 74f, t - 12f, fill)
+            }
+            4 -> { // car lift with an old wreck on it
+                fill.color = 0xFFF9A825.toInt()
+                c.drawRect(l + 20f, t + 10f, l + 34f, 0f, fill)
+                c.drawRect(rr - 34f, t + 10f, rr - 20f, 0f, fill)
+                fill.color = 0xFF546E7A.toInt()
+                c.drawRect(l, t, rr, t + 12f, fill)
+                fill.color = 0xFF6D4C41.toInt()
+                c.drawRoundRect(l + 10f, t - 56f, rr - 10f, t - 6f, 14f, 14f, fill)
+                c.drawRoundRect(l + 60f, t - 90f, rr - 70f, t - 50f, 12f, 12f, fill)
+                fill.color = 0xFF263238.toInt()
+                c.drawCircle(l + 50f, t - 8f, 18f, fill)
+                c.drawCircle(rr - 50f, t - 8f, 18f, fill)
+            }
+            5 -> { // tall fridge / cabinet
+                fill.color = 0xFFCFD8DC.toInt()
+                c.drawRoundRect(l, t, rr, 0f, 8f, 8f, fill)
+                stroke.color = 0xFF90A4AE.toInt()
+                stroke.strokeWidth = 3f
+                c.drawLine(l, t + 70f, rr, t + 70f, stroke)
+                fill.color = 0xFF78909C.toInt()
+                c.drawRect(rr - 16f, t + 20f, rr - 10f, t + 56f, fill)
+            }
+            else -> { // bed
+                fill.color = shade(wood, 0.8f)
+                c.drawRect(l, t - 50f, l + 16f, 0f, fill)
+                fill.color = 0xFFECEFF1.toInt()
+                c.drawRoundRect(l + 10f, t, rr, t + 30f, 10f, 10f, fill)
+                fill.color = 0xFF5C6BC0.toInt()
+                c.drawRoundRect(l + 70f, t + 2f, rr, t + 34f, 10f, 10f, fill)
+                fill.color = wood
+                c.drawRect(l, t + 30f, rr, 0f, fill)
+            }
+        }
+    }
+
+    private fun drawChest(c: Canvas, ch: Chest) {
+        val x = ch.x
+        val b = -ch.y
+        val glow = !ch.opened
+        if (glow) {
+            fill.color = Color.argb((50 + 40 * sin(g.anim * 4f + x)).toInt(), 255, 213, 79)
+            c.drawCircle(x, b - 40f, 70f, fill)
+        }
+        when (ch.kind) {
+            3, 5 -> { // fridge / safe
+                val col = if (ch.kind == 5) 0xFF455A64.toInt() else 0xFFE0E0E0.toInt()
+                fill.color = col
+                c.drawRoundRect(x - 36f, b - (if (ch.kind == 5) 76f else 130f), x + 36f, b, 6f, 6f, fill)
+                fill.color = shade(col, 0.7f)
+                if (ch.kind == 5) {
+                    c.drawCircle(x + 8f, b - 40f, 12f, fill)
+                    fill.color = 0xFFFFD740.toInt()
+                    c.drawCircle(x + 8f, b - 40f, 4f, fill)
+                } else {
+                    c.drawRect(x + 22f, b - 110f, x + 28f, b - 70f, fill)
+                }
+                if (ch.opened) {
+                    fill.color = 0xFF1A1A1A.toInt()
+                    c.drawRect(x - 30f, b - (if (ch.kind == 5) 70f else 124f), x + 30f, b - 6f, fill)
+                }
+            }
+            4 -> { // medicine cabinet
+                fill.color = 0xFFFAFAFA.toInt()
+                c.drawRoundRect(x - 40f, b - 70f, x + 40f, b, 6f, 6f, fill)
+                fill.color = 0xFFE53935.toInt()
+                c.drawRect(x - 6f, b - 56f, x + 6f, b - 20f, fill)
+                c.drawRect(x - 18f, b - 44f, x + 18f, b - 32f, fill)
+            }
+            else -> { // cupboard / crate / toolbox
+                val col = when (ch.kind) { 0 -> 0xFF8D6E63.toInt(); 2 -> 0xFFC62828.toInt(); else -> 0xFFA1887F.toInt() }
+                val h = if (ch.kind == 2) 40f else 62f
+                fill.color = col
+                c.drawRect(x - 40f, b - h, x + 40f, b, fill)
+                fill.color = shade(col, 0.7f)
+                c.drawRect(x - 40f, b - h, x + 40f, b - h + 8f, fill)
+                if (ch.kind == 1) {
+                    stroke.color = shade(col, 0.6f)
+                    stroke.strokeWidth = 4f
+                    c.drawLine(x - 36f, b - h + 8f, x + 36f, b - 4f, stroke)
+                }
+                fill.color = 0xFFFFD740.toInt()
+                c.drawRect(x - 5f, b - h + 10f, x + 5f, b - h + 22f, fill)
+                if (ch.opened) {
+                    // lid thrown back
+                    fill.color = shade(col, 0.85f)
+                    c.save()
+                    c.translate(x - 40f, b - h); c.rotate(-60f); c.translate(-(x - 40f), -(b - h))
+                    c.drawRect(x - 40f, b - h - 10f, x + 40f, b - h, fill)
+                    c.restore()
+                }
+            }
+        }
+        if (glow) {
+            text.textAlign = Paint.Align.CENTER
+            text.textSize = 30f
+            text.color = 0xFFFFD740.toInt()
+            c.drawText("?", x, b - 150f + sin(g.anim * 3f) * 6f, text)
+        }
+    }
 }

@@ -23,9 +23,6 @@ import kotlin.random.Random
  */
 class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
     companion object {
-        /** Seconds to search a building. */
-        const val LOOT_TIME = 2.2f
-
         const val VIRTUAL_HEIGHT = 720f
         const val METER = 30f
         const val G = 900f
@@ -111,6 +108,14 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
     val buildings = ArrayList<Building>()
     val driver = Driver()
 
+    /** The building the driver is inside (its rooms are drawn instead of the road), if any. */
+    var inside: Building? = null
+        private set
+    val interior get() = inside?.interior
+
+    /** Where the player is: the driver when on foot, else the car. */
+    val playerX get() = if (driver.out) inside?.x ?: driver.x else car.x
+
     /** Parts found this run (for the result screen). */
     var runParts = 0
 
@@ -155,12 +160,13 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
     private val rewardMul get() = (1f + 0.12f * (stage - 1)) * (if (harvest) 1.25f else 1f)
 
     // garage browsing
-    /** 0 vehicles, 1 weapons, 2 skill tree. */
+    /** 0 vehicles, 1 weapons, 2 skill tree, 3 hand weapons. */
     var garageTab = 0
 
     /** Vehicle on show in the garage (index into [Vehicles.all]). */
     var showVeh = 0
     var garageWeapon = WeaponType.PISTOL
+    var garageSide = SideWeapon.PISTOL
     var skillPage = 0
     var skillSel = 0
 
@@ -177,11 +183,11 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
     private val renderer = Renderer(this)
     private val phys = CarPhysics()
 
-    val distanceM get() = max(0f, car.x / METER)
+    val distanceM get() = max(0f, playerX / METER)
     val goalM get() = goalX / METER
 
     init {
-        sfx.enabled = save.sound
+        sfx.enabled = true
         save.stageSel = save.stageSel.coerceIn(1, maxStartStage())
         loadStage(save.stageSel)
         if (save.storySeen and (1 shl Story.PROLOGUE_BIT) == 0) {
@@ -291,6 +297,8 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
         c.boost = c.maxBoost
         c.ammo = ct.ammo + up(SkillStat.AMMO)
         driver.out = false; driver.hp = driver.maxHp; driver.looting = null; driver.hurtT = 0f
+        driver.shieldT = 0f; driver.cloneT = 0f; driver.atkT = 0f; driver.vy = 0f; driver.air = 0f
+        inside = null
         c.shieldT = 0f; c.cloneT = 0f; c.hurtT = 0f; c.flipT = 0f; c.stuckT = 0f; c.fireCd = 0f
         c.aim = 0f
 
@@ -331,7 +339,7 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
         return (stage - 1) * LEVELS_PER_STAGE + section + 1
     }
 
-    val levelInStage get() = levelAt(car.x) - (stage - 1) * LEVELS_PER_STAGE
+    val levelInStage get() = levelAt(playerX) - (stage - 1) * LEVELS_PER_STAGE
 
     /** Zombies/obstacles per 100 m: 3 on level 1, +1 per level (arithmetic), capped. */
     /** Kept low on purpose: a few monsters at a time, never a swarm. */
@@ -512,30 +520,90 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
         sfx.play(Sfx.S.GO, 0.5f)
     }
 
-    /** What the action button does on foot: search a door, or get back in. */
-    fun driverAction(): String? = when {
-        !driver.out -> null
-        doorNear(driver.x, 110f) != null -> "loot"
-        !wrecked && abs(driver.x - car.x) < 130f -> "car"
-        else -> null
+    /** What the action button does on foot: go into a building, search a chest, leave, or get back in. */
+    fun driverAction(): String? {
+        if (!driver.out) return null
+        val inn = interior
+        if (inn != null) {
+            if (inn.chests.any { it.openT > 0f && !it.opened }) return "busy"
+            if (inn.chestNear(driver.x, driver.y) != null) return "chest"
+            if (abs(driver.x - inn.exitX) < 120f) return "leave"
+            return null
+        }
+        return when {
+            doorNear(driver.x, 110f) != null -> "enter"
+            !wrecked && abs(driver.x - car.x) < 130f -> "car"
+            else -> null
+        }
     }
 
-    private fun hurtDriver(amount: Float) {
+    /** Through the door: the road is left behind and the rooms take the screen. */
+    private fun enterBuilding(b: Building) {
+        val inn = b.interior ?: Interior(b, stage, region).also { b.interior = it }
+        inside = b
         val d = driver
-        if (amount <= 0f) return
+        d.x = inn.exitX + 60f
+        d.y = 0f
+        d.vy = 0f
+        d.face = 1f
+        inn.camX = d.x - viewW * 0.45f
+        particles.clear()
+        texts.clear()
+        pointers.clear()
+        updateControls()
+        texts.add(FloatText(Building.NAMES[b.kind], d.x + 300f, -330f, 0xFFFFD740.toInt()).also { it.life = 1.8f; it.size = 52f })
+        sfx.play(Sfx.S.WOOD, 0.7f)
+    }
+
+    private fun leaveBuilding() {
+        val b = inside ?: return
+        inside = null
+        val d = driver
+        d.x = b.x
+        d.y = terrain.heightAt(b.x)
+        d.vy = 0f
+        particles.clear()
+        texts.clear()
+        pointers.clear()
+        updateControls()
+        if (b.interior?.cleared == true) {
+            b.looted = true
+            texts.add(FloatText("ĐÃ LỤC SẠCH!", b.x, d.y - 200f, 0xFF69F0AE.toInt()).also { it.life = 1.8f })
+        }
+        sfx.play(Sfx.S.WOOD, 0.7f)
+    }
+
+    /** Hurts the driver on foot; a shield bubble blocks everything but the storm. */
+    internal fun hurtDriver(amount: Float, storm: Boolean = false) {
+        val d = driver
+        if (amount <= 0f || dyingT > 0f) return
+        if (d.shieldT > 0f && !storm) return
         d.hp -= amount
         d.hurtT = 0.25f
         d.looting = null
+        interior?.chests?.forEach { if (!it.opened) it.openT = 0f }
         if (Random.nextFloat() < 0.3f) bleed(d.x, d.y - 50f, 2)
+        if (d.hp <= 0f && d.cloneT > 0f) {
+            // the clone pickup: back on the feet once
+            d.cloneT = 0f
+            d.hp = d.maxHp * 0.6f
+            if (storm) {
+                if (inside != null) leaveBuilding()
+                d.x = max(d.x, stormX + 600f)
+                d.y = terrain.heightAt(d.x)
+            }
+            burst(d.x, d.y - 50f, ItemType.CLONE.color, 24)
+            texts.add(FloatText("BẢN SAO HỒI SINH!", d.x, d.y - 160f, 0xFF64FFDA.toInt()))
+            sfx.play(Sfx.S.CLONE)
+        }
     }
 
     private fun updateDriver(dt: Float) {
         val d = driver
-        val c = car
         if (d.hurtT > 0f) d.hurtT -= dt
+        if (d.atkT > 0f) d.atkT -= dt
         // walking
         d.dir = (if (leanFwd) 1f else 0f) - (if (leanBack) 1f else 0f)
-        if (d.looting != null) d.dir = 0f
         if (d.dir != 0f) {
             d.face = d.dir
             d.x += d.dir * 240f * dt
@@ -572,100 +640,203 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
         if (feet > g2) feet = g2
         d.y = feet
         d.air = max(0f, terrain.heightAt(d.x) - d.y)
-        // searching a building
-        d.looting?.let { b ->
-            b.lootT += dt * (if (scavenger) 2f else 1f)
-            if (Random.nextFloat() < dt * 6f) particles.add(Particle(b.x + rnd(-30f, 30f), d.y - rnd(20f, 90f), rnd(-40f, 40f), -rnd(30f, 90f), 0.5f, 0.5f, 5f, 0xFFBCAAA4.toInt(), 0f, 1f))
-            if (b.lootT >= LOOT_TIME) {
-                d.looting = null
-                loot(b)
-            }
-        }
-        // the driver's own pistol: aims at the nearest monster and fires by itself
-        d.fireCd -= dt
-        var best = 700f
-        var tx = 0f
-        var ty = 0f
-        for (z in zombies) {
-            if (!z.alive) continue
-            val dd = abs(z.x - d.x)
-            if (dd < best) {
-                best = dd; tx = z.x; ty = z.y - z.fly - z.type.h * 0.55f
-            }
-        }
-        if (best >= 700f) {
-            // nothing alive near: shoot at what blocks the way
-            for (o in obstacles) {
-                if (!o.alive) continue
-                val dd = abs(o.x - d.x)
-                if (dd < 520f && dd < best && sign(o.x - d.x) == d.face) {
-                    best = dd; tx = o.x; ty = o.y - o.type.h * 0.5f
-                }
-            }
-            bb?.let { if (it.alive && it.engaged && abs(it.x - d.x) < 900f) { best = abs(it.x - d.x); tx = it.x; ty = it.cy } }
-        }
-        if (best < 700f) {
-            val gx = d.x
-            val gy = d.y - 58f
-            d.aim = kotlin.math.atan2(ty - gy, tx - gx)
-            d.face = if (tx >= d.x) 1f else -1f
-            if (d.fireCd <= 0f && d.looting == null) {
-                d.fireCd = 0.32f
-                val sp = 1900f
-                shots.add(Projectile(WeaponType.PISTOL, gx, gy, cos(d.aim) * sp, sin(d.aim) * sp, 1.5f, 1, 0f).also { it.life = 0.45f })
-                particles.add(Particle(gx + cos(d.aim) * 26f, gy + sin(d.aim) * 26f, 0f, 0f, 0.06f, 0.06f, 9f, 0xFFFFE082.toInt()))
-                sfx.play(Sfx.S.SHOOT, 0.3f)
-            }
-        } else {
-            d.aim = if (d.face > 0f) 0f else PI.toFloat()
-        }
+        driverWeapon(dt, zombies, shots, inside = false)
         // the storm swallows people on foot too
-        if (d.x < stormX) hurtDriver(45f * dt)
+        if (d.x < stormX) {
+            hurtDriver(45f * dt, storm = true)
+            stormHurt = 0.2f
+            if (Random.nextFloat() < 0.5f) particles.add(Particle(d.x + rnd(-30f, 30f), d.y - rnd(10f, 90f), 0f, -100f, 0.5f, 0.5f, 7f, 0xFFE040FB.toInt()))
+        }
         if (d.y > terrain.heightAt(d.x) + 5f) d.y = terrain.heightAt(d.x)
         if (d.hp <= 0f) driverDown(if (d.x < stormX) "Tài xế bị vòng bo nuốt chửng!" else "Tài xế bị quái vật hạ gục!")
     }
 
-    /** Searching done: money, maybe gems, supplies and a part of the next car. */
-    private fun loot(b: Building) {
-        b.looted = true
+    /** Inside a building: only the storm keeps moving outside. */
+    private fun updateInside(inn: Interior, dt: Float) {
+        val d = driver
+        val b = inside ?: return
+        updateStorm(dt)
+        if (stormHurt > 0f) stormHurt -= dt
+        if (d.shieldT > 0f) d.shieldT -= dt
+        if (d.cloneT > 0f) d.cloneT -= dt
+        // the parked car still burns if the storm rolls over it
         val c = car
-        val tx = b.x
-        val ty = terrain.heightAt(b.x) - 160f
-        val cash = ((40 + 15 * stage) * rnd(0.7f, 1.3f) * (if (b.kind == 1) 1.5f else 1f)).toInt()
+        if (!wrecked && c.x - Car.HALF_LEN < stormX) {
+            c.hp -= 80f * dt
+            if (c.hp <= 0f) {
+                c.hp = 0f
+                wrecked = true
+            }
+        }
+        inn.update(this, dt, leanBack, leanFwd, jumpHeld)
+        val stormIn = stormX > b.x - Building.W / 2
+        if (stormIn) {
+            hurtDriver(45f * dt, storm = true)
+            stormHurt = 0.2f
+            if (Random.nextFloat() < 0.6f) particles.add(Particle(d.x + rnd(-200f, 200f), d.y - rnd(10f, 300f), rnd(-40f, 40f), -80f, 0.6f, 0.6f, 8f, 0xFFE040FB.toInt()))
+        }
+        updateEffects(dt)
+        if (d.hp <= 0f) driverDown(if (stormIn) "Tài xế bị vòng bo nuốt chửng trong nhà!" else "Tài xế bị zombie trong nhà hạ gục!")
+    }
+
+    /**
+     * The hand weapon on foot: aims at the nearest monster (on the road also at
+     * blocking obstacles and the boss) and attacks by itself.
+     */
+    internal fun driverWeapon(dt: Float, zs: List<Zombie>, out: MutableList<Projectile>, inside: Boolean) {
+        val d = driver
+        val w = save.sideWeapon
+        d.fireCd -= dt
+        val inn = interior
+        val reach = if (w.melee) w.range + 30f else w.range
+        var best = reach
+        var tx = 0f
+        var ty = 0f
+        for (z in zs) {
+            if (!z.alive) continue
+            val dd = abs(z.x - d.x)
+            if (dd < best) {
+                best = dd
+                tx = z.x
+                ty = if (inside) -z.type.h * 0.55f else z.y - z.fly - z.type.h * 0.55f
+            }
+        }
+        val bb = boss
+        if (!inside && best >= reach) {
+            // nothing alive near: hit what blocks the way
+            for (o in obstacles) {
+                if (!o.alive) continue
+                val dd = abs(o.x - d.x) - (if (w.melee) o.type.w / 2 else 0f)
+                if (dd < min(reach, 520f) && dd < best && sign(o.x - d.x) == d.face) {
+                    best = dd; tx = o.x; ty = o.y - o.type.h * 0.5f
+                }
+            }
+            bb?.let { if (it.alive && it.engaged && abs(it.x - d.x) - (if (w.melee) it.w / 2 else 0f) < (if (w.melee) reach else 900f)) { best = 0f; tx = it.x; ty = it.cy } }
+        }
+        val gx = d.x
+        val gy = d.y - 58f
+        if (best >= reach) {
+            if (d.atkT <= 0f) d.aim = if (d.face > 0f) 0f else PI.toFloat()
+            return
+        }
+        d.face = if (tx >= d.x) 1f else -1f
+        d.aim = atan2(ty - gy, tx - gx)
+        val busy = inn != null && inn.chests.any { it.openT > 0f && !it.opened }
+        if (d.fireCd > 0f || busy) return
+        d.fireCd = w.interval
+        if (w.melee) {
+            d.atkT = 0.25f
+            val f = d.face
+            sfx.play(Sfx.S.HIT, 0.5f)
+            for (z in zs) {
+                if (!z.alive) continue
+                val dx = (z.x - d.x) * f
+                if (dx < -20f || dx > w.range + z.type.w / 2) continue
+                if (inside) {
+                    inn?.hit(this, z, w.damage, f * w.knock * 2f)
+                } else {
+                    z.hp -= w.damage
+                    bleed(z.x, z.y - z.fly - z.type.h * 0.5f, 5)
+                    if (z.hp <= 0f) smashZombie(z, f * (200f + w.knock), -260f) else z.x += f * w.knock * 0.25f
+                }
+            }
+            if (!inside) {
+                for (o in obstacles) {
+                    if (!o.alive) continue
+                    val dx = (o.x - d.x) * f
+                    if (dx < -20f || dx > w.range + o.type.w / 2 || o.y - o.type.h > d.y + 10f) continue
+                    if (o.type == ObstacleType.BARREL) {
+                        barrelBlast(o)
+                    } else {
+                        o.hp -= w.damage
+                        o.flash = 0.08f
+                        o.barT = 3f
+                        sparks(o.x - f * o.type.w / 2, d.y - 50f)
+                        if (o.hp <= 0f) breakObstacle(o, f * 200f)
+                    }
+                }
+                if (bb != null && bb.alive && (bb.x - d.x) * f in -20f..(w.range + bb.w / 2)) hurtBoss(bb, w.damage)
+            }
+            return
+        }
+        // thrown / fired: arcing weapons aim a little high to drop onto the target
+        val dist = hypot(tx - gx, ty - gy)
+        val lob = if (w.gravity > 0f) w.gravity * dist / (w.speed * w.speed) * 0.5f else 0f
+        for (k in 0 until w.pellets) {
+            val off = if (w.pellets > 1) w.spread * (k - (w.pellets - 1) / 2f) / ((w.pellets - 1) / 2f) else 0f
+            var a = d.aim + off + rnd(-0.03f, 0.03f)
+            a -= lob * cos(a).let { if (it >= 0f) 1f else -1f }
+            out.add(Projectile(WeaponType.PISTOL, gx, gy, cos(a) * w.speed, sin(a) * w.speed, w.damage, w.pierce, 0f).also {
+                it.life = w.range / w.speed + 0.15f
+                it.side = w
+                it.grav = w.gravity
+            })
+        }
+        particles.add(Particle(gx + cos(d.aim) * 26f, gy + sin(d.aim) * 26f, 0f, 0f, 0.06f, 0.06f, 9f, 0xFFFFE082.toInt()))
+        sfx.play(if (w == SideWeapon.BOW || w == SideWeapon.DART) Sfx.S.BOW else Sfx.S.SHOOT, 0.35f)
+    }
+
+    /** A chest inside is open: money and a share of what the building holds. */
+    internal fun openChest(inn: Interior, ch: Chest) {
+        val c = car
+        val b = inn.b
+        val tx = ch.x
+        val ty = -ch.y - 150f
+        val cash = ((25 + 10 * stage) * rnd(0.7f, 1.3f) * (if (b.kind == 1) 1.5f else 1f) * (if (ch.kind == 5) 3f else 1f)).toInt()
         addMoney(cash, tx, ty)
         var line = 0
         fun note(s: String, color: Int) {
-            texts.add(FloatText(s, tx, ty - 60f - line * 62f, color).also { it.life = 2.4f; it.size = 32f })
+            texts.add(FloatText(s, tx, ty - 60f - line * 56f, color).also { it.life = 2.4f; it.size = 30f })
             line++
         }
-        val partChance = (if (b.kind == 3) 0.85f else 0.5f) + (if (scavenger) 0.2f else 0f)
+        val partChance = (if (b.kind == 3) 0.45f else 0.22f) + (if (ch.kind == 2) 0.2f else 0f) + (if (scavenger) 0.15f else 0f)
         val target = save.partTarget()
         if (target != null && Random.nextFloat() < partChance) {
             save.parts[target.id]++
             runParts++
             note("🔧 MẢNH ${target.title.uppercase()} (${save.parts[target.id]}/${SaveData.PARTS_NEEDED})", 0xFF80D8FF.toInt())
         }
-        if (Random.nextFloat() < 0.5f) {
-            val g = 3 + Random.nextInt(4)
-            runGems += g
-            note("+$g♦", 0xFFFF5252.toInt())
+        if (ch.kind == 5 || Random.nextFloat() < 0.35f) {
+            val gm = if (ch.kind == 5) 4 + Random.nextInt(5) else 2 + Random.nextInt(3)
+            runGems += gm
+            note("+$gm♦", 0xFFFF5252.toInt())
         }
-        if (b.kind == 2 || Random.nextFloat() < 0.3f) {
+        val firstHere = inn.chests.count { it.opened } == 1
+        if ((b.kind == 2 && firstHere) || Random.nextFloat() < 0.15f) {
             c.fuel = min(c.maxFuel, c.fuel + c.maxFuel * 0.35f)
             note("+XĂNG", 0xFFFF8A80.toInt())
         }
-        if (b.kind == 4 || Random.nextFloat() < 0.25f) {
-            c.hp = min(c.maxHp, c.hp + c.maxHp * 0.3f)
-            driver.hp = driver.maxHp
+        if (ch.kind == 3 || ch.kind == 4 || (b.kind == 4 && firstHere) || Random.nextFloat() < 0.15f) {
+            val full = ch.kind == 4 || b.kind == 4
+            driver.hp = min(driver.maxHp, driver.hp + driver.maxHp * (if (full) 1f else 0.4f))
+            if (!wrecked) c.hp = min(c.maxHp, c.hp + c.maxHp * (if (full) 0.3f else 0.15f))
             note("+MÁU", 0xFF69F0AE.toInt())
         }
-        if (Random.nextFloat() < 0.35f && weapon != WeaponType.KNIFE) {
-            c.ammo += 20f
-            note("+20 ĐẠN", 0xFFFFCC80.toInt())
+        if (Random.nextFloat() < 0.25f && weapon != WeaponType.KNIFE) {
+            c.ammo += 15f
+            note("+15 ĐẠN", 0xFFFFCC80.toInt())
         }
-        burst(tx, ty, 0xFFFFD740.toInt(), 20)
+        // now and then a hand weapon nobody had found yet
+        val finds = SideWeapon.entries.filter { !save.ownsSide(it) && save.sideUnlocked(it) }
+        if (finds.isNotEmpty() && Random.nextFloat() < (if (ch.kind == 5) 0.25f else 0.06f)) {
+            val w = finds.random()
+            save.ownedSide = save.ownedSide or (1 shl w.ordinal)
+            note("🗡 TÌM ĐƯỢC ${w.title.uppercase()}!", 0xFFFFD740.toInt())
+        }
+        if (inn.cleared) {
+            runGems += 2
+            note("ĐÃ LỤC SẠCH! +2♦", 0xFF69F0AE.toInt())
+        }
+        burst(tx, ty + 100f, 0xFFFFD740.toInt(), 20)
         sfx.play(Sfx.S.WIN, 0.7f)
     }
+
+    // small hooks for the building interiors
+    internal val scavengerPerk get() = scavenger
+    internal val monsterRewardMul get() = rewardMul
+    internal fun giveMoney(n: Int, x: Float, y: Float) = addMoney(n, x, y)
+    internal fun bleedAt(x: Float, y: Float, n: Int) = bleed(x, y, n)
+    internal fun sparksAt(x: Float, y: Float) = sparks(x, y)
 
     /** Pillboxes that shoot back: 1 on stage 1, one more every 3 stages. */
     private fun placeBunkers() {
@@ -780,6 +951,9 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
             pause(); true
         }
         State.MENU -> false
+        State.SOUND -> {
+            save.save(); setState(soundBack); true
+        }
         State.PAUSED -> {
             endRun("Bỏ cuộc"); true
         }
@@ -790,6 +964,7 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
 
     private fun goMenu() {
         save.save()
+        inside = null
         boss = null
         bossRocks.clear()
         zombies.clear(); obstacles.clear(); debris.clear(); items.clear()
@@ -805,9 +980,13 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
         stateTime += dt
         if (shake > 0f) shake -= dt
         if (hurtFlash > 0f) hurtFlash -= dt
-        music.enabled = save.music
+        music.enabled = save.volMusic > 0
+        music.master = save.volMusic / 100f
+        sfx.fxVol = save.volSfx / 100f
+        sfx.engineMaster = save.volEngine / 100f
         when (state) {
             State.MENU, State.MAPS, State.GARAGE, State.STORY, State.LAYOUT -> music.play(Music.Track.CHILL, 1f)
+            State.SOUND -> music.play(if (soundBack == State.PAUSED && intense) Music.Track.INTENSE else Music.Track.CHILL, if (soundBack == State.PAUSED) 0.4f else 1f)
             // kept low in a run so the engine and the action carry the sound
             State.PLAYING -> music.play(if (intense) Music.Track.INTENSE else Music.Track.CHILL, 0.4f)
             State.PAUSED -> music.play(if (intense) Music.Track.INTENSE else Music.Track.CHILL, 0.3f)
@@ -818,7 +997,7 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
         updateEngineSound(dt)
         when (state) {
             State.PLAYING -> updatePlay(dt)
-            State.PAUSED -> {}
+            State.PAUSED, State.SOUND -> {}
             else -> {
                 updateEffects(dt)
                 updateDebris(dt)
@@ -831,7 +1010,12 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
     /** Engine note: pitch follows road speed (revs up in the air), loudness the throttle. */
     private fun updateEngineSound(dt: Float) {
         val c = car
-        if (state != State.PLAYING || dyingT > 0f || wrecked) {
+        if (state == State.SOUND && dragVol == 2) {
+            // let the engine slider be heard while it moves
+            sfx.engine(true, 1.1f, 0.8f)
+            return
+        }
+        if (state != State.PLAYING || dyingT > 0f || wrecked || driver.out) {
             sfx.engine(false)
             engineRev = 0f
             return
@@ -865,11 +1049,17 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
                 left -= h
             }
             stormX += STORM_SPEED[phase] * dt * 0.3f
-            burn(dt, true)
-            updateDebris(dt)
+            if (inside == null) {
+                burn(dt, true)
+                updateDebris(dt)
+                updateCamera(dt)
+            }
             updateEffects(dt)
-            updateCamera(dt)
             if (dyingT <= 0f) endRun(dyingReason)
+            return
+        }
+        interior?.let {
+            updateInside(it, dt)
             return
         }
         updateStorm(dt)
@@ -904,6 +1094,8 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
 
         if (c.shieldT > 0f) c.shieldT -= dt
         if (c.cloneT > 0f) c.cloneT -= dt
+        if (driver.shieldT > 0f) driver.shieldT -= dt
+        if (driver.cloneT > 0f) driver.cloneT -= dt
         if (c.hurtT > 0f) c.hurtT -= dt
         if (stormHurt > 0f) stormHurt -= dt
 
@@ -1007,7 +1199,7 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
         if (c.x >= goalX && !driver.out) {
             stageComplete(); return
         }
-        if (driver.out && driver.x >= goalX) {
+        if (driver.out && inside == null && driver.x >= goalX) {
             // made it to the station on foot
             stageComplete(); return
         }
@@ -1271,7 +1463,13 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
             }
             if (driver.out && abs(z.x - driver.x) < z.type.w / 2 + 16f && z.y - z.fly * 0.2f > driver.y - 90f) {
                 // a monster has reached the driver
-                if (z.type.flying) {
+                val away = sign(z.x - driver.x).let { if (it == 0f) 1f else it }
+                if (driver.shieldT > 0f) {
+                    // the bubble throws monsters off and hurts them
+                    z.hp -= 1.5f
+                    sparks(driver.x + away * 30f, driver.y - 50f)
+                    if (z.hp <= 0f || z.type.flying) smashZombie(z, away * 400f, -300f) else z.x = driver.x + away * (z.type.w / 2 + 70f)
+                } else if (z.type.flying) {
                     smashZombie(z, rnd(-80f, 80f), -200f)
                     hurtDriver(8f)
                 } else {
@@ -1874,11 +2072,12 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
                 text("+XĂNG", it, 0xFFFF8A80.toInt())
             }
             ItemType.REPAIR -> {
-                c.hp = min(c.maxHp, c.hp + c.maxHp * 0.3f)
+                // on foot it patches up the driver
+                if (driver.out) driver.hp = min(driver.maxHp, driver.hp + driver.maxHp * 0.4f) else c.hp = min(c.maxHp, c.hp + c.maxHp * 0.3f)
                 text("+MÁU", it, 0xFF69F0AE.toInt())
             }
             ItemType.SHIELD -> {
-                c.shieldT = 6f
+                if (driver.out) driver.shieldT = 6f else c.shieldT = 6f
                 text("LÁ CHẮN!", it, 0xFF82B1FF.toInt())
             }
             ItemType.AMMO -> {
@@ -1897,7 +2096,7 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
                 return
             }
             ItemType.CLONE -> {
-                c.cloneT = 10f
+                if (driver.out) driver.cloneT = 10f else c.cloneT = 10f
                 text("NHÂN BẢN: x2 MẠNG!", it, 0xFF64FFDA.toInt())
                 sfx.play(Sfx.S.CLONE)
                 return
@@ -2114,6 +2313,7 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
                 WeaponType.ROCKET -> steerRocket(s, dt)
                 else -> {}
             }
+            s.vy += s.grav * dt
             s.x += s.vx * dt
             s.y += s.vy * dt
             val blasts = s.splash > 0f
@@ -2263,7 +2463,7 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
         }
     }
 
-    private fun rnd(a: Float, b: Float) = a + Random.nextFloat() * (b - a)
+    internal fun rnd(a: Float, b: Float) = a + Random.nextFloat() * (b - a)
 
     private fun bleed(x: Float, y: Float, n: Int) {
         repeat(n) {
@@ -2332,7 +2532,10 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
         slotButton(3, "jump", "NHẢY", 0x5529B6F6),
         slotButton(4, "act", when (driverAction()) {
             "car" -> "LÊN XE"
-            "loot" -> if (driver.looting != null) "ĐANG LỤC…" else "LỤC SOÁT"
+            "enter" -> if (doorNear(driver.x, 110f)?.interior != null) "VÀO LẠI" else "VÀO NHÀ"
+            "chest" -> "LỤC"
+            "busy" -> "ĐANG LỤC…"
+            "leave" -> "RA NGOÀI"
             else -> "…"
         }, if (driverAction() != null) 0x55FFC107 else 0x33FFFFFF),
     ) else listOf(
@@ -2386,18 +2589,17 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
                 Button("maps", "🗺  ẢI ${save.stageSel}: ${Themes.of(save.stageSel).name.uppercase()}", cx - 230f, 128f, cx + 230f, 214f, 0xFF6D4C41.toInt()),
                 b("play", "CHẠY!", cx, 262f, 460f, green),
                 b("garage", "GARA", cx, 360f, 460f, purple),
-                Button("sound", if (save.sound) "🔊" else "🔇", W - 100f, 20f, W - 24f, 96f, 0x66000000),
-                Button("music", "🎵", W - 190f, 20f, W - 114f, 96f, if (save.music) 0x66000000 else 0x66B71C1C),
+                Button("soundMenu", "🔊 ÂM THANH", W - 196f, 20f, W - 24f, 96f, 0xFF00897B.toInt()),
             )
             State.MAPS -> listOf(b("menu", "QUAY LẠI", W / 2, H - 84f, 360f, grey))
             State.GARAGE -> garageButtons(green, grey)
             State.PAUSED -> listOf(
                 b("resume", "TIẾP TỤC", W / 2, H * 0.32f, 420f, green),
                 b("quit", "BỎ CUỘC", W / 2, H * 0.32f + 104f, 420f, grey),
-                Button("sound", if (save.sound) "🔊 HIỆU ỨNG: BẬT" else "🔇 HIỆU ỨNG: TẮT", W / 2 - 330f, H * 0.32f + 214f, W / 2 - 10f, H * 0.32f + 290f, if (save.sound) 0xFF00897B.toInt() else grey),
-                Button("music", if (save.music) "🎵 NHẠC: BẬT" else "🎵 NHẠC: TẮT", W / 2 + 10f, H * 0.32f + 214f, W / 2 + 330f, H * 0.32f + 290f, if (save.music) 0xFF00897B.toInt() else grey),
+                Button("soundMenu", "🔊 CHỈNH ÂM THANH", W / 2 - 330f, H * 0.32f + 214f, W / 2 + 330f, H * 0.32f + 290f, 0xFF00897B.toInt()),
                 Button("layout", "🎮 ĐỔI VỊ TRÍ PHÍM", W / 2 - 330f, H * 0.32f + 304f, W / 2 + 330f, H * 0.32f + 376f, 0xFF37474F.toInt()),
             )
+            State.SOUND -> listOf(Button("soundDone", "XONG", W / 2 - 180f, H - 120f, W / 2 + 180f, H - 40f, green))
             State.STORY -> listOf(Button("skip", "BỎ QUA ›", W - 290f, H - 96f, W - 40f, H - 24f, grey))
             State.LAYOUT -> listOf(
                 Button("layoutReset", "MẶC ĐỊNH", W / 2 - 330f, 120f, W / 2 - 20f, 196f, grey),
@@ -2463,6 +2665,17 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
                     }
                 }
             }
+            3 -> {
+                val w = garageSide
+                val pr = weaponPanelRect()
+                val (label, color, on) = when {
+                    save.side == w.ordinal -> Triple("ĐANG DÙNG", green, false)
+                    save.ownsSide(w) -> Triple("TRANG BỊ", blue, true)
+                    !save.sideUnlocked(w) -> Triple("🔒 QUA ẢI ${w.unlockStage}", grey, false)
+                    else -> Triple("MUA ${w.cost}$", gold, save.money >= w.cost)
+                }
+                l.add(Button("sideAct", label, pr[2] - 330f, pr[1] + 24f, pr[2] - 24f, pr[1] + 94f, color, on))
+            }
             else -> {
                 val n = Skills.nodes[skillSel]
                 val bits = save.skills
@@ -2493,10 +2706,10 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
     /** Left of the garage content (the round nav buttons sit before it). */
     val garageL = 168f
 
-    /** Round nav buttons: home, vehicles, weapons, skill tree. */
+    /** Round nav buttons: home, vehicles, weapons, skill tree, hand weapons. */
     fun navRect(i: Int): FloatArray {
-        val cy = 160f + i * 132f
-        return floatArrayOf(26f, cy - 58f, 142f, cy + 58f)
+        val cy = 128f + i * 114f
+        return floatArrayOf(32f, cy - 52f, 136f, cy + 52f)
     }
 
     /** The garage floor where the vehicle stands (between the nav and the stat panel). */
@@ -2542,11 +2755,45 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
     private fun openGarage() {
         showVeh = save.vehicle
         garageWeapon = save.weaponType
+        garageSide = save.sideWeapon
         // open the skill page where the next node waits
         val next = Skills.nodes.firstOrNull { Skills.available(save.skills, it) && it.stat != null }
         skillSel = next?.id ?: 0
         skillPage = next?.page ?: 0
         setState(State.GARAGE)
+    }
+
+    // ------------------------------------------------------- sound sliders
+
+    /** Where to go back after the sound screen. */
+    var soundBack = State.MENU
+        private set
+
+    /** Slider being dragged: 0 music, 1 effects, 2 engine; -1 none. */
+    var dragVol = -1
+        private set
+    private var dragVolId = -1
+
+    /** Track of slider [i] (screen coordinates). */
+    fun volSlider(i: Int): FloatArray {
+        val y = 230f + i * 118f
+        return floatArrayOf(W / 2 - 300f, y - 12f, W / 2 + 300f, y + 12f)
+    }
+
+    fun volValue(i: Int) = when (i) {
+        0 -> save.volMusic
+        1 -> save.volSfx
+        else -> save.volEngine
+    }
+
+    private fun setVol(i: Int, x: Float) {
+        val r = volSlider(i)
+        val v = (((x - r[0]) / (r[2] - r[0])) * 100f).toInt().coerceIn(0, 100)
+        when (i) {
+            0 -> save.volMusic = v
+            1 -> save.volSfx = v
+            else -> save.volEngine = v
+        }
     }
 
     private fun inRect(r: FloatArray, x: Float, y: Float) = x >= r[0] && x <= r[2] && y >= r[1] && y <= r[3]
@@ -2564,10 +2811,12 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
                 "exit" -> if (canLeaveCar()) leaveCar()
                 "act" -> when (driverAction()) {
                     "car" -> enterCar()
-                    "loot" -> doorNear(driver.x, 110f)?.let {
-                        driver.looting = it
+                    "enter" -> doorNear(driver.x, 110f)?.let { enterBuilding(it) }
+                    "chest" -> interior?.chestNear(driver.x, driver.y)?.let {
+                        it.openT = 0.001f
                         sfx.play(Sfx.S.CLICK)
                     }
+                    "leave" -> leaveBuilding()
                 }
                 else -> {
                     pointers[id] = ctl
@@ -2588,6 +2837,17 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
                     }
                 }
                 return
+            }
+        }
+        if (state == State.SOUND) {
+            for (i in 0..2) {
+                val r = volSlider(i)
+                if (x > r[0] - 40f && x < r[2] + 40f && y > r[1] - 44f && y < r[3] + 44f) {
+                    dragVol = i
+                    dragVolId = id
+                    setVol(i, x)
+                    return
+                }
             }
         }
         if (stateTime < 0.4f) return
@@ -2612,7 +2872,7 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
             }
         }
         if (state == State.GARAGE) {
-            for (i in 0..3) if (inRect(navRect(i), x, y)) {
+            for (i in 0..4) if (inRect(navRect(i), x, y)) {
                 sfx.play(Sfx.S.CLICK)
                 if (i == 0) goMenu() else garageTab = i - 1
                 return
@@ -2634,6 +2894,11 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
                 1 -> for (w in WeaponType.entries) if (inRect(weaponRect(w.ordinal), x, y)) {
                     sfx.play(Sfx.S.CLICK)
                     garageWeapon = w
+                    return
+                }
+                3 -> for (w in SideWeapon.entries) if (inRect(weaponRect(w.ordinal), x, y)) {
+                    sfx.play(Sfx.S.CLICK)
+                    garageSide = w
                     return
                 }
                 else -> {
@@ -2701,15 +2966,15 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
             "stNext" -> {
                 save.stageSel = min(maxStartStage(), save.stageSel + 1); loadStage(save.stageSel)
             }
-            "sound" -> {
-                save.sound = !save.sound
-                sfx.enabled = save.sound
-                save.save()
+            "soundMenu" -> {
+                soundBack = state
+                setState(State.SOUND)
             }
-            "music" -> {
-                save.music = !save.music
+            "soundDone" -> {
                 save.save()
+                setState(soundBack)
             }
+            "sideAct" -> pickSide(garageSide)
         }
     }
 
@@ -2720,6 +2985,10 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
     }
 
     fun touchMove(id: Int, x: Float, y: Float) {
+        if (state == State.SOUND && id == dragVolId && dragVol >= 0) {
+            setVol(dragVol, x)
+            return
+        }
         if (state == State.LAYOUT && id == dragId && dragSlot >= 0) {
             save.ctlX[dragSlot] = (x / W * 1000f).toInt().coerceIn(0, 1000)
             save.ctlY[dragSlot] = (y / H * 1000f).toInt().coerceIn(0, 1000)
@@ -2734,6 +3003,12 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
     }
 
     fun touchUp(id: Int) {
+        if (id == dragVolId) {
+            // a sample of the new effects level
+            if (dragVol == 1) sfx.play(Sfx.S.COIN)
+            dragVol = -1
+            dragVolId = -1
+        }
         if (id == dragId) {
             dragId = -1
             dragSlot = -1
@@ -2787,6 +3062,17 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
             save.ownedWeapons = save.ownedWeapons or (1 shl w.ordinal)
         }
         save.weapon = w.ordinal
+        sfx.play(Sfx.S.COIN)
+        save.save()
+    }
+
+    private fun pickSide(w: SideWeapon) {
+        if (!save.ownsSide(w)) {
+            if (!save.sideUnlocked(w) || save.money < w.cost) return
+            save.money -= w.cost
+            save.ownedSide = save.ownedSide or (1 shl w.ordinal)
+        }
+        save.side = w.ordinal
         sfx.play(Sfx.S.COIN)
         save.save()
     }

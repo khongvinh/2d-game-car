@@ -29,6 +29,10 @@ class Music(private val cacheDir: File? = null, private val startAfter: CountDow
     @Volatile
     var enabled = true
 
+    /** Music slider (0..1). */
+    @Volatile
+    var master = 1f
+
     /** True while the app is in the background: everything is silent. */
     @Volatile
     var suspended = false
@@ -87,7 +91,7 @@ class Music(private val cacheDir: File? = null, private val startAfter: CountDow
         if (!ready) return
         for (t in Track.entries) {
             val track = tracks[t.ordinal] ?: continue
-            val target = if (enabled && !suspended && t == want) wantVol * MASTER else 0f
+            val target = if (enabled && !suspended && t == want) wantVol * MASTER * master else 0f
             val v = vol[t.ordinal]
             val nv = if (v < target) min(target, v + dt * 0.8f) else max(target, v - dt * 0.8f)
             vol[t.ordinal] = nv

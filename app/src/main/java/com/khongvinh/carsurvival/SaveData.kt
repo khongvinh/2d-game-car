@@ -36,6 +36,15 @@ class SaveData(context: Context) {
     var music = prefs.getBoolean("music", true)
     var bestScore = prefs.getInt("bestScore", 0)
 
+    /** Volume sliders 0..100: music, sound effects, engine. Old on/off switches carry over. */
+    var volMusic = prefs.getInt("volMusic", if (music) 50 else 0)
+    var volSfx = prefs.getInt("volSfx", if (sound) 65 else 0)
+    var volEngine = prefs.getInt("volEngine", if (sound) 100 else 0)
+
+    /** Hand weapons for the driver on foot: bit per [SideWeapon] ordinal (pistol free), and the one carried. */
+    var ownedSide = prefs.getInt("ownedSide", 1)
+    var side = prefs.getInt("side", 0)
+
     /** Red gems for tuning upgrades, and the level of each upgrade. */
     var gems = prefs.getInt("gems", 0)
 
@@ -147,6 +156,8 @@ class SaveData(context: Context) {
         ownedWeapons = 1
         weapon = 0
         weaponLevels.fill(0)
+        ownedSide = 1
+        side = 0
         bestScore = 0
         records.clear()
         gems = 0
@@ -161,6 +172,10 @@ class SaveData(context: Context) {
     val weaponType get() = WeaponType.entries[weapon.coerceIn(0, WeaponType.entries.size - 1)]
     fun weaponLevel(w: WeaponType) = weaponLevels[w.ordinal]
     val cloneUnlocked get() = bestStage >= 5
+
+    val sideWeapon get() = SideWeapon.entries[side.coerceIn(0, SideWeapon.entries.size - 1)]
+    fun ownsSide(w: SideWeapon) = ownedSide and (1 shl w.ordinal) != 0
+    fun sideUnlocked(w: SideWeapon) = bestStage >= w.unlockStage
 
     fun ownsVehicle(id: Int) = ownedVehicles and (1 shl id) != 0
     fun ownsWeapon(i: Int) = ownedWeapons and (1 shl i) != 0
@@ -182,6 +197,11 @@ class SaveData(context: Context) {
         e.putBoolean("sound", sound)
         e.putBoolean("music", music)
         e.putInt("bestScore", bestScore)
+        e.putInt("volMusic", volMusic)
+        e.putInt("volSfx", volSfx)
+        e.putInt("volEngine", volEngine)
+        e.putInt("ownedSide", ownedSide)
+        e.putInt("side", side)
         e.putString("runs", records.joinToString(";") { it.joinToString(",") })
         e.putInt("gems", gems)
         e.putInt("skills", skills)
