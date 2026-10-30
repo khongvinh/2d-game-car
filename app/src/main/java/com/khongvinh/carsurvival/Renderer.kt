@@ -41,7 +41,10 @@ class Renderer(private val g: Game) {
     fun render(c: Canvas) {
         art.time = g.anim
         val inn = g.interior
-        if (inn != null && g.state != State.MENU && g.state != State.MAPS && g.state != State.GARAGE && g.state != State.STORY) {
+        val run = g.rooms
+        if (run != null && g.state != State.MENU && g.state != State.MAPS && g.state != State.GARAGE && g.state != State.STORY) {
+            drawRooms(c, run)
+        } else if (inn != null && g.state != State.MENU && g.state != State.MAPS && g.state != State.GARAGE && g.state != State.STORY) {
             drawInterior(c, inn)
         } else {
             drawBackground(c)
@@ -59,6 +62,7 @@ class Renderer(private val g: Game) {
             State.STORY -> drawStory(c)
             State.LAYOUT -> drawLayout(c)
             State.SOUND -> drawSound(c)
+            State.PICK -> g.rooms?.let { drawRoomHud(c, it); drawPick(c, it) }
             State.PLAYING, State.PAUSED -> {
                 drawDamageOverlay(c)
                 drawHud(c)
@@ -1605,7 +1609,7 @@ class Renderer(private val g: Game) {
     }
 
     private fun drawBoss(c: Canvas, b: Boss) {
-        val dir = if (g.car.x >= b.x) 1f else -1f
+        val dir = if (targetX() >= b.x) 1f else -1f
         val w = b.w
         val h = b.h
         val stomp = if (b.slamAnim > 0f) sin(b.slamAnim / 0.5f * 3.14f) else 0f
@@ -2022,6 +2026,10 @@ class Renderer(private val g: Game) {
     }
 
     private fun drawHud(c: Canvas) {
+        g.rooms?.let {
+            drawRoomHud(c, it)
+            return
+        }
         val W = g.W
         val H = g.H
         val car = g.car
@@ -2165,7 +2173,10 @@ class Renderer(private val g: Game) {
             }
         }
 
-        if (g.state == State.PLAYING && g.dyingT <= 0f && d.out) for (b in g.controls()) drawButton(c, b, g.isHeld(b.id))
+        if (g.state == State.PLAYING && g.dyingT <= 0f && d.out) {
+            for (b in g.controls()) drawButton(c, b, g.isHeld(b.id))
+            drawJoystick(c)
+        }
         if (d.out) {
             drawCountdown(c)
             return
@@ -2847,7 +2858,7 @@ class Renderer(private val g: Game) {
         for (b in g.layoutButtons()) drawButton(c, b, false)
         text.textAlign = Paint.Align.CENTER
         text.color = 0xFFE0E0E0.toInt()
-        fitText(c, "Ô trái/phải: nghiêng xe • khi đi bộ: ◀ ▶ • tên lửa = NHẢY • GA = LỤC SOÁT/LÊN XE", g.W / 2, 236f, 22f, g.W - 80f)
+        fitText(c, "Ô trái/phải: nghiêng xe • khi đi bộ: cần gạt ở nửa trái màn hình • tên lửa = NHẢY • GA = VÀO NHÀ/LÊN XE", g.W / 2, 236f, 22f, g.W - 80f)
         drawMenuButtons(c)
     }
 
@@ -3443,7 +3454,7 @@ class Renderer(private val g: Game) {
         val car = g.car
         var a = 0f
         if (g.hurtFlash > 0f) a = min(1f, g.hurtFlash * 2.2f) * 0.85f
-        if (car.hp < car.maxHp * 0.25f && !g.wrecked && g.state == State.PLAYING) {
+        if (car.hp < car.maxHp * 0.25f && !g.wrecked && g.rooms == null && g.state == State.PLAYING) {
             a = max(a, 0.25f + 0.2f * sin(g.anim * 6f))
         }
         if (a <= 0f) return
@@ -3884,7 +3895,7 @@ class Renderer(private val g: Game) {
 
 
     private fun drawDragon(c: Canvas, b: Boss) {
-        val dir = if (g.car.x >= b.x) 1f else -1f
+        val dir = if (targetX() >= b.x) 1f else -1f
         val w = b.w
         val h = b.h
         val hit = b.flash > 0f
@@ -3986,7 +3997,7 @@ class Renderer(private val g: Game) {
 
 
     private fun drawBatBoss(c: Canvas, b: Boss) {
-        val dir = if (g.car.x >= b.x) 1f else -1f
+        val dir = if (targetX() >= b.x) 1f else -1f
         val w = b.w
         val h = b.h
         val hit = b.flash > 0f
@@ -4040,7 +4051,7 @@ class Renderer(private val g: Game) {
 
 
     private fun drawAlienBoss(c: Canvas, b: Boss) {
-        val dir = if (g.car.x >= b.x) 1f else -1f
+        val dir = if (targetX() >= b.x) 1f else -1f
         val w = b.w
         val h = b.h
         val hit = b.flash > 0f
@@ -4677,6 +4688,556 @@ class Renderer(private val g: Game) {
             text.textSize = 30f
             text.color = 0xFFFFD740.toInt()
             c.drawText("?", x, b - 150f + sin(g.anim * 3f) * 6f, text)
+        }
+    }
+
+    // ------------------------------------------------------- warehouse rooms
+
+    /** Who monsters and bosses face: the driver on foot, else the car. */
+    private fun targetX() = if (g.driver.out) g.driver.x else g.car.x
+
+    private fun drawRooms(c: Canvas, run: RoomRun) {
+        val W = g.W
+        val H = g.H
+        val rm = run.room
+        fill.shader = null
+        fill.alpha = 255
+        // sunset sky behind everything (seen through the windows and the open ends)
+        val sky = when (g.region) {
+            Region.DESERT -> intArrayOf(0xFFE8A060.toInt(), 0xFFC8643A.toInt())
+            Region.VOLCANO -> intArrayOf(0xFFB04A2A.toInt(), 0xFF5A1E14.toInt())
+            Region.NIGHT -> intArrayOf(0xFF2B3A66.toInt(), 0xFF141C33.toInt())
+            Region.ALIEN -> intArrayOf(0xFF7A4AA8.toInt(), 0xFF2E1A4A.toInt())
+        }
+        fill.color = sky[1]
+        c.drawRect(0f, 0f, W, H, fill)
+        fill.color = sky[0]
+        c.drawRect(0f, H * 0.3f, W, H, fill)
+        c.save()
+        if (g.shake > 0f) {
+            val s = g.shake * 30f
+            c.translate((Random.nextFloat() - 0.5f) * s, (Random.nextFloat() - 0.5f) * s)
+        }
+        c.scale(Game.ZOOM, Game.ZOOM)
+        val camY = -g.viewH * 0.72f
+        c.translate(-run.camX, -camY)
+        val ceil = -600f
+        val x0 = run.camX - 100f
+        val x1 = run.camX + g.viewW + 100f
+        // far mesas outside
+        fill.color = shade(sky[0], 0.75f)
+        path.reset()
+        path.moveTo(x0 - 200f, 0f)
+        var mx = floor((x0 - 200f) / 260f) * 260f
+        while (mx < x1 + 300f) {
+            path.lineTo(mx, -330f - (hash(mx.toInt()) % 120))
+            path.lineTo(mx + 200f, -330f - (hash(mx.toInt()) % 120))
+            path.lineTo(mx + 260f, -180f)
+            mx += 260f
+        }
+        path.lineTo(x1 + 300f, 0f)
+        path.close()
+        c.drawPath(path, fill)
+        // the hall: plaster above, brick below, roof trusses
+        val plaster = when (rm.palette) { 0 -> 0xFFB79A78.toInt(); 1 -> 0xFFA88D70.toInt(); else -> 0xFF9C8C78.toInt() }
+        val brick = 0xFF7A3B2E.toInt()
+        fill.color = plaster
+        c.drawRect(0f, ceil, rm.width, -260f, fill)
+        fill.color = brick
+        c.drawRect(0f, -260f, rm.width, 0f, fill)
+        stroke.color = shade(brick, 0.75f)
+        stroke.strokeWidth = 2f
+        var by = -18f
+        var row = 0
+        while (by > -260f) {
+            c.drawLine(0f, by, rm.width, by, stroke)
+            var bx = if (row % 2 == 0) 0f else 30f
+            while (bx < rm.width) {
+                if (bx > x0 && bx < x1) c.drawLine(bx, by, bx, by + 18f, stroke)
+                bx += 60f
+            }
+            by -= 18f; row++
+        }
+        fill.color = shade(plaster, 0.8f)
+        c.drawRect(0f, -268f, rm.width, -258f, fill)
+        // arched windows glowing with the evening
+        var wx = 260f
+        while (wx < rm.width - 200f) {
+            if (wx > x0 - 300f && wx < x1 + 300f) {
+                for (k in 0..2) {
+                    val l = wx + k * 92f
+                    fill.color = 0xFF3B2A20.toInt()
+                    c.drawRect(l - 6f, -540f, l + 80f, -300f, fill)
+                    fill.color = sky[0]
+                    c.drawRect(l, -500f, l + 74f, -306f, fill)
+                    r.set(l, -540f, l + 74f, -460f)
+                    c.drawArc(r, 180f, 180f, true, fill)
+                    fill.color = 0x55FFE0A0
+                    c.drawRect(l, -480f, l + 30f, -306f, fill)
+                    stroke.color = 0xFF3B2A20.toInt()
+                    stroke.strokeWidth = 4f
+                    c.drawLine(l + 37f, -540f, l + 37f, -306f, stroke)
+                    c.drawLine(l, -420f, l + 74f, -420f, stroke)
+                    c.drawLine(l, -360f, l + 74f, -360f, stroke)
+                }
+            }
+            wx += 760f
+        }
+        // roof
+        fill.color = 0xFF4A3A30.toInt()
+        c.drawRect(x0, ceil - 120f, x1, ceil, fill)
+        stroke.color = 0xFF3A2C24.toInt()
+        stroke.strokeWidth = 10f
+        var tx = floor(x0 / 240f) * 240f
+        while (tx < x1) {
+            c.drawLine(tx, ceil, tx + 120f, ceil + 60f, stroke)
+            c.drawLine(tx + 240f, ceil, tx + 120f, ceil + 60f, stroke)
+            tx += 240f
+        }
+        c.drawLine(x0, ceil + 60f, x1, ceil + 60f, stroke)
+        // background clutter: shelves of boxes, wrecked cars, crates, pallets
+        for (dc in rm.decor) {
+            val dx = dc[0]
+            if (dx < x0 - 200f || dx > x1 + 200f) continue
+            when (dc[1].toInt()) {
+                0 -> {
+                    fill.color = 0xFF5D4A3A.toInt()
+                    c.drawRect(dx - 90f, -220f, dx - 82f, 0f, fill)
+                    c.drawRect(dx + 82f, -220f, dx + 90f, 0f, fill)
+                    for (k in 0..2) {
+                        val y = -220f + k * 75f
+                        c.drawRect(dx - 90f, y, dx + 90f, y + 6f, fill)
+                        for (j in 0..2) {
+                            fill.color = 0xFF9C7B57.toInt()
+                            c.drawRect(dx - 80f + j * 55f, y - 44f + 4f * j, dx - 34f + j * 55f, y, fill)
+                            fill.color = 0xFF5D4A3A.toInt()
+                        }
+                    }
+                }
+                1 -> {
+                    fill.color = 0xFF5B4038.toInt()
+                    c.drawRoundRect(dx - 120f, -70f, dx + 120f, -18f, 16f, 16f, fill)
+                    c.drawRoundRect(dx - 60f, -110f, dx + 60f, -60f, 14f, 14f, fill)
+                    fill.color = 0xFF2B2420.toInt()
+                    c.drawCircle(dx - 70f, -16f, 20f, fill)
+                    c.drawCircle(dx + 70f, -16f, 20f, fill)
+                    fill.color = 0x66FFE0A0
+                    c.drawRect(dx - 50f, -102f, dx - 6f, -70f, fill)
+                }
+                2 -> {
+                    for (k in 0..2) {
+                        fill.color = if (k % 2 == 0) 0xFFA1887F.toInt() else 0xFF8D6E63.toInt()
+                        c.drawRect(dx - 40f + k * 30f, -60f - (k % 2) * 56f, dx + 16f + k * 30f, -4f - (k % 2) * 56f, fill)
+                    }
+                }
+                else -> {
+                    fill.color = 0xFF6D5A44.toInt()
+                    for (k in 0..2) c.drawRect(dx - 70f, -14f - k * 18f, dx + 70f, -4f - k * 18f, fill)
+                    fill.color = 0xFF2E7D32.toInt()
+                    c.drawRect(dx + 80f, -90f, dx + 130f, 0f, fill)
+                }
+            }
+        }
+        // floor
+        fill.color = 0xFF4E4842.toInt()
+        c.drawRect(x0, 0f, x1, 400f, fill)
+        fill.color = 0xFF8A827A.toInt()
+        c.drawRect(x0, 0f, x1, 10f, fill)
+        fill.color = 0xFF2A2420.toInt()
+        c.drawRect(-400f, ceil - 120f, 0f, 400f, fill)
+        c.drawRect(rm.width, ceil - 120f, rm.width + 400f, 400f, fill)
+        // doors: the one behind and the EXIT ahead
+        door(c, rm.entryX, false, true)
+        door(c, rm.exitX, true, rm.open)
+        // ledges with hazard stripes
+        for (p in rm.platforms) {
+            if (p.r < x0 || p.l > x1) continue
+            val t = -p.top
+            fill.color = 0xFF3A3530.toInt()
+            c.drawRect(p.l + 14f, t + 16f, p.l + 22f, t + 40f, fill)
+            c.drawRect(p.r - 22f, t + 16f, p.r - 14f, t + 40f, fill)
+            fill.color = 0xFF2B2B2B.toInt()
+            c.drawRect(p.l, t, p.r, t + 16f, fill)
+            fill.color = 0xFFF9C02E.toInt()
+            var sx = p.l
+            while (sx < p.r) {
+                path.reset()
+                path.moveTo(sx, t + 16f); path.lineTo(sx + 14f, t); path.lineTo(min(p.r, sx + 28f), t); path.lineTo(min(p.r, sx + 14f), t + 16f); path.close()
+                c.drawPath(path, fill)
+                sx += 28f
+            }
+            fill.color = 0x55FFFFFF
+            c.drawRect(p.l, t, p.r, t + 3f, fill)
+        }
+        // money and hearts
+        for (cs in rm.cash) {
+            if (cs.heart) {
+                fill.color = 0xFFE53935.toInt()
+                c.drawCircle(cs.x - 7f, cs.y - 4f, 9f, fill)
+                c.drawCircle(cs.x + 7f, cs.y - 4f, 9f, fill)
+                path.reset()
+                path.moveTo(cs.x - 16f, cs.y); path.lineTo(cs.x, cs.y + 16f); path.lineTo(cs.x + 16f, cs.y); path.close()
+                c.drawPath(path, fill)
+            } else {
+                c.save()
+                c.translate(cs.x, cs.y)
+                c.rotate(sin(cs.t * 6f + cs.x) * 25f)
+                fill.color = 0xFF2E7D32.toInt()
+                c.drawRect(-18f, -9f, 18f, 9f, fill)
+                fill.color = 0xFF66BB6A.toInt()
+                c.drawRect(-15f, -6f, 15f, 6f, fill)
+                fill.color = 0xFF2E7D32.toInt()
+                c.drawCircle(0f, 0f, 4f, fill)
+                c.restore()
+            }
+        }
+        // monsters, boss, player
+        for (f in rm.foes) {
+            val z = f.z
+            if (z.x < x0 || z.x > x1) continue
+            fill.color = 0x40000000
+            val gy = rm.support(z.x, z.y)
+            c.drawOval(z.x - z.type.w * 0.7f, gy - 5f, z.x + z.type.w * 0.7f, gy + 5f, fill)
+            drawZombie(c, z)
+            if (f.slowT > 0f) {
+                fill.color = 0x5580D8FF
+                c.drawOval(z.x - z.type.w * 0.6f, z.y - z.type.h, z.x + z.type.w * 0.6f, z.y, fill)
+            }
+            if (f.ranged) {
+                fill.color = 0xFF76FF03.toInt()
+                c.drawCircle(z.x, z.y - z.type.h - 12f, 5f, fill)
+            }
+            if (z.hp < z.type.hp * 1.6f) {
+                val fr = (z.hp / (z.type.hp * 1.6f)).coerceIn(0f, 1f)
+                fill.color = 0xCC000000.toInt()
+                c.drawRect(z.x - 22f, z.y - z.type.h - 26f, z.x + 22f, z.y - z.type.h - 20f, fill)
+                fill.color = 0xFFE53935.toInt()
+                c.drawRect(z.x - 22f, z.y - z.type.h - 26f, z.x - 22f + 44f * fr, z.y - z.type.h - 20f, fill)
+            }
+        }
+        rm.roomBoss?.let { b -> if (b.alive) drawRoomBoss(c, b) }
+        // burning aura and orbiting junk around the player
+        val d = g.driver
+        val match = run.lv(Power.MATCH)
+        if (match > 0) {
+            fill.color = Color.argb((40 + 20 * sin(g.anim * 8f)).toInt(), 255, 120, 0)
+            c.drawOval(d.x - (120f + 20f * match), d.y - 50f - (120f + 20f * match) * 0.6f, d.x + 120f + 20f * match, d.y - 50f + (120f + 20f * match) * 0.6f, fill)
+        }
+        drawDriver(c)
+        val orb = run.lv(Power.ORBIT)
+        for (k in 0 until orb) {
+            val a = run.orbitA + k * (2f * PI.toFloat() / orb)
+            c.save()
+            c.translate(d.x + cos(a) * 115f, d.y - 50f + sin(a) * 115f)
+            c.rotate(g.anim * 600f)
+            fill.color = 0xFF90A4AE.toInt()
+            path.reset()
+            for (j in 0 until 6) {
+                val rr = if (j % 2 == 0) 20f else 9f
+                val aa = j * PI.toFloat() / 3f
+                if (j == 0) path.moveTo(cos(aa) * rr, sin(aa) * rr) else path.lineTo(cos(aa) * rr, sin(aa) * rr)
+            }
+            path.close()
+            c.drawPath(path, fill)
+            fill.color = 0xFFD32F2F.toInt()
+            c.drawCircle(0f, 0f, 5f, fill)
+            c.restore()
+        }
+        for (s in g.roomProjectiles) sideShot(c, s)
+        for (s in rm.shots) {
+            when (s.kind) {
+                0 -> {
+                    fill.color = 0xFF76FF03.toInt()
+                    c.drawCircle(s.x, s.y, 9f, fill)
+                    fill.color = 0x8833691E.toInt()
+                    c.drawCircle(s.x - s.vx * 0.02f, s.y - s.vy * 0.02f, 7f, fill)
+                }
+                1 -> {
+                    fill.color = 0xCCFF6D00.toInt()
+                    c.drawCircle(s.x, s.y, 16f, fill)
+                    fill.color = 0xFFFFEB3B.toInt()
+                    c.drawCircle(s.x, s.y, 8f, fill)
+                }
+                else -> {
+                    c.save()
+                    c.translate(s.x, s.y)
+                    c.rotate(g.anim * 720f)
+                    fill.color = 0xFFC62828.toInt()
+                    c.drawRect(-6f, -16f, 6f, 16f, fill)
+                    fill.color = 0xFFFFD740.toInt()
+                    c.drawCircle(0f, -18f, 4f + Random.nextFloat() * 3f, fill)
+                    c.restore()
+                }
+            }
+        }
+        for (z in run.zaps) {
+            stroke.color = 0xFF80D8FF.toInt()
+            stroke.strokeWidth = 5f
+            stroke.alpha = (255 * (z.life / 0.22f)).toInt().coerceIn(0, 255)
+            var i = 0
+            while (i + 3 < z.pts.size) {
+                val ax = z.pts[i]; val ay = z.pts[i + 1]; val bx = z.pts[i + 2]; val by2 = z.pts[i + 3]
+                val mx2 = (ax + bx) / 2 + (Random.nextFloat() - 0.5f) * 40f
+                val my2 = (ay + by2) / 2 + (Random.nextFloat() - 0.5f) * 40f
+                c.drawLine(ax, ay, mx2, my2, stroke)
+                c.drawLine(mx2, my2, bx, by2, stroke)
+                i += 2
+            }
+            stroke.alpha = 255
+        }
+        for (p in g.particles) {
+            val ratio = (p.life / p.maxLife).coerceIn(0f, 1f)
+            fill.color = p.color
+            fill.alpha = (255 * ratio * (if (p.grow > 0f) 0.55f else 1f)).toInt().coerceIn(0, 255)
+            c.drawCircle(p.x, p.y, p.size * (1f + p.grow * (1f - ratio)), fill)
+        }
+        fill.alpha = 255
+        for (t in g.texts) {
+            val a = (255 * min(1f, t.life)).toInt()
+            text.textAlign = Paint.Align.CENTER
+            text.textSize = t.size * (1f + max(0f, t.life - 1.1f) * 1.2f)
+            text.style = Paint.Style.STROKE
+            text.strokeWidth = 7f
+            text.color = 0xFF1A1A1A.toInt()
+            text.alpha = a
+            c.drawText(t.text, t.x, t.y, text)
+            text.style = Paint.Style.FILL
+            text.color = t.color
+            text.alpha = a
+            c.drawText(t.text, t.x, t.y, text)
+        }
+        text.alpha = 255
+        c.restore()
+        if (run.fade > 0f) {
+            fill.color = Color.argb((255 * run.fade.coerceIn(0f, 1f)).toInt(), 0, 0, 0)
+            c.drawRect(0f, 0f, W, H, fill)
+        }
+    }
+
+    private fun door(c: Canvas, x: Float, exit: Boolean, open: Boolean) {
+        fill.color = 0xFF3E3A36.toInt()
+        c.drawRect(x - 62f, -250f, x + 62f, 0f, fill)
+        fill.color = if (exit) 0xFF4DB6AC.toInt() else 0xFF5B7F6E.toInt()
+        c.drawRect(x - 50f, -238f, x + 50f, 0f, fill)
+        fill.color = shade(if (exit) 0xFF4DB6AC.toInt() else 0xFF5B7F6E.toInt(), 0.8f)
+        c.drawRect(x - 38f, -220f, x + 38f, -140f, fill)
+        fill.color = 0xFFCFD8DC.toInt()
+        c.drawRect(x + 30f, -126f, x + 42f, -118f, fill)
+        if (!exit) return
+        // EXIT sign, red while locked; planks across a locked door
+        fill.color = if (open) 0xFF1B5E20.toInt() else 0xFF7F1D1D.toInt()
+        c.drawRoundRect(x - 50f, -300f, x + 50f, -262f, 6f, 6f, fill)
+        text.textAlign = Paint.Align.CENTER
+        text.textSize = 24f
+        text.color = if (open) 0xFFB9F6CA.toInt() else 0xFFFFCDD2.toInt()
+        c.drawText(if (open) "EXIT ➜" else "KHÓA", x, -272f, text)
+        if (open) {
+            fill.color = Color.argb((60 + 50 * sin(g.anim * 5f)).toInt(), 105, 240, 174)
+            c.drawRect(x - 62f, -250f, x + 62f, 0f, fill)
+        } else {
+            fill.color = 0xFF8D6E63.toInt()
+            c.save()
+            c.translate(x, -160f); c.rotate(-18f); c.drawRect(-70f, -10f, 70f, 10f, fill)
+            c.restore()
+            c.save()
+            c.translate(x, -80f); c.rotate(14f); c.drawRect(-70f, -10f, 70f, 10f, fill)
+            c.restore()
+        }
+    }
+
+    private fun drawRoomBoss(c: Canvas, b: RoomBoss) {
+        val x = b.x
+        when (b.kind) {
+            0 -> { // cannon turret on a crate base
+                fill.color = 0xFF5D4037.toInt()
+                c.drawRect(x - 70f, -70f, x + 70f, 0f, fill)
+                fill.color = if (b.flash > 0f) Color.WHITE else 0xFFC62828.toInt()
+                c.drawRoundRect(x - 55f, -140f, x + 55f, -66f, 20f, 20f, fill)
+                c.save()
+                c.translate(x, -110f)
+                val a = atan2Deg(g.driver.y - 60f + 110f, g.driver.x - x)
+                c.rotate(a)
+                fill.color = 0xFF37474F.toInt()
+                c.drawRect(0f, -14f, 90f, 14f, fill)
+                fill.color = 0xFFFF6D00.toInt()
+                c.drawRect(84f, -16f, 94f, 16f, fill)
+                c.restore()
+                fill.color = 0xFFFFD740.toInt()
+                c.drawCircle(x - 30f, -116f, 6f, fill)
+            }
+            1 -> { // butcher brute
+                c.save()
+                c.translate(x, 0f)
+                c.scale(2.1f * (if (b.dir < 0f) -1f else 1f) * -1f, 2.1f)
+                zombieFigure(c, 60f, 92f, 0xFF6D1B1B.toInt(), sin(b.anim * (if (b.chargeT > 0f) 14f else 4f)), 1f, true)
+                c.restore()
+                if (b.flash > 0f) {
+                    fill.color = 0x88FFFFFF.toInt()
+                    c.drawOval(x - 60f, -190f, x + 60f, 0f, fill)
+                }
+            }
+            else -> {
+                b.look.y = 0f
+                b.look.flash = b.flash
+                drawBossAny(c, b.look)
+            }
+        }
+        // health bar above
+        val f = (b.hp / b.maxHp).coerceIn(0f, 1f)
+        fill.color = 0xCC000000.toInt()
+        c.drawRoundRect(x - 90f, -b.h - 60f, x + 90f, -b.h - 44f, 6f, 6f, fill)
+        fill.color = 0xFFD50000.toInt()
+        c.drawRoundRect(x - 87f, -b.h - 57f, x - 87f + 174f * f, -b.h - 47f, 4f, 4f, fill)
+    }
+
+    /** HUD over the rooms: level bar, room counter, health, power-ups, controls. */
+    private fun drawRoomHud(c: Canvas, run: RoomRun) {
+        val W = g.W
+        val d = g.driver
+        // level bar across the top
+        val l = W * 0.18f
+        val rr = W * 0.78f
+        fill.color = 0xCC1B1714.toInt()
+        c.drawRoundRect(l, 14f, rr, 46f, 14f, 14f, fill)
+        val xf = (run.xp.toFloat() / run.xpNeed).coerceIn(0f, 1f)
+        fill.color = 0xFF29B6F6.toInt()
+        if (xf > 0f) c.drawRoundRect(l + 4f, 18f, l + 4f + (rr - l - 8f) * xf, 42f, 11f, 11f, fill)
+        fill.color = 0x55FFFFFF
+        c.drawRect(l + 10f, 20f, l + 4f + (rr - l - 8f) * xf - 6f, 24f, fill)
+        text.textAlign = Paint.Align.LEFT
+        text.textSize = 22f
+        text.color = Color.WHITE
+        c.drawText("Cấp ${run.level}", l + 16f, 38f, text)
+        // room counter
+        text.textAlign = Paint.Align.CENTER
+        val bossRoom = run.index % 10 == 0
+        val label = "🚪 Phòng ${run.index} / ${RoomRun.TOTAL}${if (bossRoom) "  👹" else ""}"
+        text.textSize = 28f
+        val tw = text.measureText(label)
+        glassPanel(c, W / 2 - tw / 2 - 24f, 56f, W / 2 + tw / 2 + 24f, 100f, 16f)
+        text.color = if (bossRoom) 0xFFFF8A80.toInt() else Color.WHITE
+        c.drawText(label, W / 2, 88f, text)
+        // health and money
+        glassPanel(c, 12f, 12f, 230f, 100f)
+        val hf = (d.hp / d.maxHp).coerceIn(0f, 1f)
+        bar(c, 22f, 22f, 170f, hf, if (hf > 0.3f) 0xFF43A047.toInt() else 0xFFE53935.toInt(), "♥")
+        text.textAlign = Paint.Align.LEFT
+        text.textSize = 24f
+        text.color = Color.WHITE
+        c.drawText("${d.hp.toInt()}/${d.maxHp.toInt()}", 64f, 86f, text)
+        val money = "+${g.runMoney}$"
+        text.textSize = 30f
+        val mw = text.measureText(money)
+        glassPanel(c, W - 132f - mw, 18f, W - 108f, 86f, 30f)
+        text.textAlign = Paint.Align.RIGHT
+        text.color = 0xFF69F0AE.toInt()
+        c.drawText(money, W - 120f, 64f, text)
+        drawButton(c, g.pauseBtn, false)
+        // power-ups owned
+        var px = 22f
+        text.textAlign = Paint.Align.CENTER
+        for (p in Power.entries) {
+            val n = run.lv(p)
+            if (n == 0) continue
+            fill.color = 0xAA000000.toInt()
+            c.drawRoundRect(px, 110f, px + 44f, 154f, 8f, 8f, fill)
+            text.textSize = 24f
+            text.color = Color.WHITE
+            c.drawText(p.icon, px + 22f, 140f, text)
+            if (n > 1) {
+                text.textSize = 16f
+                text.color = 0xFFFFD740.toInt()
+                c.drawText("$n", px + 37f, 152f, text)
+            }
+            px += 50f
+            if (px > W * 0.4f) break
+        }
+        if (run.roomNoteT > 0f && run.index % 10 == 0) {
+            title(c, "PHÒNG TRÙM!", W / 2, g.H * 0.36f, 0xFFFF5252.toInt(), 64f)
+        }
+        if (g.state == State.PLAYING && g.dyingT <= 0f) {
+            for (b in g.controls()) drawButton(c, b, g.isHeld(b.id))
+            drawJoystick(c)
+        }
+        if (g.stormHurt > 0f) {
+            fill.color = 0x40E040FB
+            c.drawRect(0f, 0f, W, g.H, fill)
+        }
+    }
+
+    /** Floating stick: where the thumb went down, and the knob following it. */
+    private fun drawJoystick(c: Canvas) {
+        if (!g.driver.out) return
+        val on = g.joyId >= 0
+        val bx = if (on) g.joyX else 190f
+        val by = if (on) g.joyY else g.H - 150f
+        fill.color = if (on) 0x44FFFFFF else 0x26FFFFFF
+        c.drawCircle(bx, by, 92f, fill)
+        stroke.color = 0x88FFFFFF.toInt()
+        stroke.strokeWidth = 3f
+        c.drawCircle(bx, by, 92f, stroke)
+        fill.color = 0x99FFFFFF.toInt()
+        val kx = bx + (if (on) g.joyDx else 0f)
+        val ky = by + (if (on) g.joyDy else 0f)
+        c.drawCircle(kx, ky, 42f, fill)
+        text.textAlign = Paint.Align.CENTER
+        text.textSize = 26f
+        text.color = 0x99FFFFFF.toInt()
+        c.drawText("◀", bx - 66f, by + 9f, text)
+        c.drawText("▶", bx + 66f, by + 9f, text)
+    }
+
+    /** Level-up power-ups, the merchant's mystery boxes, or the boss upgrade. */
+    private fun drawPick(c: Canvas, run: RoomRun) {
+        val W = g.W
+        dim(c, 0xC8)
+        val (head, sub) = when (run.pickKind) {
+            1 -> "LÁI BUÔN" to "Chọn 1 hộp quà bí ẩn"
+            2 -> "CHỌN NÂNG CẤP" to "Phần thưởng hạ trùm"
+            else -> "LÊN CẤP ${run.level}!" to "Chọn 1 sức mạnh"
+        }
+        fill.color = 0xFFB71C1C.toInt()
+        c.drawRoundRect(W / 2 - 330f, 64f, W / 2 + 330f, 136f, 14f, 14f, fill)
+        title(c, head, W / 2, 122f, Color.WHITE, 50f)
+        text.textAlign = Paint.Align.CENTER
+        text.textSize = 24f
+        text.color = 0xFFE0E0E0.toInt()
+        c.drawText(sub, W / 2, 176f, text)
+        val n = run.choices.size
+        for (i in 0 until n) {
+            val p = run.choices[i]
+            val rc = g.pickCard(i, n)
+            metalPanel(c, rc[0], rc[1], rc[2], rc[3], 18f)
+            val cx = (rc[0] + rc[2]) / 2
+            // photo-like frame with the icon
+            fill.color = 0xFFF5F0E6.toInt()
+            c.drawRect(cx - 90f, rc[1] + 26f, cx + 90f, rc[1] + 196f, fill)
+            fill.color = 0xFF263238.toInt()
+            c.drawRect(cx - 80f, rc[1] + 36f, cx + 80f, rc[1] + 170f, fill)
+            if (run.pickKind == 1) {
+                // closed metal case
+                fill.color = 0xFFB0BEC5.toInt()
+                c.drawRoundRect(cx - 62f, rc[1] + 80f, cx + 62f, rc[1] + 150f, 10f, 10f, fill)
+                fill.color = 0xFF78909C.toInt()
+                c.drawRect(cx - 62f, rc[1] + 104f, cx + 62f, rc[1] + 112f, fill)
+                fill.color = 0xFFFFC107.toInt()
+                c.drawRect(cx - 10f, rc[1] + 98f, cx + 10f, rc[1] + 118f, fill)
+                text.textSize = 34f
+                text.color = Color.WHITE
+                c.drawText("??????", cx, rc[1] + 250f, text)
+            } else {
+                text.textSize = 76f
+                text.color = Color.WHITE
+                c.drawText(p.icon, cx, rc[1] + 132f, text)
+                text.color = Color.WHITE
+                fitText(c, p.title, cx, rc[1] + 236f, 30f, rc[2] - rc[0] - 24f)
+                text.color = 0xFFB0BEC5.toInt()
+                wrapText(c, p.desc, cx, rc[1] + 274f, rc[2] - rc[0] - 30f, 21f, 26f)
+                val lv = run.lv(p)
+                text.color = 0xFFFFD740.toInt()
+                text.textSize = 22f
+                c.drawText(if (lv == 0) "MỚI" else "Cấp $lv → ${lv + 1}", cx, rc[3] - 22f, text)
+            }
         }
     }
 }

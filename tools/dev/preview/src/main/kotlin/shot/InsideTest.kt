@@ -32,8 +32,7 @@ fun main() {
         val inn = g.interior!!
         println("  inside: rooms=${inn.rooms} chests=${inn.chests.size} zombies=${inn.zombiesLeft} weapon=${save.sideWeapon}")
         shot(g, "in_${st}_a")
-        val fwd = g.controls().first { it.id == "leanFwd" }
-        val back = g.controls().first { it.id == "leanBack" }
+        fun walk(dir: Float) { g.touchUp(2); g.touchDown(2, 190f, H - 150f); g.touchMove(2, 190f + dir * 80f, H - 150f) }
         val jump = g.controls().first { it.id == "jump" }
         var t = 0f
         var shots = 0
@@ -45,12 +44,12 @@ fun main() {
             g.touchUp(2); g.touchUp(3)
             if (target == null) {
                 if (g.driverAction() == "leave") { press("act"); break }
-                g.touchDown(2, back.cx, back.cy)
+                walk(-1f)
             } else if (g.driverAction() == "chest") {
                 press("act")
             } else if (g.driverAction() != "busy") {
                 if (target.y > 0f && kotlin.math.abs(target.x - g.driver.x) < 160f) g.touchDown(3, jump.cx, jump.cy)
-                if (target.x > g.driver.x) g.touchDown(2, fwd.cx, fwd.cy) else g.touchDown(2, back.cx, back.cy)
+                if (target.x > g.driver.x) walk(1f) else walk(-1f)
             }
             tick(g, 0.1f); t += 0.1f
             if (shots < 3 && (t * 10).toInt() % 60 == 30) { shot(g, "in_${st}_${"bcd"[shots]}"); shots++ }

@@ -2,7 +2,7 @@ package com.khongvinh.carsurvival
 
 import kotlin.math.min
 
-enum class State { MENU, MAPS, GARAGE, STORY, LAYOUT, SOUND, PLAYING, PAUSED, RESULT, STAGE_DONE, VICTORY }
+enum class State { MENU, MAPS, GARAGE, STORY, LAYOUT, SOUND, PLAYING, PAUSED, PICK, RESULT, STAGE_DONE, VICTORY }
 
 enum class ItemType(val icon: String, val color: Int) {
     COIN("$", 0xFFFFC107.toInt()),
@@ -315,7 +315,7 @@ class Driver {
     var dir = 0f
     var face = 1f
     var hp = 100f
-    val maxHp = 100f
+    var maxHp = 100f
     var fireCd = 0f
     var aim = 0f
     var walk = 0f

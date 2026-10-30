@@ -113,8 +113,17 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
         private set
     val interior get() = inside?.interior
 
+    /** The run of rooms after the drive (arrived at the station or the car broke down). */
+    var rooms: RoomRun? = null
+        private set
+    val roomProjectiles = ArrayList<Projectile>()
+    private val roomRules = RoomRules(this)
+
+    /** Seconds until the rooms start after the car is lost (-1 = not counting). */
+    private var roomsIn = -1f
+
     /** Where the player is: the driver when on foot, else the car. */
-    val playerX get() = if (driver.out) inside?.x ?: driver.x else car.x
+    val playerX get() = if (rooms != null) goalX else if (driver.out) inside?.x ?: driver.x else car.x
 
     /** Parts found this run (for the result screen). */
     var runParts = 0
@@ -298,7 +307,12 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
         c.ammo = ct.ammo + up(SkillStat.AMMO)
         driver.out = false; driver.hp = driver.maxHp; driver.looting = null; driver.hurtT = 0f
         driver.shieldT = 0f; driver.cloneT = 0f; driver.atkT = 0f; driver.vy = 0f; driver.air = 0f
+        driver.maxHp = 100f
         inside = null
+        rooms = null
+        roomsIn = -1f
+        roomProjectiles.clear()
+        joyId = -1
         c.shieldT = 0f; c.cloneT = 0f; c.hurtT = 0f; c.flipT = 0f; c.stuckT = 0f; c.fireCd = 0f
         c.aim = 0f
 
@@ -831,12 +845,144 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
         sfx.play(Sfx.S.WIN, 0.7f)
     }
 
+    // ------------------------------------------------------------- rooms
+
+    /** Out of the car and into the warehouse: 30 rooms, power-ups, bosses. */
+    private fun startRooms(arrived: Boolean) {
+        flushDamage()
+        inside = null
+        val run = RoomRun(stage, region, stage * 977 + save.day * 31)
+        if (arrived) maxDist = goalM
+        rooms = run
+        val d = driver
+        d.out = true
+        d.maxHp = 100f + stage * 4f + Skills.total(save.skills, SkillStat.HP) * 0.5f
+        d.hp = if (arrived) d.maxHp else max(d.hp / 100f, 0.7f) * d.maxHp
+        d.x = run.room.entryX
+        d.y = 0f
+        d.vy = 0f
+        d.face = 1f
+        d.shieldT = 0f
+        run.camX = d.x - viewW * 0.42f
+        roomProjectiles.clear()
+        particles.clear()
+        texts.clear()
+        pointers.clear()
+        joyId = -1
+        updateControls()
+        intense = true
+        // the merchant waits at the door; reaching the station earns a second box
+        run.merchantQueued = if (arrived) 2 else 1
+        texts.add(FloatText(if (arrived) "TỚI TRẠM! VÀO KHO HÀNG" else "XE HỎNG! CHẠY VÀO KHO HÀNG", d.x + 400f, -300f, 0xFFFFD740.toInt()).also { it.size = 46f; it.life = 2.2f })
+        sfx.play(Sfx.S.GO)
+    }
+
+    private fun updateRooms(run: RoomRun, dt: Float) {
+        val d = driver
+        roomRules.update(run, dt, leanBack, leanFwd, jumpHeld)
+        updateEffects(dt)
+        if (d.hp <= 0f) {
+            driverDown("Gục ở phòng ${run.index}/${RoomRun.TOTAL}")
+            return
+        }
+        val rm = run.room
+        if (rm.open && d.x > rm.exitX - 40f && d.y > -20f) {
+            if (run.index >= RoomRun.TOTAL) {
+                bossKilled = bossKilled || boss == null || boss?.alive == false
+                rooms = null
+                stageComplete()
+                return
+            }
+            if (run.index in RoomRun.MERCHANT_AFTER) run.merchantQueued++
+            run.nextRoom()
+            d.x = run.room.entryX
+            d.y = 0f
+            d.vy = 0f
+            run.camX = d.x - viewW * 0.42f
+            roomProjectiles.clear()
+            particles.clear()
+            texts.clear()
+            sfx.play(Sfx.S.WOOD, 0.6f)
+        }
+        checkPicks(run)
+    }
+
+    /** Opens the next waiting choice: level-up power, boss upgrade, merchant box. */
+    private fun checkPicks(run: RoomRun) {
+        if (state != State.PLAYING || dyingT > 0f) return
+        when {
+            run.merchantQueued > 0 -> {
+                run.merchantQueued--
+                run.pickKind = 1
+                run.choices = run.roll()
+            }
+            run.upgradeQueued > 0 -> {
+                run.upgradeQueued--
+                run.pickKind = 2
+                run.choices = listOf(Power.DAMAGE, Power.VITAL).filter { run.lv(it) < it.max }
+            }
+            run.levelUps > 0 -> {
+                run.levelUps--
+                run.pickKind = 0
+                run.choices = run.roll()
+            }
+            else -> return
+        }
+        if (run.choices.isEmpty()) return
+        pointers.clear()
+        joyId = -1
+        updateControls()
+        sfx.play(Sfx.S.POWER, 0.7f)
+        setState(State.PICK)
+    }
+
+    /** Card [i] of the current choice. */
+    fun pickCard(i: Int, n: Int): FloatArray {
+        val w = 270f
+        val gap = 34f
+        val l = W / 2 - (n * w + (n - 1) * gap) / 2 + i * (w + gap)
+        return floatArrayOf(l, 200f, l + w, 560f)
+    }
+
+    private fun choosePick(i: Int) {
+        val run = rooms ?: return
+        val p = run.choices.getOrNull(i) ?: return
+        run.powers[p.ordinal]++
+        if (p == Power.VITAL) {
+            driver.maxHp += 25f
+            driver.hp = min(driver.maxHp, driver.hp + driver.maxHp * 0.25f)
+        }
+        texts.add(FloatText("${p.icon} ${p.title.uppercase()}${if (run.lv(p) > 1) " CẤP ${run.lv(p)}" else ""}", driver.x, driver.y - 170f, 0xFF80D8FF.toInt()).also { it.size = 38f; it.life = 1.8f })
+        run.pickKind = -1
+        sfx.play(Sfx.S.COIN)
+        setState(State.PLAYING)
+    }
+
+    // ------------------------------------------------------------ joystick
+
+    /** Floating stick on the left half while on foot. */
+    var joyId = -1
+        private set
+    var joyX = 0f
+        private set
+    var joyY = 0f
+        private set
+    var joyDx = 0f
+        private set
+    var joyDy = 0f
+        private set
+
     // small hooks for the building interiors
     internal val scavengerPerk get() = scavenger
     internal val monsterRewardMul get() = rewardMul
     internal fun giveMoney(n: Int, x: Float, y: Float) = addMoney(n, x, y)
     internal fun bleedAt(x: Float, y: Float, n: Int) = bleed(x, y, n)
     internal fun sparksAt(x: Float, y: Float) = sparks(x, y)
+    internal fun burstAt(x: Float, y: Float, color: Int, n: Int) = burst(x, y, color, n)
+    internal fun explodeAt(x: Float, y: Float, n: Int) = explode(x, y, 0xFFFF6D00.toInt(), n)
+    internal fun giveMoneyQuiet(n: Int) {
+        runMoney += n
+    }
 
     /** Pillboxes that shoot back: 1 on stage 1, one more every 3 stages. */
     private fun placeBunkers() {
@@ -951,6 +1097,7 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
             pause(); true
         }
         State.MENU -> false
+        State.PICK -> true
         State.SOUND -> {
             save.save(); setState(soundBack); true
         }
@@ -965,6 +1112,7 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
     private fun goMenu() {
         save.save()
         inside = null
+        rooms = null
         boss = null
         bossRocks.clear()
         zombies.clear(); obstacles.clear(); debris.clear(); items.clear()
@@ -989,7 +1137,7 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
             State.SOUND -> music.play(if (soundBack == State.PAUSED && intense) Music.Track.INTENSE else Music.Track.CHILL, if (soundBack == State.PAUSED) 0.4f else 1f)
             // kept low in a run so the engine and the action carry the sound
             State.PLAYING -> music.play(if (intense) Music.Track.INTENSE else Music.Track.CHILL, 0.4f)
-            State.PAUSED -> music.play(if (intense) Music.Track.INTENSE else Music.Track.CHILL, 0.3f)
+            State.PAUSED, State.PICK -> music.play(if (intense) Music.Track.INTENSE else Music.Track.CHILL, 0.3f)
             State.RESULT -> music.play(Music.Track.CHILL, 0.6f)
             State.STAGE_DONE, State.VICTORY -> music.play(Music.Track.VICTORY, 1f)
         }
@@ -997,7 +1145,7 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
         updateEngineSound(dt)
         when (state) {
             State.PLAYING -> updatePlay(dt)
-            State.PAUSED, State.SOUND -> {}
+            State.PAUSED, State.SOUND, State.PICK -> {}
             else -> {
                 updateEffects(dt)
                 updateDebris(dt)
@@ -1049,7 +1197,7 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
                 left -= h
             }
             stormX += STORM_SPEED[phase] * dt * 0.3f
-            if (inside == null) {
+            if (inside == null && rooms == null) {
                 burn(dt, true)
                 updateDebris(dt)
                 updateCamera(dt)
@@ -1058,9 +1206,22 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
             if (dyingT <= 0f) endRun(dyingReason)
             return
         }
+        rooms?.let {
+            updateRooms(it, dt)
+            return
+        }
         interior?.let {
             updateInside(it, dt)
             return
+        }
+        // the car is gone: on foot to the nearest shelter, the rooms begin
+        if (wrecked && roomsIn < 0f) roomsIn = 1.8f
+        if (roomsIn > 0f) {
+            roomsIn -= dt
+            if (roomsIn <= 0f) {
+                startRooms(false)
+                return
+            }
         }
         updateStorm(dt)
 
@@ -1196,12 +1357,9 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
             c.x = goalX - 140f
             if (c.vx > 0f) c.vx = -c.vx * 0.3f
         }
-        if (c.x >= goalX && !driver.out) {
-            stageComplete(); return
-        }
-        if (driver.out && inside == null && driver.x >= goalX) {
-            // made it to the station on foot
-            stageComplete(); return
+        if ((c.x >= goalX && !driver.out) || (driver.out && inside == null && driver.x >= goalX)) {
+            // at the station: on foot into the warehouse rooms
+            startRooms(true); return
         }
 
         updateCamera(dt)
@@ -2526,9 +2684,9 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
         return Button(id, label, r[0], r[1], r[2], r[3], color)
     }
 
-    fun controls(): List<Button> = if (driver.out) listOf(
-        slotButton(1, "leanBack", "◀", 0x55FFFFFF),
-        slotButton(2, "leanFwd", "▶", 0x55FFFFFF),
+    fun controls(): List<Button> = if (driver.out && rooms != null) listOf(
+        slotButton(3, "jump", "NHẢY", 0x5529B6F6),
+    ) else if (driver.out) listOf(
         slotButton(3, "jump", "NHẢY", 0x5529B6F6),
         slotButton(4, "act", when (driverAction()) {
             "car" -> "LÊN XE"
@@ -2599,6 +2757,7 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
                 Button("soundMenu", "🔊 CHỈNH ÂM THANH", W / 2 - 330f, H * 0.32f + 214f, W / 2 + 330f, H * 0.32f + 290f, 0xFF00897B.toInt()),
                 Button("layout", "🎮 ĐỔI VỊ TRÍ PHÍM", W / 2 - 330f, H * 0.32f + 304f, W / 2 + 330f, H * 0.32f + 376f, 0xFF37474F.toInt()),
             )
+            State.PICK -> rooms?.let { run -> run.choices.indices.map { i -> val r = pickCard(i, run.choices.size); Button("pick$i", "", r[0], r[1], r[2], r[3], 0) } } ?: emptyList()
             State.SOUND -> listOf(Button("soundDone", "XONG", W / 2 - 180f, H - 120f, W / 2 + 180f, H - 40f, green))
             State.STORY -> listOf(Button("skip", "BỎ QUA ›", W - 290f, H - 96f, W - 40f, H - 24f, grey))
             State.LAYOUT -> listOf(
@@ -2807,6 +2966,15 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
                 return
             }
             val ctl = controlAt(x, y)
+            if (driver.out && ctl == "none" && x < W * 0.5f && joyId < 0) {
+                joyId = id
+                joyX = x
+                joyY = y
+                joyDx = 0f
+                joyDy = 0f
+                updateControls()
+                return
+            }
             when (ctl) {
                 "exit" -> if (canLeaveCar()) leaveCar()
                 "act" -> when (driverAction()) {
@@ -2975,6 +3143,9 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
                 setState(soundBack)
             }
             "sideAct" -> pickSide(garageSide)
+            "pick0" -> choosePick(0)
+            "pick1" -> choosePick(1)
+            "pick2" -> choosePick(2)
         }
     }
 
@@ -2992,6 +3163,12 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
         if (state == State.LAYOUT && id == dragId && dragSlot >= 0) {
             save.ctlX[dragSlot] = (x / W * 1000f).toInt().coerceIn(0, 1000)
             save.ctlY[dragSlot] = (y / H * 1000f).toInt().coerceIn(0, 1000)
+            return
+        }
+        if (state == State.PLAYING && id == joyId) {
+            joyDx = (x - joyX).coerceIn(-90f, 90f)
+            joyDy = (y - joyY).coerceIn(-90f, 90f)
+            updateControls()
             return
         }
         if (state != State.PLAYING || !pointers.containsKey(id)) return
@@ -3013,6 +3190,7 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
             dragId = -1
             dragSlot = -1
         }
+        if (id == joyId) joyId = -1
         pointers.remove(id)
         updateControls()
     }
@@ -3021,8 +3199,9 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
         val v = pointers.values
         gas = "gas" in v
         brake = "brake" in v
-        leanBack = "leanBack" in v
-        leanFwd = "leanFwd" in v
+        val joy = joyId >= 0 && driver.out
+        leanBack = "leanBack" in v || (joy && joyDx < -22f)
+        leanFwd = "leanFwd" in v || (joy && joyDx > 22f)
         boostHeld = "boost" in v
         jumpHeld = "jump" in v
     }

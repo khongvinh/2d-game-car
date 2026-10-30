@@ -1,6 +1,6 @@
 # TỔNG HỢP TIẾN TRÌNH DỰ ÁN "ĐUA XE SINH TỒN"
 
-Tài liệu bàn giao để tiếp tục làm việc ở phiên chat mới mà không bị thiếu sót. Cập nhật đến phiên bản v5.1 (ngày 29/10/2026).
+Tài liệu bàn giao để tiếp tục làm việc ở phiên chat mới mà không bị thiếu sót. Cập nhật đến phiên bản v6.0 (ngày 30/10/2026).
 
 ## 1. Thông tin chung
 
@@ -12,8 +12,8 @@ Tài liệu bàn giao để tiếp tục làm việc ở phiên chat mới mà k
 | Ngôn ngữ / công nghệ | Kotlin + Canvas (SurfaceView), không engine, không thư viện ngoài, không file ảnh/âm thanh |
 | Repo GitHub | khongvinh/2d-game-car |
 | Nhánh làm việc | claude/2d-driving-game-f0kpjk (chưa có Pull Request, chưa merge) |
-| Commit mới nhất | xem git log nhánh làm việc (v5.1: lá chắn khi đi bộ, HUD theo tài xế, 3 thanh âm lượng, vào nhà đánh zombie, kho vũ khí phụ) |
-| Phiên bản hiện tại | v5.1 (versionCode 15) |
+| Commit mới nhất | xem git log nhánh làm việc (v6.0: chuỗi 30 phòng nhà kho kiểu Earn to Die Rogue sau mỗi chặng lái xe) |
+| Phiên bản hiện tại | v6.0 (versionCode 16) |
 | Build tự động | GitHub Actions "Build APK" (.github/workflows/android.yml) — đang xanh, xuất artifact DuaXeSinhTon-apk |
 | Khóa ký | app/debug.keystore (cố định, mật khẩu android) nên các bản cài đè lên nhau được |
 
@@ -167,7 +167,7 @@ Tài liệu bàn giao để tiếp tục làm việc ở phiên chat mới mà k
 - Đi bộ: nút NHẢY (ô tên lửa) bật -620, rơi theo trọng lực; đứng được trên nóc thùng/xác xe/lô cốt; vật cản chỉ chặn khi chân thấp hơn nóc (nhảy qua được). Rời xe có cú nhảy nhỏ.
 - Đổi vị trí phím (State.LAYOUT): nút "🎮 PHÍM" ở màn hình chính và "🎮 ĐỔI VỊ TRÍ PHÍM" trong menu tạm dừng; kéo 6 ô (PHANH, ↺/◀, ↻/▶, 🚀/NHẢY, GA/LỤC, XUỐNG XE) tới chỗ mới; MẶC ĐỊNH / XONG. Lưu tâm ô theo phần nghìn màn hình ở khóa cx0..cx5, cy0..cy5 (-1 = chỗ mặc định); ô dùng chung cho lúc lái xe và lúc đi bộ.
 
-### v5.1 — Lá chắn khi đi bộ, bão khi đi bộ, 3 thanh âm lượng, vào nhà đánh zombie, kho vũ khí phụ (hiện tại)
+### v5.1 — Lá chắn khi đi bộ, bão khi đi bộ, 3 thanh âm lượng, vào nhà đánh zombie, kho vũ khí phụ
 - Yêu cầu: (1) đi bộ nhặt lá chắn không có tác dụng; (2) bão chạy qua lúc đi bộ mà không mất máu, tới vạch đích mới chết; (3) nhạc và hiệu ứng vẫn to hơn động cơ → thanh kéo chỉnh riêng 3 loại âm thanh; (4) lục soát nhà: thay vì đứng ở cửa thì vào một map riêng trong nhà, nhận vật phẩm và đánh zombie bằng vũ khí phụ; làm kho vũ khí phụ (súng lục, cung tên, giáo, phi tiêu…).
 - Lá chắn / sửa xe / nhân bản khi đi bộ: tác dụng lên tài xế (Driver.shieldT, cloneT). Lá chắn 6 giây chặn mọi sát thương trừ bão, quái chạm vào bị hất văng và mất 1,5 máu (dơi nổ); có bong bóng xanh quanh tài xế và 🛡 trên HUD. Sửa xe khi đi bộ hồi 40% máu tài xế. Nhân bản: tài xế gục thì sống lại 60% máu (gục vì bão thì được đặt lên trước bão 600).
 - Bão khi đi bộ: thực ra tài xế vẫn mất máu, nhưng HUD (thanh máu, "Bão cách …m", quãng đường, màn, chấm tiến độ) đều tính theo CHIẾC XE bỏ lại nên người chơi tưởng không mất máu. Nay HUD theo tài xế khi đi bộ (Game.playerX; thanh máu ♥ màu xanh dương là máu tài xế, ẩn đồng hồ tốc độ), màn hình chớp tím + hạt tím khi ở trong bão, cảnh báo "⚠ ĐANG Ở TRONG BÃO!".
@@ -189,7 +189,22 @@ Tài liệu bàn giao để tiếp tục làm việc ở phiên chat mới mà k
 
 - Kiểm tra (tools/dev/preview `gradle inside`): bot vào nhà ở ải 1/7/12/18, mở hết 3–4 rương (cả rương trên kệ), hạ 4–10 zombie, ra ngoài, nhà thành đã lục; `gradle walk`: tài xế đứng yên bị bão nuốt sau ~12 giây; `gradle drive` ải 5/10/20 vẫn tới đích.
 
-## 3. Luật chơi hiện tại (v5.1)
+### v6.0 — Chuỗi 30 phòng nhà kho kiểu Earn to Die Rogue (hiện tại)
+- Yêu cầu: người dùng gửi video Earn to Die Rogue (lái xe → xe cháy → đi bộ tới xe lái buôn chọn hộp quà → nhà kho "Room 1/30", bục vàng-đen nhiều tầng, cần gạt + nút nhảy, súng tự bắn, tiền xanh rơi, thanh Lvl → "Select Powerup" 1 trong 3, "Select Upgrade" Damage+/Heal+, trùm tháp pháo) và muốn biến game thành như vậy. Người dùng chọn: GIỮ cả lái xe; 30 phòng như video; cần gạt + nút nhảy.
+- Vòng chơi mới mỗi ải: lái xe vượt bão như cũ → khi xe tới trạm (hoặc tài xế đi bộ tới trạm) HOẶC xe bị phá hủy (1,8 giây sau) thì vào chuỗi phòng (Rooms.kt). Tới trạm: đủ máu + 2 hộp lái buôn; xe hỏng: máu theo tài xế (tối thiểu 70%) + 1 hộp. Qua phòng 30 = vượt ải (stageComplete như cũ). Gục trong phòng = hết ngày ("Gục ở phòng n/30"). Trong phòng không có bão.
+- Máu tài xế trong phòng: 100 + 4 x ải + 0,5 x tổng kỹ năng Máu (+25 mỗi cấp Máu+).
+- Phòng: rộng 1900–2460 (phòng trùm 2000), sàn y=0, bục chắn vàng-đen một chiều ở độ cao 150/290/420 (nhảy -700, tối đa ~270), đồ trang trí (kệ hộp, xác xe, thùng, pallet), cửa vào trái, cửa EXIT phải (biển đỏ "KHÓA" + ván đóng, mở thì xanh "EXIT ➜" khi diệt hết quái); bước vào cửa mở = sang phòng sau (màn tối dần). Phòng >3 có 40% đợt quái thứ 2 từ hai cửa. Màu trời qua cửa sổ theo vùng.
+- Quái: min(14, 3 + phòng/3 + ải/3), 40% đứng trên bục (rơi xuống khi đi ra mép), máu = gốc x 1,6 x (1 + 0,06 x (ải-1) + 0,03 x phòng); loại theo vùng (đêm có dơi bay bổ nhào); 22% là quái phun axit xanh (đứng cách 420, phun vòng cung 6 + 0,6 x ải). Cắn 8 + 0,7 x ải + 0,15 x phòng máu/giây.
+- Trùm: phòng 10 THÁP PHÁO (60 máu x hệ số, bắn quạt 3 cầu lửa mỗi 2,2 giây), phòng 20 ĐỒ TỂ (80, đi chậm rồi húc lao 620 trong 0,9 giây), phòng 30 trùm vùng (120, vẽ bằng hình trùm đường đua: khổng lồ/rồng/dơi/ngoài hành tinh; ải 5/10/15/20 dùng đúng trùm ải). Hạ trùm: nổ, 10 cọc tiền, +10 XP, bảng CHỌN NÂNG CẤP (Sát thương+ hoặc Máu+).
+- Tiền: quái rơi tiền giấy xanh (nửa giá thưởng quái), tự bay vào người trong 170 (x2/x3 với Nam châm); 5% rơi tim +15 máu. Tiền cộng vào runMoney.
+- Cấp trong lượt: XP 1/quái (béo/nhớt 2, trùm 10), cần 4 + 3 x cấp; lên cấp → State.PICK "LÊN CẤP n!" chọn 1/3 sức mạnh. Lái buôn ("LÁI BUÔN — chọn 1 hộp quà bí ẩn", 3 hộp ??????) ở đầu lượt và sau phòng 5, 15, 25.
+- 15 sức mạnh (Power, cộng dồn tới cấp tối đa): Đạn kép (+1 viên/phát, 4), Thuốc nổ (tự ném mỗi 3,4/(1+0,15 cấp) giây, nổ 150 + 15 x cấp, 4 + 2 x cấp, 5), Que diêm (vùng lửa 120 + 20 x cấp đốt 1,2 máu/giây, 5), Nitơ lỏng (trúng đạn chậm 25%/cấp 1,6 giây, 3), Xác nổ (quái chết nổ 120, 2 + 1,5 x cấp, 5), Giày chạy (+15%/cấp, 3), Mảnh sắt quay (n mảnh bán kính 115, 2 + cấp, 4), Adrenaline (hạ quái bắn nhanh x1,5 trong 2 + cấp giây, 3), Pin xe (sét mỗi 2,5 giây nhảy 2 + cấp quái, 2 + 1,2 x cấp, 5), Sát thương+ (+25%, 6), Tốc bắn+ (+20%, 5), Máu+ (+25 máu tối đa, hồi 25%, 6), Nam châm (2), Nhảy đôi (1), Hút máu (hạ quái hồi 1,5 x cấp, 3). Vũ khí là vũ khí phụ đang trang bị (tự nhắm mọi hướng, tầm +150).
+- Điều khiển đi bộ (ngoài đường, trong nhà và trong phòng): CẦN GẠT nổi — chạm bất kỳ đâu nửa trái màn hình (không trúng nút) để đặt cần, kéo trái/phải để đi (ngưỡng 22); nút NHẢY (ô tên lửa); ngoài đường còn ô GA = VÀO NHÀ/LỤC/RA NGOÀI/LÊN XE. Bỏ 2 ô ◀ ▶ khi đi bộ.
+- HUD phòng: thanh "Cấp n" + XP trên cùng, "🚪 Phòng n / 30" (👹 phòng trùm, chữ "PHÒNG TRÙM!"), máu ♥ số, tiền xanh, hàng biểu tượng sức mạnh có số cấp.
+- Kiểm tra (tools/dev/preview `gradle rooms`, thêm `-Pa=god` để bất tử): bot bất tử qua đủ 30 phòng ở ải 1/6/10 (~4 phút/lượt, cấp 12–15, 250–330 quái); bot thường qua ải 1 (còn 9 máu), ải 6 (còn 105/199), gục ở phòng 10 ải 10. `gradle drive`: tới trạm thì vào lái buôn (State.PICK).
+- Còn có thể làm tiếp theo video: màn hình chính dạng bản đồ vùng có thanh tiến độ, nhiệm vụ hằng ngày, thành tích, quà miễn phí, nhân vật lái buôn vẽ hình, phòng nghỉ có bàn đồ nghề, cây kỹ năng dài vô tận mở bằng tiền.
+
+## 3. Luật chơi hiện tại (v6.0)
 
 ### Điều khiển
 | Nút | Tác dụng |
@@ -293,6 +308,7 @@ Vũ khí (10 loại, mỗi loại nâng 5 cấp: +18% sát thương, -6% thời 
 | Story.kt | Cốt truyện: lời mở đầu, 4 chương theo vùng, kết thúc; trang đã mở |
 | CarArt.kt | Vẽ 25 xe (có người lái xe máy, xích xe tăng) và 10 vũ khí, dùng cho trận đấu và gara |
 | Entities.kt | Kiểu dữ liệu: State, Upgrade, ItemType, Zombie, Obstacle, Boss, BossRock, Debris, Projectile, Particle, FloatText, Car... |
+| Rooms.kt | Chuỗi 30 phòng nhà kho: Power (15 sức mạnh), Foe, RoomBoss, RoomShot, Cash, Room (bục, quái, cửa), RoomRun (cấp, XP, sức mạnh, hàng chờ chọn), RoomRules (di chuyển, quái, trùm, vũ khí, sức mạnh, tiền) |
 | Interior.kt | Màn trong nhà: phòng, đồ đạc đứng lên được (Platform), rương (Chest), zombie trong nhà, đạn vũ khí phụ trong nhà |
 | SideWeapons.kt | 7 vũ khí phụ của tài xế (SideWeapon): giá, ải mở, sát thương, tốc độ, tầm, cận chiến/bay cong |
 | Sfx.kt | Hiệu ứng âm thanh tổng hợp ra WAV (cache theo phiên bản), phát bằng SoundPool khi đã nạp xong, có ưu tiên và giãn cách |
@@ -324,6 +340,7 @@ cd tools/dev/preview && gradle shots     # chụp ảnh màn hình + xuất nh�
 cd tools/dev/preview && gradle sim       # mô phỏng vật lý trên các ải
 cd tools/dev/preview && gradle ram       # thử tông xác xe 4 lần
 cd tools/dev/preview && gradle boss      # thử đánh trùm ải 5 và ải 20
+cd tools/dev/preview && gradle rooms     # bot qua 30 phòng ở ải 1/6/10 (-Pa=god: bất tử) + ảnh phòng, chọn sức mạnh, lái buôn, trùm
 cd tools/dev/preview && gradle inside    # vào nhà ở 4 ải, lục rương, đánh zombie + ảnh màn âm thanh, tab vũ khí phụ
 cd tools/dev/preview && gradle walk      # tài xế đứng yên khi bão đi qua (WALK=1: vừa đi vừa chạy bão)
 ```
@@ -362,7 +379,7 @@ cd tools/dev/preview && gradle walk      # tài xế đứng yên khi bão đi q
 
 | Phiên | Tiêu đề | Phạm vi |
 |---|---|---|
-| #2 | Đua Xe Sinh Tồn #2 — v5.0→v5.1: lá chắn đi bộ, bão khi đi bộ, thanh âm lượng, map trong nhà + vũ khí phụ | v5.1 + bài thử preview `inside`, `walk` |
+| #2 | Đua Xe Sinh Tồn #2 — v5.0→v6.0: lá chắn đi bộ, bão khi đi bộ, thanh âm lượng, map trong nhà + vũ khí phụ, chuỗi 30 phòng kiểu Earn to Die Rogue | v5.1, v6.0 + bài thử preview `inside`, `walk`, `rooms` |
 | #1 | Đua Xe Sinh Tồn #1 — v1.0→v5.0: tạo game, kiểu Earn to Die, bão 3 bo, nhạc, trùm cuối, 20 bản đồ, gara 25 xe, 20 kiểu đường, giao diện thép, tiếng động cơ, ngọc đỏ, lô cốt, cốt truyện, cây kỹ năng, tài xế lục soát, xe nổ tài xế chạy tiếp, nhảy, đổi vị trí phím | Từ đầu đến v5.0 + tài liệu bàn giao, công cụ tools/dev, quy tắc CLAUDE.md |
 
 - Quy tắc làm việc (đặt tiêu đề phiên, tự lưu tiến trình khi ngữ cảnh ≥ 90% rồi nhắc mở chat mới) nằm trong CLAUDE.md ở gốc repo.
