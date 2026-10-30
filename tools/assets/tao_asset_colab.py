@@ -248,7 +248,7 @@ def tao_hinh(mo_ta, kich_thuoc):
     (vector_illustration trả về SVG nên không dùng được cho game/xóa phông)."""
     r = goi("POST", "https://external.api.recraft.ai/v1/images/generations",
             headers={"Authorization": f"Bearer {RECRAFT_API_TOKEN}"},
-            json={"prompt": mo_ta[:1000], "style": "digital_illustration", "size": kich_thuoc, "n": 1})
+            json={"prompt": mo_ta[:1000], "model": "recraftv3", "style": "digital_illustration", "size": kich_thuoc, "n": 1})
     if r is None or r.status_code != 200:
         print("   ❌ Recraft:", None if r is None else r.text[:300])
         return None
