@@ -41,7 +41,7 @@ internal fun Renderer.drawCamp(c: Canvas) {
     tent(c, 40f, 0xFF8D6E63.toInt())
     tent(c, 260f, 0xFF6D4C41.toInt())
     val v = Vehicles.of(VehicleClass.entries[s.carTier.coerceIn(0, 4)], 0)
-    if (!sprite(c, Sprites.CARS[s.carTier.coerceIn(0, 4)], 150f, 4f, 130f)) {
+    if (!sprite(c, Sprites.CARS[s.carTier.coerceIn(0, 4)], 150f, 4f + sin(g.anim * 9f) * 0.8f, 130f)) {
         c.save()
         c.translate(140f, -60f)
         c.scale(0.9f, 0.9f)
@@ -110,7 +110,9 @@ internal fun Renderer.drawCamp(c: Canvas) {
     for (f in cp.foes) {
         val zz = f.z
         val pic = if (cp.isBoss(f)) "boss_brute" else Sprites.zombie(zz.type)
-        if (sprite(c, pic, zz.x, zz.y + 4f, if (cp.isBoss(f)) 220f else zz.type.h * 1.3f, flip = true)) {
+        val sway = sin(zz.phase)
+        if (sprite(c, pic, zz.x, zz.y + 4f - kotlin.math.abs(sway) * 5f, if (cp.isBoss(f)) 220f else zz.type.h * 1.3f, flip = true,
+                rot = sway * 6f, squash = 1f + 0.05f * kotlin.math.abs(sin(zz.phase * 2f)))) {
             // drawn from the AI picture, facing the camp
         } else if (cp.isBoss(f)) {
             c.save()
@@ -262,7 +264,11 @@ private fun Renderer.drawDef(c: Canvas, d: Def, x: Float, y: Float) {
         d.type.blocks -> 120f
         else -> 130f
     }
-    if (sprite(c, Sprites.def(d.type), x, y + 4f, h, alpha = if (hit) 170 else 255)) {
+    val kick = if (d.fireT > 0f) -8f else 0f
+    val shake = if (hit) (kotlin.random.Random.nextFloat() - 0.5f) * 6f else 0f
+    val idle = if (d.type.blocks || d.type == DefType.MINE) 0f else sin(g.anim * 1.5f + x) * 2f
+    if (sprite(c, Sprites.def(d.type), x + kick + shake, y + 4f, h, alpha = if (hit) 170 else 255, rot = idle,
+            squash = if (d.fireT > 0f) 0.96f else 1f)) {
         // picture from the asset pack
     } else when (d.type) {
         DefType.WOOD -> {

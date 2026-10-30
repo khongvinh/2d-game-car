@@ -1141,7 +1141,15 @@ class Renderer(internal val g: Game) {
         }
         val hurt = car.hurtT > 0f && (g.anim * 20f).toInt() % 2 == 0
         art.noRider = g.driver.out
-        if (!hurt) art.draw(c, v, car.x, car.y, car.angle, car.wheelRot, car.aim, car.boosting, w, false, car.compress, g.wrecked, car.squat, car.slashT)
+        val carPic = Sprites.CARS[v.cls.ordinal]
+        if (!hurt && !g.wrecked && Sprites.has(carPic)) {
+            c.save()
+            c.translate(car.x, car.y)
+            c.rotate(car.angle * 180f / PI.toFloat() + car.squat * 57f)
+            val bounce = (car.compress[0] + car.compress[1]) * 0.25f
+            sprite(c, carPic, 0f, Car.WHEEL_Y + Car.WHEEL_R + 6f + bounce, if (v.cls == VehicleClass.MOTO) 118f else 104f)
+            c.restore()
+        } else if (!hurt) art.draw(c, v, car.x, car.y, car.angle, car.wheelRot, car.aim, car.boosting, w, false, car.compress, g.wrecked, car.squat, car.slashT)
         art.noRider = false
         if (car.shieldT > 0f) {
             val fade = if (car.shieldT < 1.5f && (g.anim * 8f).toInt() % 2 == 0) 0.4f else 1f
@@ -1165,7 +1173,9 @@ class Renderer(internal val g: Game) {
         val px = if (g.driver.out) g.driver.x else g.car.x
         val dir = sign(px - z.x).let { if (it == 0f) -1f else it }
         // AI sprites face right; turn them towards the player
-        if (sprite(c, Sprites.zombie(z.type), z.x, z.y + 4f, z.type.h * 1.3f, flip = dir < 0f)) return
+        val sway = sin(z.phase)
+        if (sprite(c, Sprites.zombie(z.type), z.x, z.y + 4f - kotlin.math.abs(sway) * 4f, z.type.h * 1.3f, flip = dir < 0f,
+                rot = sway * (if (z.type.flying) 10f else 6f), squash = 1f + 0.04f * kotlin.math.abs(sin(z.phase * 2f)))) return
         c.save()
         c.translate(z.x, z.y)
         when (z.type) {
@@ -1495,7 +1505,10 @@ class Renderer(internal val g: Game) {
         c.drawOval(x - 20f, y - 4f, x + 20f, y + 4f, fill)
         val moving = d.dir != 0f && g.state == State.PLAYING
         val pic = if (moving && Sprites.has("survivor_run")) "survivor_run" else "survivor_idle"
-        if (sprite(c, pic, x, y + 4f - (if (moving) kotlin.math.abs(sin(d.walk)) * 4f else 0f), 108f, flip = f < 0f)) {
+        val bob = if (moving) kotlin.math.abs(sin(d.walk)) * 6f else 0f
+        val lean = if (moving) 6f * f + sin(d.walk) * 3f else 0f
+        val breathe = if (moving) 1f else 1f + 0.02f * sin(g.anim * 3f)
+        if (sprite(c, pic, x, y + 4f - bob, 108f, flip = f < 0f, rot = lean, squash = breathe)) {
             driverHp(c, d, x, y)
             return
         }
@@ -2452,12 +2465,14 @@ class Renderer(internal val g: Game) {
         fill.color = th.crust[2]
         c.drawRect(mx - iw, top - 14f, mx + iw, top - 9f, fill)
         // wreck, signpost with a skull flag, the survivor
-        fill.color = 0xFF5D4037.toInt()
-        c.drawRoundRect(mx + iw * 0.25f, top - 44f, mx + iw * 0.75f, top - 14f, 10f, 10f, fill)
-        c.drawRoundRect(mx + iw * 0.35f, top - 66f, mx + iw * 0.6f, top - 40f, 8f, 8f, fill)
-        fill.color = 0xFF212121.toInt()
-        c.drawCircle(mx + iw * 0.33f, top - 14f, 12f, fill)
-        c.drawCircle(mx + iw * 0.67f, top - 14f, 12f, fill)
+        if (!sprite(c, Sprites.CARS[s.carTier.coerceIn(0, 4)], mx + iw * 0.5f, top - 4f + sin(g.anim * 6f) * 1.5f, 96f)) {
+            fill.color = 0xFF5D4037.toInt()
+            c.drawRoundRect(mx + iw * 0.25f, top - 44f, mx + iw * 0.75f, top - 14f, 10f, 10f, fill)
+            c.drawRoundRect(mx + iw * 0.35f, top - 66f, mx + iw * 0.6f, top - 40f, 8f, 8f, fill)
+            fill.color = 0xFF212121.toInt()
+            c.drawCircle(mx + iw * 0.33f, top - 14f, 12f, fill)
+            c.drawCircle(mx + iw * 0.67f, top - 14f, 12f, fill)
+        }
         fill.color = 0xFF6D4C41.toInt()
         c.drawRect(mx - iw * 0.45f, top - 170f, mx - iw * 0.42f, top - 10f, fill)
         c.drawRect(mx - iw * 0.62f, top - 168f, mx - iw * 0.18f, top - 108f, fill)
@@ -2578,7 +2593,7 @@ class Renderer(internal val g: Game) {
         val x = g.W - 170f
         val y = g.H + 10f
         val bob = sin(g.anim * 2f) * 3f
-        if (!sprite(c, "merchant", x - 40f, y + bob, 420f)) {
+        if (!sprite(c, "merchant", x - 40f, y + bob, 420f, rot = sin(g.anim * 1.3f) * 2f, squash = 1f + 0.015f * sin(g.anim * 2.5f))) {
         c.save()
         c.translate(x, y + bob)
         // body
@@ -2966,11 +2981,11 @@ class Renderer(internal val g: Game) {
 
     /** Round metal nav buttons down the left side: home, vehicles, weapons, skills. */
     internal fun garageNav(c: Canvas, home: Boolean = false) {
-        for (i in 0..4) {
+        for (i in 0..3) {
             val rc = g.navRect(i)
             val cx = (rc[0] + rc[2]) / 2
             val cy = (rc[1] + rc[3]) / 2
-            val on = if (home) i == 0 else i > 0 && g.garageTab == i - 1
+            val on = if (home) i == 0 else i > 0 && (g.garageTab == i - 1 || (i == 2 && g.garageTab == 3))
             val rad = (rc[2] - rc[0]) / 2
             fill.color = 0x88000000.toInt()
             c.drawCircle(cx + 3f, cy + 5f, rad, fill)
@@ -4489,12 +4504,14 @@ class Renderer(internal val g: Game) {
         val w = g.garageSide
         val pr = g.weaponPanelRect()
         card(c, pr, false)
-        c.save()
-        c.translate(pr[0] + 60f, pr[1] + 110f)
-        lockedLayer(c, !(s.sideUnlocked(w) || s.ownsSide(w)))
-        handWeapon(c, w, 2.6f)
-        c.restore()
-        c.restore()
+        if (!spriteBox(c, Sprites.side(w), pr[0] + 30f, pr[1] + 30f + sin(g.anim * 2f) * 4f, pr[0] + 260f, pr[1] + 250f + sin(g.anim * 2f) * 4f)) {
+            c.save()
+            c.translate(pr[0] + 60f, pr[1] + 110f)
+            lockedLayer(c, !(s.sideUnlocked(w) || s.ownsSide(w)))
+            handWeapon(c, w, 2.6f)
+            c.restore()
+            c.restore()
+        }
         val tx = pr[0] + 290f
         text.textAlign = Paint.Align.LEFT
         text.color = Color.WHITE
@@ -5485,7 +5502,7 @@ class Renderer(internal val g: Game) {
             } else {
                 text.textSize = 76f
                 text.color = Color.WHITE
-                if (!spriteBox(c, Sprites.power(p), cx - 78f, rc[1] + 38f, cx + 78f, rc[1] + 168f)) c.drawText(p.icon, cx, rc[1] + 132f, text)
+                if (!spriteBox(c, Sprites.power(p), cx - 78f, rc[1] + 38f + sin(g.anim * 3f + i) * 5f, cx + 78f, rc[1] + 168f + sin(g.anim * 3f + i) * 5f)) c.drawText(p.icon, cx, rc[1] + 132f, text)
                 text.color = Color.WHITE
                 fitText(c, p.title, cx, rc[1] + 236f, 30f, rc[2] - rc[0] - 24f)
                 text.color = 0xFFB0BEC5.toInt()

@@ -24,7 +24,7 @@ import kotlin.random.Random
 class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
     companion object {
         /** Shown on the menu so the installed build is easy to check. */
-        const val VERSION = "7.2"
+        const val VERSION = "7.3"
 
         const val VIRTUAL_HEIGHT = 720f
         const val METER = 30f
@@ -3003,6 +3003,12 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
         val gold = 0xFFF9A825.toInt()
         val blue = 0xFF1E88E5.toInt()
         l.add(Button("play", "CHẠY!", W - 370f, H - 100f, W - 24f, H - 22f, green))
+        if (garageTab == 1 || garageTab == 3) {
+            // one weapons screen, two lists: mounted on the car / carried by the driver
+            val mid = (garageL + 330f + W - 470f) / 2
+            l.add(Button("wsub0", "🚗 GẮN TRÊN XE", mid - 300f, 16f, mid - 6f, 74f, if (garageTab == 1) 0xFFB71C1C.toInt() else grey))
+            l.add(Button("wsub1", "🧍 TÀI XẾ CẦM", mid + 6f, 16f, mid + 300f, 74f, if (garageTab == 3) 0xFFB71C1C.toInt() else grey))
+        }
         when (garageTab) {
             0 -> {
                 val v = Vehicles.of(showVeh)
@@ -3339,7 +3345,7 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
             }
         }
         if (state == State.MENU && !confirmReset) {
-            for (i in 1..4) if (inRect(navRect(i), x, y)) {
+            for (i in 1..3) if (inRect(navRect(i), x, y)) {
                 sfx.play(Sfx.S.CLICK)
                 if (i == 1) {
                     setState(State.WORKSHOP)
@@ -3382,9 +3388,10 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
             }
         }
         if (state == State.GARAGE) {
-            for (i in 0..4) if (inRect(navRect(i), x, y)) {
+            for (i in 0..3) if (inRect(navRect(i), x, y)) {
                 sfx.play(Sfx.S.CLICK)
-                if (i == 0) goMenu() else garageTab = i - 1
+                // the weapons button keeps whichever list (car / hand) was open
+                if (i == 0) goMenu() else if (i == 2 && garageTab == 3) Unit else garageTab = i - 1
                 return
             }
             when (garageTab) {
@@ -3493,6 +3500,8 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
                 setState(soundBack)
             }
             "sideAct" -> pickSide(garageSide)
+            "wsub0" -> garageTab = 1
+            "wsub1" -> garageTab = 3
             else -> if (btn.id.startsWith("bld")) {
                 campaign.build(campaign.selSlot, DefType.entries[btn.id.substring(3).toInt()])
                 campaign.selSlot = -1

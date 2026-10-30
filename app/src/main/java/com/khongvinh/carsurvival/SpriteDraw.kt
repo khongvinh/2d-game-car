@@ -6,11 +6,24 @@ import android.graphics.Paint
 private val bmpPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { isFilterBitmap = true }
 
 /** Draws sprite [name] standing on ([cx], [bottom]) [h] tall; false if there is no such picture. */
-internal fun Renderer.sprite(c: Canvas, name: String?, cx: Float, bottom: Float, h: Float, flip: Boolean = false, alpha: Int = 255): Boolean {
+internal fun Renderer.sprite(
+    c: Canvas,
+    name: String?,
+    cx: Float,
+    bottom: Float,
+    h: Float,
+    flip: Boolean = false,
+    alpha: Int = 255,
+    rot: Float = 0f,
+    squash: Float = 1f,
+): Boolean {
     val b = Sprites.get(name ?: return false) ?: return false
     val w = h * b.width / b.height
     c.save()
     c.translate(cx, bottom)
+    // simple motion for still pictures: tilt about the feet, squash and stretch
+    if (rot != 0f) c.rotate(rot)
+    if (squash != 1f) c.scale(2f - squash, squash)
     if (flip) c.scale(-1f, 1f)
     r.set(-w / 2, -h, w / 2, 0f)
     bmpPaint.alpha = alpha
