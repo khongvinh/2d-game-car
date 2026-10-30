@@ -11,14 +11,19 @@ from getpass import getpass
 #    không có thì hỏi khi chạy. KHÔNG dán key thẳng vào code.
 # ------------------------------------------------------------
 def lay_key(ten):
+    v = None
     try:
         from google.colab import userdata
         v = userdata.get(ten)
-        if v:
-            return v
     except Exception:
         pass
-    return getpass(f"Nhập {ten}: ")
+    if not v:
+        v = getpass(f"Nhập {ten}: ")
+    v = v.strip()
+    # key thật là 1 chuỗi liền, không có dấu cách hay xuống dòng
+    if not v or any(ch.isspace() for ch in v) or len(v) > 300:
+        raise SystemExit(f"❌ {ten} không đúng: ô Value phải chỉ chứa đúng chuỗi key (không dán đoạn code mẫu). Sửa lại trong 🔑 Secrets rồi chạy lại.")
+    return v
 
 RECRAFT_API_TOKEN = lay_key("RECRAFT_API_TOKEN")
 FAL_KEY = lay_key("FAL_KEY")
