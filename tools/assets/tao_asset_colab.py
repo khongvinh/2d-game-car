@@ -1,46 +1,57 @@
 # ============================================================
-#  TẠO ASSET CHO GAME "ĐUA XE SINH TỒN" — chạy trên Google Colab
-#  Dán toàn bộ file này vào 1 ô (cell) rồi bấm Chạy.
-#  Chạy lại được nhiều lần: file đã có sẽ được bỏ qua.
+#  TẠO ASSET CHO GAME "ĐUA XE SINH TỒN" — Google Colab, MIỄN PHÍ
+#  Ảnh: FLUX.1-schnell trên Hugging Face (gradio_client)
+#  Xóa phông: rembg (chạy ngay trên Colab)
+#  Âm thanh: ElevenLabs (không bắt buộc — bỏ trống key thì bỏ qua)
+#  Dán toàn bộ vào 1 ô rồi bấm Chạy. Chạy lại được: file đã có sẽ bỏ qua.
 # ============================================================
-import os, time, zipfile, requests
+import os, sys, time, zipfile, subprocess, tempfile
 from getpass import getpass
 
 # ------------------------------------------------------------
-# 1. KEY: ưu tiên lấy từ Colab Secrets (biểu tượng 🔑 bên trái),
-#    không có thì hỏi khi chạy. KHÔNG dán key thẳng vào code.
+# 0. CÀI THƯ VIỆN (chỉ lần đầu, mất 1–2 phút)
 # ------------------------------------------------------------
-def lay_key(ten):
+subprocess.run([sys.executable, "-m", "pip", "install", "-q", "gradio_client", "rembg", "onnxruntime", "pillow", "requests"], check=False)
+import requests
+from PIL import Image
+from gradio_client import Client
+from rembg import remove, new_session
+
+# ------------------------------------------------------------
+# 1. KEY (đều miễn phí, để trong 🔑 Secrets của Colab)
+#    HF_TOKEN: huggingface.co → Settings → Access Tokens → New token (Read).
+#              Không bắt buộc, nhưng có token thì được nhiều lượt GPU miễn phí hơn.
+#    ELEVENLABS_API_KEY: chỉ cần nếu muốn tạo âm thanh.
+# ------------------------------------------------------------
+def lay_key(ten, bat_buoc=False):
     v = None
     try:
         from google.colab import userdata
         v = userdata.get(ten)
     except Exception:
         pass
-    if not v:
-        v = getpass(f"Nhập {ten}: ")
-    v = v.strip()
-    # key thật là 1 chuỗi liền, không có dấu cách hay xuống dòng
-    if not v or any(ch.isspace() for ch in v) or len(v) > 300:
-        raise SystemExit(f"❌ {ten} không đúng: ô Value phải chỉ chứa đúng chuỗi key (không dán đoạn code mẫu). Sửa lại trong 🔑 Secrets rồi chạy lại.")
-    return v
+    v = (v or "").strip()
+    if v and (any(ch.isspace() for ch in v) or len(v) > 300):
+        raise SystemExit(f"❌ {ten} không đúng: ô Value phải chỉ chứa đúng chuỗi key (không dán đoạn code). Sửa trong 🔑 Secrets rồi chạy lại.")
+    if not v and bat_buoc:
+        v = getpass(f"Nhập {ten}: ").strip()
+    return v or None
 
-RECRAFT_API_TOKEN = lay_key("RECRAFT_API_TOKEN")
-FAL_KEY = lay_key("FAL_KEY")
+HF_TOKEN = lay_key("HF_TOKEN")
 ELEVENLABS_API_KEY = lay_key("ELEVENLABS_API_KEY")
 
 # ------------------------------------------------------------
 # 2. CÀI ĐẶT
 # ------------------------------------------------------------
-# Lưu vào Google Drive để không mất file khi Colab trên điện thoại bị ngắt.
 LUU_VAO_DRIVE = True
-# Chọn nhóm cần tạo (xóa bớt để tiết kiệm credit). Nhóm có thể chọn:
-# "nhan_vat", "zombie", "xe", "manh_xe", "vu_khi", "phong_thu",
-# "vat_pham", "suc_manh", "giao_dien", "nen", "am_thanh", "nhac"
+# Nhóm cần tạo (xóa bớt cho nhanh): "nhan_vat", "zombie", "xe", "manh_xe", "vu_khi",
+# "phong_thu", "vat_pham", "suc_manh", "giao_dien", "nen", "am_thanh", "nhac"
 CHON_NHOM = ["nhan_vat", "zombie", "xe", "manh_xe", "vu_khi", "phong_thu",
              "vat_pham", "suc_manh", "giao_dien", "nen", "am_thanh", "nhac"]
-# Thử trước 1 file mỗi nhóm để xem phong cách có ưng không (True = thử).
+# True = mỗi nhóm chỉ tạo 1 file để xem thử phong cách
 CHAY_THU = False
+# Model trên Hugging Face (Space miễn phí)
+SPACE = "black-forest-labs/FLUX.1-schnell"
 
 if LUU_VAO_DRIVE:
     from google.colab import drive
@@ -50,29 +61,27 @@ else:
     THU_MUC = "/content/DuaXeSinhTon_assets"
 os.makedirs(THU_MUC, exist_ok=True)
 
-# Một phong cách chung cho mọi hình để asset trông cùng một bộ.
+# Một phong cách chung. Nền trắng trơn để rembg tách phông sạch.
 PHONG_CACH = (
-    "2D side-view mobile game asset in the style of Earn to Die, hand-drawn comic art, "
-    "bold dark outlines, gritty post-apocalyptic desert colors, soft cel shading, "
-    "single subject centered, whole object visible, plain solid light grey background, "
-    "no text, no watermark"
+    "2D side-view mobile game sprite in the style of Earn to Die, hand-drawn comic art, "
+    "bold dark outlines, gritty post-apocalyptic desert colors, cel shading, "
+    "single subject centered, whole object visible with margin around it, "
+    "isolated on a plain flat pure white background, no shadow on the ground, no text, no watermark"
 )
 PHONG_CACH_ICON = (
-    "square mobile game UI icon, hand-drawn comic style, bold dark outline, "
-    "bright readable colors, single object centered, plain solid light grey background, "
-    "no text, no watermark"
+    "square mobile game UI icon, hand-drawn comic style, bold dark outline, bright readable colors, "
+    "single object centered, isolated on a plain flat pure white background, no text, no watermark"
 )
 PHONG_CACH_NEN = (
-    "2D side-scrolling mobile game background, hand-drawn comic art like Earn to Die, "
-    "post-apocalyptic, warm sunset light, wide panoramic, no characters, no text"
+    "2D side-scrolling mobile game background art, hand-drawn comic style like Earn to Die, "
+    "post-apocalyptic, warm sunset light, wide panoramic scene, no characters, no text"
 )
 
 # ------------------------------------------------------------
 # 3. DANH SÁCH ASSET: (nhóm, tên file, mô tả, xóa phông?, kích thước)
-#    Tên file giữ nguyên để game nạp đúng chỗ.
 # ------------------------------------------------------------
 VUONG = "1024x1024"
-NGANG = "1820x1024"
+NGANG = "1344x768"
 
 HINH = [
     # --- Nhân vật ---
@@ -232,69 +241,90 @@ AM_THANH = [
 ]
 
 # ------------------------------------------------------------
-# 4. GỌI API
+# 4. TẠO ẢNH (FLUX.1-schnell) + XÓA PHÔNG (rembg)
 # ------------------------------------------------------------
-def goi(method, url, thu_lai=4, **kw):
-    """Gọi API, tự thử lại khi mạng lỗi hoặc bị giới hạn (429/5xx)."""
+_client = None
+_rembg = None
+
+class HetLuot(Exception):
+    """Hết lượt GPU miễn phí trên Hugging Face — chạy lại sau."""
+
+def client():
+    global _client
+    if _client is None:
+        try:
+            _client = Client(SPACE, hf_token=HF_TOKEN) if HF_TOKEN else Client(SPACE)
+        except TypeError:
+            _client = Client(SPACE, token=HF_TOKEN) if HF_TOKEN else Client(SPACE)
+    return _client
+
+def tao_hinh(mo_ta, kich_thuoc, thu_lai=3):
+    """Trả về đường dẫn ảnh PNG/WEBP tạm do Space sinh ra."""
+    w, h = (int(x) for x in kich_thuoc.split("x"))
     for lan in range(thu_lai):
         try:
-            r = requests.request(method, url, timeout=180, **kw)
-            if r.status_code in (429, 500, 502, 503, 504):
-                time.sleep(5 * (lan + 1))
-                continue
-            return r
-        except requests.RequestException as e:
-            print("   mạng lỗi, thử lại:", e)
-            time.sleep(5 * (lan + 1))
+            try:
+                kq = client().predict(
+                    prompt=mo_ta, seed=0, randomize_seed=True,
+                    width=w, height=h, num_inference_steps=4,
+                    api_name="/infer",
+                )
+            except (TypeError, ValueError):
+                # Space đổi tên tham số: gọi theo thứ tự
+                kq = client().predict(mo_ta, 0, True, w, h, 4, api_name="/infer")
+            return kq[0] if isinstance(kq, (list, tuple)) else kq
+        except Exception as e:
+            loi = str(e)
+            if "quota" in loi.lower() or "exceeded" in loi.lower():
+                raise HetLuot(loi)
+            print(f"   lỗi, thử lại ({lan + 1}/{thu_lai}):", loi[:200])
+            time.sleep(10 * (lan + 1))
     return None
 
-def tao_hinh(mo_ta, kich_thuoc):
-    """Recraft: style digital_illustration cho ra PNG
-    (vector_illustration trả về SVG nên không dùng được cho game/xóa phông)."""
-    r = goi("POST", "https://external.api.recraft.ai/v1/images/generations",
-            headers={"Authorization": f"Bearer {RECRAFT_API_TOKEN}"},
-            json={"prompt": mo_ta[:1000], "model": "recraftv3", "style": "digital_illustration", "size": kich_thuoc, "n": 1})
-    if r is None or r.status_code != 200:
-        print("   ❌ Recraft:", None if r is None else r.text[:300])
-        return None
-    return r.json()["data"][0]["url"]
+def xoa_phong_va_cat(duong_vao, duong_ra):
+    """Xóa phông bằng rembg, cắt sát vật thể (chừa lề 8px), lưu PNG trong suốt."""
+    global _rembg
+    if _rembg is None:
+        _rembg = new_session("isnet-general-use")
+    anh = Image.open(duong_vao).convert("RGBA")
+    anh = remove(anh, session=_rembg)
+    hop = anh.getchannel("A").getbbox()
+    if hop:
+        l, t, r, b = hop
+        anh = anh.crop((max(0, l - 8), max(0, t - 8), min(anh.width, r + 8), min(anh.height, b + 8)))
+    anh.save(duong_ra, "PNG")
 
-def xoa_phong(url_anh):
-    """fal.ai BiRefNet: trả về PNG nền trong suốt."""
-    r = goi("POST", "https://fal.run/fal-ai/birefnet",
-            headers={"Authorization": f"Key {FAL_KEY}"},
-            json={"image_url": url_anh})
-    if r is None or r.status_code != 200:
-        print("   ❌ fal.ai:", None if r is None else r.text[:300])
-        return None
-    return r.json()["image"]["url"]
-
-def tai_ve(url, duong_dan):
-    r = goi("GET", url)
-    if r is None or r.status_code != 200:
-        return False
-    with open(duong_dan, "wb") as f:
-        f.write(r.content)
-    return True
-
-def tao_am_thanh(mo_ta, giay, duong_dan):
-    """ElevenLabs Sound Effects: 0,5–22 giây, trả về MP3."""
-    r = goi("POST", "https://api.elevenlabs.io/v1/sound-generation",
-            headers={"xi-api-key": ELEVENLABS_API_KEY},
-            json={"text": mo_ta, "duration_seconds": max(0.5, min(22.0, giay)), "prompt_influence": 0.5})
-    if r is None or r.status_code != 200:
-        print("   ❌ ElevenLabs:", None if r is None else r.text[:300])
-        return False
-    with open(duong_dan, "wb") as f:
-        f.write(r.content)
-    return True
+def luu_png(duong_vao, duong_ra):
+    Image.open(duong_vao).convert("RGB").save(duong_ra, "PNG")
 
 # ------------------------------------------------------------
-# 5. CHẠY
+# 5. ÂM THANH (ElevenLabs, không bắt buộc)
+# ------------------------------------------------------------
+def tao_am_thanh(mo_ta, giay, duong_dan):
+    for lan in range(3):
+        try:
+            r = requests.post("https://api.elevenlabs.io/v1/sound-generation",
+                              headers={"xi-api-key": ELEVENLABS_API_KEY}, timeout=180,
+                              json={"text": mo_ta, "duration_seconds": max(0.5, min(22.0, giay)), "prompt_influence": 0.5})
+            if r.status_code == 200:
+                with open(duong_dan, "wb") as f:
+                    f.write(r.content)
+                return True
+            print("   ❌ ElevenLabs:", r.text[:200])
+            if r.status_code not in (429, 500, 502, 503):
+                return False
+        except requests.RequestException as e:
+            print("   mạng lỗi:", e)
+        time.sleep(5 * (lan + 1))
+    return False
+
+# ------------------------------------------------------------
+# 6. CHẠY
 # ------------------------------------------------------------
 def chay():
     xong, loi, bo_qua = 0, [], 0
     da_thu = set()
+    het_luot = False
     for nhom, ten, mo_ta, can_xoa_phong, kich_thuoc in HINH:
         if nhom not in CHON_NHOM or (CHAY_THU and nhom in da_thu):
             continue
@@ -304,16 +334,30 @@ def chay():
         if os.path.exists(dich):
             bo_qua += 1
             continue
+        if het_luot:
+            loi.append(ten)
+            continue
         print(f"🎨 {nhom}/{ten}")
         nen = PHONG_CACH_NEN if nhom == "nen" else PHONG_CACH_ICON if nhom in ("suc_manh", "giao_dien") else PHONG_CACH
-        url = tao_hinh(f"{mo_ta}. {nen}", kich_thuoc)
-        if url and can_xoa_phong:
-            url = xoa_phong(url) or None
-        if url and tai_ve(url, dich):
-            xong += 1
-        else:
+        try:
+            tam = tao_hinh(f"{mo_ta}. {nen}", kich_thuoc)
+        except HetLuot:
+            print("⏳ Hết lượt GPU miễn phí của Hugging Face. Đợi vài tiếng (hoặc thêm HF_TOKEN) rồi chạy lại ô này — ảnh đã tạo được giữ nguyên.")
+            het_luot = True
             loi.append(ten)
-        time.sleep(1)
+            continue
+        if not tam:
+            loi.append(ten)
+            continue
+        try:
+            if can_xoa_phong:
+                xoa_phong_va_cat(tam, dich)
+            else:
+                luu_png(tam, dich)
+            xong += 1
+        except Exception as e:
+            print("   ❌ lưu ảnh lỗi:", e)
+            loi.append(ten)
     for nhom, ten, mo_ta, giay in AM_THANH:
         if nhom not in CHON_NHOM or (CHAY_THU and nhom in da_thu):
             continue
@@ -323,14 +367,14 @@ def chay():
         if os.path.exists(dich):
             bo_qua += 1
             continue
+        if not ELEVENLABS_API_KEY:
+            continue
         print(f"🔊 {nhom}/{ten}")
         if tao_am_thanh(mo_ta, giay, dich):
             xong += 1
         else:
             loi.append(ten)
-        time.sleep(1)
 
-    # gói lại thành 1 file zip để tải về / gửi cho Claude
     zip_path = f"{THU_MUC}.zip"
     with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as z:
         for goc, _, files in os.walk(THU_MUC):
@@ -339,13 +383,8 @@ def chay():
                 z.write(p, os.path.relpath(p, os.path.dirname(THU_MUC)))
     print(f"\n✅ Tạo mới {xong} file, bỏ qua {bo_qua} file đã có.")
     if loi:
-        print("❌ Lỗi (chạy lại ô này để thử lại):", ", ".join(loi))
+        print(f"❌ Chưa xong {len(loi)} file (chạy lại ô này để làm tiếp):", ", ".join(loi[:20]), "..." if len(loi) > 20 else "")
+    print("📁 Thư mục:", THU_MUC)
     print("📦 File zip:", zip_path)
-    if not LUU_VAO_DRIVE:
-        try:
-            from google.colab import files
-            files.download(zip_path)
-        except Exception:
-            pass
 
 chay()
