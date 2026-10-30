@@ -25,3 +25,15 @@ class SoundPool {
     private var listener: ((SoundPool, Int, Int) -> Unit)? = null
     private var next = 1
 }
+
+/** Stand-in for android.media.MediaPlayer: silent in the preview. */
+class MediaPlayer {
+    var isLooping = false
+    val isPlaying = false
+    fun setDataSource(@Suppress("UNUSED_PARAMETER") path: String) {}
+    fun prepare() {}
+    fun start() {}
+    fun pause() {}
+    fun setVolume(@Suppress("UNUSED_PARAMETER") l: Float, @Suppress("UNUSED_PARAMETER") r: Float) {}
+    fun release() {}
+}

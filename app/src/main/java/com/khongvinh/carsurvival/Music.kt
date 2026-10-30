@@ -3,6 +3,7 @@ package com.khongvinh.carsurvival
 import android.media.AudioAttributes
 import android.media.AudioFormat
 import android.media.AudioTrack
+import android.media.MediaPlayer
 import java.io.File
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
@@ -38,6 +39,10 @@ class Music(private val cacheDir: File? = null, private val startAfter: CountDow
     var suspended = false
 
     private val tracks = arrayOfNulls<AudioTrack>(Track.entries.size)
+
+    /** Recorded music from assets/music (music_menu, music_battle) plays instead of the composed track. */
+    private val mp3 = arrayOfNulls<MediaPlayer>(Track.entries.size)
+    private val mp3Name = mapOf(Track.CHILL to "music_menu", Track.INTENSE to "music_battle")
     private val vol = FloatArray(Track.entries.size)
     private var want: Track? = null
     private var wantVol = 1f
@@ -51,6 +56,8 @@ class Music(private val cacheDir: File? = null, private val startAfter: CountDow
                 // sound effects first: composing music must not delay them
                 startAfter?.await(15, TimeUnit.SECONDS)
                 for (t in Track.entries) {
+                    mp3[t.ordinal] = openMp3(t)
+                    if (mp3[t.ordinal] != null) continue
                     val (pcm, loopStart) = loadOrCompose(t)
                     tracks[t.ordinal] = makeTrack(pcm, loopStart)
                 }
@@ -81,6 +88,7 @@ class Music(private val cacheDir: File? = null, private val startAfter: CountDow
             vol[i] = 0f
             try {
                 tracks[i]?.pause()
+                mp3[i]?.let { if (it.isPlaying) it.pause() }
             } catch (_: IllegalStateException) {
             }
         }
@@ -90,6 +98,21 @@ class Music(private val cacheDir: File? = null, private val startAfter: CountDow
     fun update(dt: Float) {
         if (!ready) return
         for (t in Track.entries) {
+            mp3[t.ordinal]?.let { mp ->
+                val target = if (enabled && !suspended && t == want) wantVol * MASTER * master else 0f
+                val v = vol[t.ordinal]
+                val nv = if (v < target) min(target, v + dt * 0.8f) else max(target, v - dt * 0.8f)
+                vol[t.ordinal] = nv
+                try {
+                    if (nv > 0.001f) {
+                        if (!mp.isPlaying) mp.start()
+                        mp.setVolume(nv, nv)
+                    } else if (mp.isPlaying) {
+                        mp.pause()
+                    }
+                } catch (_: IllegalStateException) {
+                }
+            }
             val track = tracks[t.ordinal] ?: continue
             val target = if (enabled && !suspended && t == want) wantVol * MASTER * master else 0f
             val v = vol[t.ordinal]
@@ -122,7 +145,31 @@ class Music(private val cacheDir: File? = null, private val startAfter: CountDow
         track.playbackHeadPosition = 0
     }
 
+    /** A looping player for the recorded track, if the app ships one. */
+    private fun openMp3(t: Track): MediaPlayer? {
+        val name = mp3Name[t] ?: return null
+        val dir = cacheDir ?: return null
+        return try {
+            val f = File(dir, "asset_$name.mp3")
+            if (!f.exists() || f.length() == 0L) {
+                val inp = Sprites.open?.invoke("music/$name.mp3") ?: return null
+                inp.use { i -> f.outputStream().use { o -> i.copyTo(o) } }
+            }
+            MediaPlayer().apply {
+                setDataSource(f.absolutePath)
+                isLooping = true
+                prepare()
+            }
+        } catch (_: Exception) {
+            null
+        }
+    }
+
     fun release() {
+        for (m in mp3) try {
+            m?.release()
+        } catch (_: Exception) {
+        }
         for (t in tracks) try {
             t?.release()
         } catch (_: Exception) {

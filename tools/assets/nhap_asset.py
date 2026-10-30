@@ -33,6 +33,8 @@ for group in sorted(os.listdir(src)):
             else:
                 im = im.convert("RGBA")
                 im.thumbnail((384, 384))
+                # 256-colour palette (alpha kept) keeps each sprite around 50-80 KB
+                im = im.quantize(colors=256, method=Image.Quantize.FASTOCTREE)
                 im.save(os.path.join(img_dir, name + ".png"), "PNG", optimize=True)
             n += 1
         elif ext == ".mp3":
