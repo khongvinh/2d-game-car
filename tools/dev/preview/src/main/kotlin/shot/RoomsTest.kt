@@ -35,7 +35,7 @@ fun main(args: Array<String>) {
         while (t < 1500f && (g.state == State.PLAYING || g.state == State.PICK)) {
             if (god) g.driver.hp = g.driver.maxHp
             if (g.state == State.PICK) {
-                if (run.pickKind !in seen && shots < 12) { seen.add(run.pickKind); shot(g, "rm_${st}_pick${run.pickKind}"); shots++ }
+                if (run.pickKind !in seen && shots < 16) { seen.add(run.pickKind); shot(g, "rm_${st}_pick${run.pickKind}"); shots++ }
                 tick(g, 0.45f); t += 0.45f
                 tap(g, "pick0")
                 continue
@@ -43,7 +43,7 @@ fun main(args: Array<String>) {
             val d = g.driver
             val rm = run.room
             if (run.index != lastRoom) { lastRoom = run.index; worstRoom = maxOf(worstRoom, roomT); roomT = 0f
-                if (run.index in listOf(2, 10, 20) && shots < 12) { tick(g, 1.2f); shot(g, "rm_${st}_r${run.index}"); shots++ } }
+                if (run.index in listOf(2, 7, 10, 20) && shots < 16) { tick(g, 1.2f); shot(g, "rm_${st}_r${run.index}"); shots++ } }
             val target = if (rm.open) rm.exitX else (rm.foes.minByOrNull { abs(it.z.x - d.x) + abs(it.z.y - d.y) * 0.5f }?.z?.x ?: rm.roomBoss?.x ?: rm.exitX)
             val ty = if (rm.open) 0f else (rm.foes.minByOrNull { abs(it.z.x - d.x) }?.z?.y ?: 0f)
             val want = if (rm.open) 0f else if (save.sideWeapon.melee) 60f else 260f

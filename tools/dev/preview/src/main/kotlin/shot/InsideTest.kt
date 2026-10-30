@@ -22,6 +22,7 @@ fun main() {
         g.car.x = b.x - 40f; g.car.y = g.terrain.heightAt(g.car.x) - 60f
         tick(g, 1.0f)
         fun press(id: String) { val c = g.controls().first { it.id == id }; g.touchDown(7, c.cx, c.cy); g.touchUp(7) }
+        if (g.controls().none { it.id == "exit" }) { println("stage $st: cannot get out (rooms=${g.rooms != null}, speed=${g.car.forwardSpeed.toInt()})"); continue }
         press("exit")
         tick(g, 0.6f)
         g.driver.x = b.x
@@ -72,10 +73,14 @@ fun main() {
     g.resize(W.toFloat(), H.toFloat())
     tick(g, 0.6f)
     shot(g, "menu_new")
+    tap(g, "missions"); tick(g, 0.5f)
+    shot(g, "missions")
+    tap(g, "mtab1"); tick(g, 0.2f)
+    shot(g, "achievements")
+    tap(g, "menu"); tick(g, 0.5f)
     tap(g, "soundMenu"); tick(g, 0.5f)
     shot(g, "sound")
     tap(g, "soundDone"); tick(g, 0.5f)
-    tap(g, "garage"); tick(g, 0.5f)
     val nr = g.navRect(4)
     g.touchDown(9, (nr[0] + nr[2]) / 2, (nr[1] + nr[3]) / 2); g.touchUp(9)
     tick(g, 0.2f)

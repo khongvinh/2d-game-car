@@ -62,6 +62,7 @@ class Renderer(private val g: Game) {
             State.STORY -> drawStory(c)
             State.LAYOUT -> drawLayout(c)
             State.SOUND -> drawSound(c)
+            State.MISSIONS -> drawMissions(c)
             State.PICK -> g.rooms?.let { drawRoomHud(c, it); drawPick(c, it) }
             State.PLAYING, State.PAUSED -> {
                 drawDamageOverlay(c)
@@ -2384,70 +2385,275 @@ class Renderer(private val g: Game) {
 
     private fun drawMenu(c: Canvas) {
         val W = g.W
+        val H = g.H
         val s = g.save
-        fill.color = 0x40000000
-        c.drawRect(0f, 0f, W, g.H, fill)
-        val lx = W * 0.27f
-        val lw = W * 0.5f
-        val bob = sin(g.anim * 2f) * 4f
-        title(c, "ĐUA XE", lx, 115f + bob, 0xFFFFD740.toInt(), 104f, lw)
-        title(c, "SINH TỒN", lx, 215f + bob, 0xFFFF5252.toInt(), 104f, lw)
-
-        // slogan ribbon
-        val slogan = "CHẠY CÀNG XA — CÀNG SỐNG SÓT!"
-        val pulse = 1f + 0.03f * sin(g.anim * 4f)
-        text.textSize = 34f * pulse
-        val sw = min(lw, text.measureText(slogan) + 60f)
-        val sy = 248f
-        fill.color = 0x55000000
-        path.reset()
-        path.moveTo(lx - sw / 2 - 18f, sy + 6f); path.lineTo(lx + sw / 2 + 18f, sy + 6f)
-        path.lineTo(lx + sw / 2 + 4f, sy + 34f); path.lineTo(lx + sw / 2 + 18f, sy + 62f)
-        path.lineTo(lx - sw / 2 - 18f, sy + 62f); path.lineTo(lx - sw / 2 - 4f, sy + 34f); path.close()
-        c.drawPath(path, fill)
-        path.offset(-3f, -6f)
-        fill.color = 0xF0B71C1C.toInt()
-        c.drawPath(path, fill)
-        stroke.color = 0xFFFFD740.toInt()
-        stroke.strokeWidth = 3f
-        c.drawPath(path, stroke)
-        text.textAlign = Paint.Align.CENTER
-        text.color = Color.WHITE
-        fitText(c, slogan, lx - 3f, sy + 40f, 34f * pulse, sw - 30f)
-
-        // stats chips
-        val chips = listOf("💰 ${s.money}$", "♦ ${s.gems}", "📅 Ngày ${s.day}", "🏆 ${s.bestStage}/${Game.STAGES} ải", "⭐ ${s.bestScore}")
-        var chipSize = 26f
-        var total: Float
-        do {
-            text.textSize = chipSize
-            total = 0f
-            for (ch in chips) total += text.measureText(ch) + chipSize * 1.2f + 10f
-            if (total > lw + 60f) chipSize -= 1f
-        } while (total > lw + 60f && chipSize > 16f)
-        var cx = lx - total / 2
-        for (ch in chips) cx += chip(c, ch, cx, 330f, chipSize, 0xAA1B1B1B.toInt(), 0xFFFFE082.toInt()) + 10f
-
-        // stage selector
-        drawMenuButtons(c)
-        val sx = W * 0.74f
-        text.textAlign = Paint.Align.CENTER
-        text.color = 0xFFFFF3E0.toInt()
+        fill.color = 0x30000000
+        c.drawRect(0f, 0f, W, H, fill)
+        garageNav(c, home = true)
+        garageTopBar(c)
+        val mx = g.menuCenterX()
         val th = Themes.of(s.stageSel)
-        fitText(c, "${th.region.title} • ${th.road.name} • ${g.stageGoalM(s.stageSel).toInt()}m • kỷ lục ${s.best[s.stageSel]}m", sx, 236f, 22f, 460f)
-        drawLeaderboard(c, sx - 230f, 458f, sx + 230f, g.H - 14f)
+        // floating island with the stage on it
+        val isl = g.menuIsland()
+        val bob = sin(g.anim * 1.6f) * 6f
+        val top = 330f + bob
+        val iw = (isl[2] - isl[0]) / 2
+        fill.color = 0x40000000
+        c.drawOval(mx - iw * 0.8f, 520f, mx + iw * 0.8f, 548f, fill)
+        path.reset()
+        path.moveTo(mx - iw, top)
+        path.lineTo(mx - iw * 0.8f, top + 60f)
+        path.lineTo(mx - iw * 0.5f, top + 110f)
+        path.lineTo(mx - iw * 0.2f, top + 150f)
+        path.lineTo(mx, top + 175f)
+        path.lineTo(mx + iw * 0.25f, top + 140f)
+        path.lineTo(mx + iw * 0.6f, top + 100f)
+        path.lineTo(mx + iw * 0.9f, top + 50f)
+        path.lineTo(mx + iw, top)
+        path.close()
+        fill.color = shade(th.ground[0], 0.7f)
+        c.drawPath(path, fill)
+        stroke.color = shade(th.ground[0], 0.5f)
+        stroke.strokeWidth = 3f
+        c.drawLine(mx - iw * 0.5f, top + 40f, mx - iw * 0.35f, top + 110f, stroke)
+        c.drawLine(mx + iw * 0.3f, top + 30f, mx + iw * 0.45f, top + 90f, stroke)
+        // mesa on the island
+        fill.color = th.mid[0]
+        path.reset()
+        path.moveTo(mx - iw * 0.75f, top)
+        path.lineTo(mx - iw * 0.6f, top - 120f)
+        path.lineTo(mx - iw * 0.2f, top - 130f)
+        path.lineTo(mx - iw * 0.05f, top)
+        path.close()
+        c.drawPath(path, fill)
+        fill.color = th.ground[0]
+        c.drawRoundRect(mx - iw - 6f, top - 14f, mx + iw + 6f, top + 16f, 14f, 14f, fill)
+        fill.color = th.crust[2]
+        c.drawRect(mx - iw, top - 14f, mx + iw, top - 9f, fill)
+        // wreck, signpost with a skull flag, the survivor
+        fill.color = 0xFF5D4037.toInt()
+        c.drawRoundRect(mx + iw * 0.25f, top - 44f, mx + iw * 0.75f, top - 14f, 10f, 10f, fill)
+        c.drawRoundRect(mx + iw * 0.35f, top - 66f, mx + iw * 0.6f, top - 40f, 8f, 8f, fill)
+        fill.color = 0xFF212121.toInt()
+        c.drawCircle(mx + iw * 0.33f, top - 14f, 12f, fill)
+        c.drawCircle(mx + iw * 0.67f, top - 14f, 12f, fill)
+        fill.color = 0xFF6D4C41.toInt()
+        c.drawRect(mx - iw * 0.45f, top - 170f, mx - iw * 0.42f, top - 10f, fill)
+        c.drawRect(mx - iw * 0.62f, top - 168f, mx - iw * 0.18f, top - 108f, fill)
+        fill.color = 0xFFF5E6C8.toInt()
+        c.drawRect(mx - iw * 0.6f, top - 164f, mx - iw * 0.2f, top - 112f, fill)
+        text.textAlign = Paint.Align.CENTER
+        text.textSize = 34f
+        text.color = 0xFF3E2723.toInt()
+        c.drawText("${s.stageSel}", mx - iw * 0.4f, top - 124f, text)
+        if (s.stageSel % 5 == 0) {
+            text.textSize = 30f
+            c.drawText("👹", mx - iw * 0.4f, top - 182f, text)
+        }
+        val d = g.driver
+        drawDriverBody(c, d, mx + iw * 0.02f, top - 12f, 1f, sin(g.anim * 3f) * 3f)
+        // region progress: five stages, the skull at the boss
+        val reg = (s.stageSel - 1) / 5
+        val bl = mx - 220f
+        val br = mx + 220f
+        val by = 548f
+        fill.color = 0xCC1B1714.toInt()
+        c.drawRoundRect(bl - 16f, by - 16f, br + 16f, by + 16f, 16f, 16f, fill)
+        val done = (s.bestStage - reg * 5).coerceIn(0, 5)
+        fill.color = 0xFF29B6F6.toInt()
+        if (done > 0) c.drawRoundRect(bl - 12f, by - 10f, bl + (br - bl) * done / 5f, by + 10f, 10f, 10f, fill)
+        for (k in 1..5) {
+            val kx = bl + (br - bl) * (k - 0.5f) / 5f
+            val st = reg * 5 + k
+            fill.color = if (st == s.stageSel) 0xFFFFD740.toInt() else if (st <= s.bestStage) 0xFF69F0AE.toInt() else 0xFF546E7A.toInt()
+            c.drawCircle(kx, by, if (st == s.stageSel) 14f else 10f, fill)
+            if (k == 5) {
+                text.textSize = 30f
+                c.drawText("💀", br + 34f, by + 11f, text)
+            }
+        }
+        text.color = 0xFFFFF3E0.toInt()
+        fitText(c, "${th.region.title} • ${th.road.name} • ${g.stageGoalM(s.stageSel).toInt()}m + ${RoomRun.TOTAL} phòng • kỷ lục ${s.best[s.stageSel]}m", mx, 596f, 22f, 640f)
+        drawMenuButtons(c)
+        // red dot when something can be claimed
+        if (s.claimable() > 0) {
+            val b = g.buttons().firstOrNull { it.id == "missions" }
+            if (b != null) {
+                fill.color = 0xFFE53935.toInt()
+                c.drawCircle(b.r - 8f, b.t + 8f, 13f, fill)
+                text.textSize = 18f
+                text.color = Color.WHITE
+                c.drawText("${s.claimable()}", b.r - 8f, b.t + 14f, text)
+            }
+        }
+        text.textAlign = Paint.Align.LEFT
+        text.textSize = 20f
+        text.color = 0x99FFFFFF.toInt()
+        c.drawText("v${Game.VERSION}", 14f, H - 12f, text)
         if (g.confirmReset) {
             dim(c, 0xC8)
-            metalPanel(c, W / 2 - 420f, g.H * 0.2f, W / 2 + 420f, g.H * 0.62f + 120f, 20f)
-            title(c, "CHƠI LẠI TỪ ĐẦU?", W / 2, g.H * 0.2f + 80f, 0xFFFF5252.toInt(), 52f, 760f)
+            metalPanel(c, W / 2 - 420f, H * 0.2f, W / 2 + 420f, H * 0.62f + 120f, 20f)
+            title(c, "CHƠI LẠI TỪ ĐẦU?", W / 2, H * 0.2f + 80f, 0xFFFF5252.toInt(), 52f, 760f)
             text.textAlign = Paint.Align.CENTER
             text.color = Color.WHITE
-            fitText(c, "Xóa toàn bộ tiền, ngọc, xe, vũ khí, nâng cấp, ải đã vượt và bảng xếp hạng.", W / 2, g.H * 0.2f + 140f, 24f, 760f)
+            fitText(c, "Xóa toàn bộ tiền, ngọc, xe, vũ khí, nâng cấp, ải đã vượt và bảng xếp hạng.", W / 2, H * 0.2f + 140f, 24f, 760f)
             text.color = 0xFFFFAB91.toInt()
-            fitText(c, "Không thể khôi phục!", W / 2, g.H * 0.2f + 180f, 26f, 760f)
+            fitText(c, "Không thể khôi phục!", W / 2, H * 0.2f + 180f, 26f, 760f)
             drawMenuButtons(c)
         }
+    }
 
+    /** Daily missions, achievements and the leaderboard. */
+    private fun drawMissions(c: Canvas) {
+        val W = g.W
+        val s = g.save
+        dim(c, 0xD0)
+        when (g.missionsTab) {
+            0 -> {
+                text.textAlign = Paint.Align.CENTER
+                text.textSize = 22f
+                text.color = 0xFFB0BEC5.toInt()
+                c.drawText("Nhiệm vụ mới mỗi ngày lúc 0 giờ", W / 2, 118f, text)
+                for (i in 0 until 3) {
+                    val r = g.missionRow(i)
+                    metalPanel(c, r[0], r[1], r[2], r[3], 16f)
+                    val prog = s.missionProgress(i).coerceAtLeast(0)
+                    val tgt = s.missionTarget(i)
+                    text.textAlign = Paint.Align.LEFT
+                    text.color = Color.WHITE
+                    fitText(c, "📋 ${s.missionText(i)}", r[0] + 30f, r[1] + 48f, 30f, r[2] - r[0] - 320f)
+                    val bw = r[2] - r[0] - 330f
+                    fill.color = 0xCC111111.toInt()
+                    c.drawRoundRect(r[0] + 30f, r[1] + 72f, r[0] + 30f + bw, r[1] + 100f, 12f, 12f, fill)
+                    fill.color = if (prog >= tgt) 0xFF69F0AE.toInt() else 0xFF29B6F6.toInt()
+                    val f = (prog.toFloat() / tgt).coerceIn(0f, 1f)
+                    if (f > 0f) c.drawRoundRect(r[0] + 33f, r[1] + 75f, r[0] + 33f + (bw - 6f) * f, r[1] + 97f, 10f, 10f, fill)
+                    text.textAlign = Paint.Align.CENTER
+                    text.textSize = 20f
+                    text.color = Color.WHITE
+                    c.drawText("${min(prog, tgt)} / $tgt", r[0] + 30f + bw / 2, r[1] + 93f, text)
+                }
+            }
+            1 -> for (i in Missions.achievements.indices) {
+                val a = Missions.achievements[i]
+                val r = g.achRow(i)
+                metalPanel(c, r[0], r[1], r[2], r[3], 12f)
+                val prog = s.achProgress(i)
+                text.textAlign = Paint.Align.LEFT
+                text.color = if (s.achDone(i)) 0xFFFFD740.toInt() else Color.WHITE
+                fitText(c, "🏆 ${a.title}", r[0] + 20f, r[1] + 30f, 22f, r[2] - r[0] - 160f)
+                val bw = r[2] - r[0] - 170f
+                fill.color = 0xCC111111.toInt()
+                c.drawRoundRect(r[0] + 20f, r[1] + 40f, r[0] + 20f + bw, r[1] + 54f, 7f, 7f, fill)
+                fill.color = 0xFF29B6F6.toInt()
+                val f = (prog.toFloat() / a.target).coerceIn(0f, 1f)
+                if (f > 0f) c.drawRoundRect(r[0] + 21f, r[1] + 41f, r[0] + 21f + (bw - 2f) * f, r[1] + 53f, 6f, 6f, fill)
+            }
+            else -> drawLeaderboard(c, W / 2 - 400f, 120f, W / 2 + 400f, g.H - 30f)
+        }
+        drawMenuButtons(c)
+    }
+
+    /** The merchant from the video: bandana, green vest and a hook, with a speech bubble. */
+    private fun drawMerchant(c: Canvas) {
+        val x = g.W - 170f
+        val y = g.H + 10f
+        val bob = sin(g.anim * 2f) * 3f
+        c.save()
+        c.translate(x, y + bob)
+        // body
+        fill.color = 0xFFF5F5F5.toInt()
+        c.drawRoundRect(-120f, -230f, 120f, 0f, 60f, 60f, fill)
+        fill.color = 0xFF558B2F.toInt()
+        c.drawRect(-120f, -200f, -40f, 0f, fill)
+        c.drawRect(40f, -200f, 120f, 0f, fill)
+        fill.color = 0xFF33691E.toInt()
+        for (k in 0..3) c.drawRect(-108f, -180f + k * 40f, -60f, -160f + k * 40f, fill)
+        // shoulder pad with spikes
+        fill.color = 0xFF616161.toInt()
+        c.drawOval(-170f, -250f, -70f, -170f, fill)
+        fill.color = 0xFFBDBDBD.toInt()
+        for (k in 0..2) {
+            path.reset()
+            path.moveTo(-160f + k * 30f, -230f); path.lineTo(-150f + k * 30f, -268f); path.lineTo(-140f + k * 30f, -230f); path.close()
+            c.drawPath(path, fill)
+        }
+        // arm with the hook
+        fill.color = 0xFFD7A07A.toInt()
+        c.drawRoundRect(-210f, -150f, -110f, -90f, 30f, 30f, fill)
+        fill.color = 0xFF5D4037.toInt()
+        c.drawRect(-226f, -146f, -196f, -94f, fill)
+        stroke.color = 0xFFCFD8DC.toInt()
+        stroke.strokeWidth = 7f
+        r.set(-268f, -170f, -222f, -124f)
+        c.drawArc(r, 0f, 260f, false, stroke)
+        // head: neck, face, beard, bandana
+        fill.color = 0xFFD7A07A.toInt()
+        c.drawRect(-30f, -260f, 30f, -220f, fill)
+        c.drawOval(-62f, -360f, 62f, -240f, fill)
+        fill.color = 0xFF4E342E.toInt()
+        path.reset()
+        path.moveTo(-58f, -300f); path.quadTo(-50f, -230f, 0f, -226f); path.quadTo(50f, -230f, 58f, -300f)
+        path.quadTo(0f, -268f, -58f, -300f)
+        c.drawPath(path, fill)
+        fill.color = 0xFFC62828.toInt()
+        c.drawRoundRect(-66f, -366f, 66f, -326f, 18f, 18f, fill)
+        path.reset()
+        path.moveTo(60f, -350f); path.lineTo(96f, -366f); path.lineTo(90f, -330f); path.close()
+        c.drawPath(path, fill)
+        fill.color = 0xFF212121.toInt()
+        c.drawCircle(-24f, -306f, 6f, fill)
+        c.drawCircle(22f, -306f, 6f, fill)
+        stroke.color = 0xFF3E2723.toInt()
+        stroke.strokeWidth = 5f
+        c.drawLine(-36f, -322f, -12f, -316f, stroke)
+        c.drawLine(36f, -322f, 12f, -316f, stroke)
+        c.restore()
+        // speech bubble
+        val bl = 120f
+        val bt = g.H - 140f
+        fill.color = 0xFFF5ECD7.toInt()
+        c.drawRoundRect(bl, bt, g.W - 330f, g.H - 40f, 16f, 16f, fill)
+        path.reset()
+        path.moveTo(g.W - 330f, bt + 30f); path.lineTo(g.W - 290f, bt + 46f); path.lineTo(g.W - 330f, bt + 60f); path.close()
+        c.drawPath(path, fill)
+        text.textAlign = Paint.Align.CENTER
+        text.color = 0xFF3E2723.toInt()
+        fitText(c, "Chọn 1 món đi, nhóc! Hàng tốt cả đấy.", (bl + g.W - 330f) / 2, bt + 60f, 28f, g.W - 480f)
+    }
+
+    /** Workbench in a rest room: a table with tools under a lamp. */
+    private fun drawBench(c: Canvas, x: Float, used: Boolean) {
+        fill.color = 0xFF5D4037.toInt()
+        c.drawRect(x - 130f, -90f, x + 130f, -76f, fill)
+        c.drawRect(x - 120f, -76f, x - 106f, 0f, fill)
+        c.drawRect(x + 106f, -76f, x + 120f, 0f, fill)
+        fill.color = 0xFF455A64.toInt()
+        c.drawRect(x - 120f, -240f, x + 120f, -96f, fill)
+        stroke.color = 0xFFB0BEC5.toInt()
+        stroke.strokeWidth = 5f
+        for (k in 0..4) c.drawLine(x - 100f + k * 46f, -220f, x - 100f + k * 46f, -150f - (k % 2) * 20f, stroke)
+        fill.color = 0xFFF9A825.toInt()
+        c.drawRect(x - 100f, -120f, x - 30f, -90f, fill)
+        fill.color = 0xFFC62828.toInt()
+        c.drawRect(x + 20f, -126f, x + 100f, -90f, fill)
+        // lamp
+        stroke.color = 0xFF263238.toInt()
+        stroke.strokeWidth = 5f
+        c.drawLine(x + 110f, -96f, x + 140f, -200f, stroke)
+        c.drawLine(x + 140f, -200f, x + 100f, -230f, stroke)
+        fill.color = if (used) 0xFF616161.toInt() else 0xFFFFF59D.toInt()
+        c.drawCircle(x + 96f, -222f, 14f, fill)
+        if (!used) {
+            fill.color = 0x33FFF59D
+            path.reset()
+            path.moveTo(x + 96f, -222f); path.lineTo(x - 140f, -90f); path.lineTo(x + 130f, -90f); path.close()
+            c.drawPath(path, fill)
+            text.textAlign = Paint.Align.CENTER
+            text.textSize = 26f
+            text.color = 0xFFFFD740.toInt()
+            c.drawText("🔧 BÀN ĐỒ NGHỀ", x, -270f + sin(g.anim * 3f) * 5f, text)
+        }
     }
 
     /** Top runs by distance, kept on this phone. */
@@ -2738,12 +2944,12 @@ class Renderer(private val g: Game) {
     }
 
     /** Round metal nav buttons down the left side: home, vehicles, weapons, skills. */
-    private fun garageNav(c: Canvas) {
+    private fun garageNav(c: Canvas, home: Boolean = false) {
         for (i in 0..4) {
             val rc = g.navRect(i)
             val cx = (rc[0] + rc[2]) / 2
             val cy = (rc[1] + rc[3]) / 2
-            val on = i > 0 && g.garageTab == i - 1
+            val on = if (home) i == 0 else i > 0 && g.garageTab == i - 1
             val rad = (rc[2] - rc[0]) / 2
             fill.color = 0x88000000.toInt()
             c.drawCircle(cx + 3f, cy + 5f, rad, fill)
@@ -4849,6 +5055,7 @@ class Renderer(private val g: Game) {
         // doors: the one behind and the EXIT ahead
         door(c, rm.entryX, false, true)
         door(c, rm.exitX, true, rm.open)
+        if (rm.rest) drawBench(c, rm.benchX, rm.benchUsed)
         // ledges with hazard stripes
         for (p in rm.platforms) {
             if (p.r < x0 || p.l > x1) continue
@@ -5111,7 +5318,7 @@ class Renderer(private val g: Game) {
         // room counter
         text.textAlign = Paint.Align.CENTER
         val bossRoom = run.index % 10 == 0
-        val label = "🚪 Phòng ${run.index} / ${RoomRun.TOTAL}${if (bossRoom) "  👹" else ""}"
+        val label = "🚪 Phòng ${run.index} / ${RoomRun.TOTAL}${if (bossRoom) "  👹" else if (run.room.rest) "  • PHÒNG NGHỈ" else ""}"
         text.textSize = 28f
         val tw = text.measureText(label)
         glassPanel(c, W / 2 - tw / 2 - 24f, 56f, W / 2 + tw / 2 + 24f, 100f, 16f)
@@ -5193,6 +5400,7 @@ class Renderer(private val g: Game) {
         dim(c, 0xC8)
         val (head, sub) = when (run.pickKind) {
             1 -> "LÁI BUÔN" to "Chọn 1 hộp quà bí ẩn"
+            3 -> "BÀN ĐỒ NGHỀ" to "Chọn 1 việc"
             2 -> "CHỌN NÂNG CẤP" to "Phần thưởng hạ trùm"
             else -> "LÊN CẤP ${run.level}!" to "Chọn 1 sức mạnh"
         }
@@ -5203,6 +5411,7 @@ class Renderer(private val g: Game) {
         text.textSize = 24f
         text.color = 0xFFE0E0E0.toInt()
         c.drawText(sub, W / 2, 176f, text)
+        if (run.pickKind == 1) drawMerchant(c)
         val n = run.choices.size
         for (i in 0 until n) {
             val p = run.choices[i]
@@ -5214,7 +5423,15 @@ class Renderer(private val g: Game) {
             c.drawRect(cx - 90f, rc[1] + 26f, cx + 90f, rc[1] + 196f, fill)
             fill.color = 0xFF263238.toInt()
             c.drawRect(cx - 80f, rc[1] + 36f, cx + 80f, rc[1] + 170f, fill)
-            if (run.pickKind == 1) {
+            if (run.pickKind == 3) {
+                val (ic, tt, ds) = g.benchOption(i)
+                text.textSize = 76f
+                text.color = Color.WHITE
+                c.drawText(ic, cx, rc[1] + 132f, text)
+                fitText(c, tt, cx, rc[1] + 236f, 30f, rc[2] - rc[0] - 24f)
+                text.color = 0xFFB0BEC5.toInt()
+                wrapText(c, ds, cx, rc[1] + 274f, rc[2] - rc[0] - 30f, 21f, 26f)
+            } else if (run.pickKind == 1) {
                 // closed metal case
                 fill.color = 0xFFB0BEC5.toInt()
                 c.drawRoundRect(cx - 62f, rc[1] + 80f, cx + 62f, rc[1] + 150f, 10f, 10f, fill)

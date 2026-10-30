@@ -41,6 +41,51 @@ class SaveData(context: Context) {
     var volSfx = prefs.getInt("volSfx", if (sound) 65 else 0)
     var volEngine = prefs.getInt("volEngine", if (sound) 100 else 0)
 
+    /** Lifetime counters per [Stat]. */
+    val life = IntArray(Stat.entries.size) { prefs.getInt("life$it", 0) }
+
+    /** Daily missions: the day they were made for, kind/tier per slot, counter at the start, claimed bits. */
+    var missionDay = prefs.getInt("mDay", -1)
+    val missionKind = IntArray(3) { prefs.getInt("mKind$it", 0) }
+    val missionTier = IntArray(3) { prefs.getInt("mTier$it", 0) }
+    val missionBase = IntArray(3) { prefs.getInt("mBase$it", 0) }
+    var missionClaimed = prefs.getInt("mClaimed", 0)
+
+    /** Claimed achievements (bit per [Missions.achievements] index). */
+    var achClaimed = prefs.getInt("achClaimed", 0)
+
+    fun addStat(st: Stat, n: Int) {
+        if (n > 0) life[st.ordinal] += n
+    }
+
+    /** Makes today's missions if the day changed. */
+    fun refreshMissions() {
+        val day = Missions.today()
+        if (day == missionDay) return
+        missionDay = day
+        Missions.forDay(day).forEachIndexed { i, (k, t) ->
+            missionKind[i] = k
+            missionTier[i] = t
+            missionBase[i] = life[Missions.kinds[k].stat.ordinal]
+        }
+        missionClaimed = 0
+        save()
+    }
+
+    fun missionProgress(i: Int): Int = life[Missions.kinds[missionKind[i]].stat.ordinal] - missionBase[i]
+    fun missionTarget(i: Int): Int = Missions.kinds[missionKind[i]].targets[missionTier[i]]
+    fun missionGems(i: Int): Int = Missions.kinds[missionKind[i]].gems[missionTier[i]]
+    fun missionDone(i: Int) = missionProgress(i) >= missionTarget(i)
+    fun missionText(i: Int) = Missions.kinds[missionKind[i]].text.format(missionTarget(i))
+
+    fun achProgress(i: Int): Int = Missions.achievements[i].stat?.let { life[it.ordinal] } ?: bestStage
+    fun achDone(i: Int) = achProgress(i) >= Missions.achievements[i].target
+
+    /** Missions and achievements waiting to be claimed (red dot on the menu). */
+    fun claimable(): Int =
+        (0 until 3).count { missionDone(it) && missionClaimed and (1 shl it) == 0 } +
+            Missions.achievements.indices.count { achDone(it) && achClaimed and (1 shl it) == 0 }
+
     /** Hand weapons for the driver on foot: bit per [SideWeapon] ordinal (pistol free), and the one carried. */
     var ownedSide = prefs.getInt("ownedSide", 1)
     var side = prefs.getInt("side", 0)
@@ -158,6 +203,9 @@ class SaveData(context: Context) {
         weaponLevels.fill(0)
         ownedSide = 1
         side = 0
+        life.fill(0)
+        missionDay = -1
+        achClaimed = 0
         bestScore = 0
         records.clear()
         gems = 0
@@ -200,6 +248,15 @@ class SaveData(context: Context) {
         e.putInt("volMusic", volMusic)
         e.putInt("volSfx", volSfx)
         e.putInt("volEngine", volEngine)
+        life.forEachIndexed { i, v -> e.putInt("life$i", v) }
+        e.putInt("mDay", missionDay)
+        for (i in 0 until 3) {
+            e.putInt("mKind$i", missionKind[i])
+            e.putInt("mTier$i", missionTier[i])
+            e.putInt("mBase$i", missionBase[i])
+        }
+        e.putInt("mClaimed", missionClaimed)
+        e.putInt("achClaimed", achClaimed)
         e.putInt("ownedSide", ownedSide)
         e.putInt("side", side)
         e.putString("runs", records.joinToString(";") { it.joinToString(",") })

@@ -81,6 +81,10 @@ class Zap(val pts: FloatArray) {
 class Room(val index: Int, stage: Int, region: Region, seed: Int) {
     private val rnd = Random(seed)
     val boss = index % 10 == 0
+
+    /** Rooms 7, 14, 21, 28: no monsters, a workbench in the middle. */
+    val rest = index % 7 == 0
+    var benchUsed = false
     val width = if (boss) 2000f else 1900f + rnd.nextInt(5) * 140f
     val platforms = ArrayList<Platform>()
 
@@ -90,10 +94,11 @@ class Room(val index: Int, stage: Int, region: Region, seed: Int) {
     val shots = ArrayList<RoomShot>()
     val cash = ArrayList<Cash>()
     var roomBoss: RoomBoss? = null
-    var wave2 = !boss && index > 3 && rnd.nextFloat() < 0.4f
+    var wave2 = !boss && !rest && index > 3 && rnd.nextFloat() < 0.4f
     val exitX = width - 130f
     val entryX = 130f
-    var open = false
+    var open = rest
+    val benchX get() = width / 2
 
     /** Sunset-lit warehouse, or darker / redder / alien depending on the region. */
     val palette = rnd.nextInt(3)
@@ -109,10 +114,11 @@ class Room(val index: Int, stage: Int, region: Region, seed: Int) {
             if (lv == 2) platforms.add(Platform(x - 160f, x - 20f, 280f, 10))
             x += w + 160f + rnd.nextFloat() * 180f
         }
+        if (rest) platforms.clear()
         if (!boss) {
             var dx = 250f
             while (dx < width - 250f) {
-                decor.add(floatArrayOf(dx, rnd.nextInt(4).toFloat()))
+                if (!rest || abs(dx - width / 2) > 260f) decor.add(floatArrayOf(dx, rnd.nextInt(4).toFloat()))
                 dx += 300f + rnd.nextFloat() * 320f
             }
         }
@@ -121,7 +127,7 @@ class Room(val index: Int, stage: Int, region: Region, seed: Int) {
             val kind = when (index) { 10 -> 0; 20 -> 1; else -> 2 }
             roomBoss = RoomBoss(kind, width - 420f, if (stage % 5 == 0) stage / 5 else (region.ordinal + 1), hpMul)
             repeat(2 + index / 10) { foes.add(spawn(stage, region, 500f + it * 300f, -1, hpMul)) }
-        } else {
+        } else if (!rest) {
             val n = min(14, 3 + index / 3 + stage / 3)
             for (k in 0 until n) {
                 val onPlat = platforms.isNotEmpty() && rnd.nextFloat() < 0.4f
@@ -178,6 +184,7 @@ class RoomRun(val stage: Int, val region: Region, private val seed: Int) {
     /** Pending choice: 0 level-up power, 1 merchant boxes, 2 upgrade after a boss. */
     var pickKind = -1
     var choices: List<Power> = emptyList()
+    var benchQueued = false
     var levelUps = 0
     var upgradeQueued = 0
     var merchantQueued = 0
@@ -259,6 +266,11 @@ class RoomRules(private val g: Game) {
         for (z in run.zaps) z.life -= dt
         run.zaps.removeAll { it.life <= 0f }
 
+        // the workbench in a rest room
+        if (rm.rest && !rm.benchUsed && abs(d.x - rm.benchX) < 90f && d.y > -10f) {
+            rm.benchUsed = true
+            run.benchQueued = true
+        }
         // all clear: maybe a second wave from the doors, then the exit opens
         val bossAlive = rm.roomBoss?.alive == true
         if (!rm.open && rm.foes.isEmpty() && !bossAlive) {

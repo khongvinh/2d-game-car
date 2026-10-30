@@ -1,6 +1,6 @@
 # TỔNG HỢP TIẾN TRÌNH DỰ ÁN "ĐUA XE SINH TỒN"
 
-Tài liệu bàn giao để tiếp tục làm việc ở phiên chat mới mà không bị thiếu sót. Cập nhật đến phiên bản v6.0 (ngày 30/10/2026).
+Tài liệu bàn giao để tiếp tục làm việc ở phiên chat mới mà không bị thiếu sót. Cập nhật đến phiên bản v6.1 (ngày 30/10/2026).
 
 ## 1. Thông tin chung
 
@@ -12,8 +12,8 @@ Tài liệu bàn giao để tiếp tục làm việc ở phiên chat mới mà k
 | Ngôn ngữ / công nghệ | Kotlin + Canvas (SurfaceView), không engine, không thư viện ngoài, không file ảnh/âm thanh |
 | Repo GitHub | khongvinh/2d-game-car |
 | Nhánh làm việc | claude/2d-driving-game-f0kpjk (chưa có Pull Request, chưa merge) |
-| Commit mới nhất | xem git log nhánh làm việc (v6.0: chuỗi 30 phòng nhà kho kiểu Earn to Die Rogue sau mỗi chặng lái xe) |
-| Phiên bản hiện tại | v6.0 (versionCode 16) |
+| Commit mới nhất | xem git log nhánh làm việc (v6.1: lái ngắn rồi vào kho, màn hình chính kiểu bản đồ, lái buôn, nhiệm vụ ngày, thành tích, phòng nghỉ) |
+| Phiên bản hiện tại | v6.1 (versionCode 17) — số phiên bản hiện góc dưới trái màn hình chính (Game.VERSION, nhớ tăng mỗi bản) |
 | Build tự động | GitHub Actions "Build APK" (.github/workflows/android.yml) — đang xanh, xuất artifact DuaXeSinhTon-apk |
 | Khóa ký | app/debug.keystore (cố định, mật khẩu android) nên các bản cài đè lên nhau được |
 
@@ -189,7 +189,7 @@ Tài liệu bàn giao để tiếp tục làm việc ở phiên chat mới mà k
 
 - Kiểm tra (tools/dev/preview `gradle inside`): bot vào nhà ở ải 1/7/12/18, mở hết 3–4 rương (cả rương trên kệ), hạ 4–10 zombie, ra ngoài, nhà thành đã lục; `gradle walk`: tài xế đứng yên bị bão nuốt sau ~12 giây; `gradle drive` ải 5/10/20 vẫn tới đích.
 
-### v6.0 — Chuỗi 30 phòng nhà kho kiểu Earn to Die Rogue (hiện tại)
+### v6.0 — Chuỗi 30 phòng nhà kho kiểu Earn to Die Rogue
 - Yêu cầu: người dùng gửi video Earn to Die Rogue (lái xe → xe cháy → đi bộ tới xe lái buôn chọn hộp quà → nhà kho "Room 1/30", bục vàng-đen nhiều tầng, cần gạt + nút nhảy, súng tự bắn, tiền xanh rơi, thanh Lvl → "Select Powerup" 1 trong 3, "Select Upgrade" Damage+/Heal+, trùm tháp pháo) và muốn biến game thành như vậy. Người dùng chọn: GIỮ cả lái xe; 30 phòng như video; cần gạt + nút nhảy.
 - Vòng chơi mới mỗi ải: lái xe vượt bão như cũ → khi xe tới trạm (hoặc tài xế đi bộ tới trạm) HOẶC xe bị phá hủy (1,8 giây sau) thì vào chuỗi phòng (Rooms.kt). Tới trạm: đủ máu + 2 hộp lái buôn; xe hỏng: máu theo tài xế (tối thiểu 70%) + 1 hộp. Qua phòng 30 = vượt ải (stageComplete như cũ). Gục trong phòng = hết ngày ("Gục ở phòng n/30"). Trong phòng không có bão.
 - Máu tài xế trong phòng: 100 + 4 x ải + 0,5 x tổng kỹ năng Máu (+25 mỗi cấp Máu+).
@@ -204,7 +204,16 @@ Tài liệu bàn giao để tiếp tục làm việc ở phiên chat mới mà k
 - Kiểm tra (tools/dev/preview `gradle rooms`, thêm `-Pa=god` để bất tử): bot bất tử qua đủ 30 phòng ở ải 1/6/10 (~4 phút/lượt, cấp 12–15, 250–330 quái); bot thường qua ải 1 (còn 9 máu), ải 6 (còn 105/199), gục ở phòng 10 ải 10. `gradle drive`: tới trạm thì vào lái buôn (State.PICK).
 - Còn có thể làm tiếp theo video: màn hình chính dạng bản đồ vùng có thanh tiến độ, nhiệm vụ hằng ngày, thành tích, quà miễn phí, nhân vật lái buôn vẽ hình, phòng nghỉ có bàn đồ nghề, cây kỹ năng dài vô tận mở bằng tiền.
 
-## 3. Luật chơi hiện tại (v6.0)
+### v6.1 — Lái ngắn rồi vào kho, màn hình chính kiểu bản đồ, lái buôn, nhiệm vụ ngày, thành tích, phòng nghỉ (hiện tại)
+- Phản hồi người dùng: "cài 6.0 rồi mà chơi không thay đổi gì mấy" — vì kho chỉ mở khi tới trạm/xe nổ; hết xăng/lật xe thì vẫn đi bộ trên đường như cũ; menu/gara không đổi; không có số phiên bản. Người dùng chọn: lái ngắn rồi vào kho; làm cả 4 phần giống video (bản đồ, lái buôn có hình, nhiệm vụ + thành tích, phòng nghỉ).
+- Đường ngắn lại: stageGoalM = 600 + 30 x (ải - 1) (ải 1 = 600m ~26 giây ga hết cỡ, ải 20 = 1170m). Hết xăng và xe dừng (< 40) quá 1,5 giây → "HẾT XĂNG! CHẠY VÀO KHO HÀNG"; lật quá 3 giây → "LẬT XE! CHẠY VÀO KHO HÀNG" (thay cho bò ra đi bộ). Tự xuống xe đi bộ lục nhà ven đường vẫn như cũ.
+- Màn hình chính (drawMenu mới, giống video): 5 nút tròn bên trái (Nhà đang sáng, Xe, Vũ khí, Kỹ năng, Vũ khí phụ → mở gara đúng tab), thanh trên (sao cấp + XP, ngọc, tiền), băng tên "🗺 ẢI n: TÊN MAP ▾" (chạm → chọn map), đảo nổi có núi, biển số ải (👹 ải trùm), xác xe và tài xế (chạm đảo → chọn map), thanh tiến độ 5 ải của vùng có đầu lâu 💀, dòng "vùng • kiểu đường • m + 30 phòng • kỷ lục", nút vàng to "CHẠY!", cột phải: 📋 NHIỆM VỤ (chấm đỏ số việc nhận được), 🏆 THÀNH TÍCH, 📖 CỐT TRUYỆN, 🔊 ÂM THANH, 🎮 PHÍM, ↺ CHƠI LẠI; "v6.1" góc dưới trái. Bỏ nút GARA và bảng xếp hạng ở menu (bảng xếp hạng chuyển vào tab XẾP HẠNG).
+- Nhiệm vụ & thành tích (Missions.kt, State.MISSIONS, 3 tab NHIỆM VỤ NGÀY / THÀNH TÍCH / XẾP HẠNG): bộ đếm trọn đời SaveData.life theo Stat (zombie, phòng, trùm, tiền, ải, ngọc, mét, nhà lục sạch). 3 nhiệm vụ mỗi ngày (đổi lúc 0 giờ giờ VN, Random(ngày)), mỗi cái 1 trong 8 loại x 3 mức (vd hạ 40/90/160 zombie, qua 10/25/45 phòng, hạ 1/2/3 trùm, kiếm 500/1500/3000$…), thưởng 5–20 ngọc; tiến độ = bộ đếm - mốc lúc nhận. 16 thành tích (100/1000/5000 zombie, 30/300/1000 phòng, 3/30 trùm, vượt ải 1/5/10/20, 10k/100k $, 10 nhà, 20km), thưởng 10–150 ngọc. Lưu khóa life0.., mDay, mKind/mTier/mBase0..2, mClaimed, achClaimed. Ghi số: phòng khi bước qua cửa, trùm khi hạ (cả trùm đường), nhà khi lục sạch, còn lại cộng lúc kết thúc lượt (finishStats).
+- Lái buôn có hình (drawMerchant): ông to con khăn đỏ, râu, áo gile xanh, giáp vai gai, tay móc câu, khung thoại "Chọn 1 món đi, nhóc! Hàng tốt cả đấy."
+- Phòng nghỉ: phòng 7, 14, 21, 28 không có quái, cửa mở sẵn, giữa phòng có BÀN ĐỒ NGHỀ (bảng dụng cụ, hộp đồ, đèn bàn); bước tới bàn → bảng "BÀN ĐỒ NGHỀ" chọn 1: Băng bó (hồi 50% máu), Mài vũ khí (+1 Sát thương+, đầy thì +1 Tốc bắn+), Đổi vũ khí (cầm vũ khí phụ kế tiếp đã có; chưa có thì +1 Đạn kép). Mỗi phòng nghỉ dùng 1 lần. HUD ghi "• PHÒNG NGHỈ".
+- Kiểm tra: `gradle drive` ải 1/3 tới trạm sau 26–31 giây rồi vào lái buôn; `gradle rooms -Pa=god` qua 30 phòng ở ải 1/6/10 (có phòng nghỉ); `gradle inside` chụp menu mới, nhiệm vụ, thành tích.
+
+## 3. Luật chơi hiện tại (v6.1)
 
 ### Điều khiển
 | Nút | Tác dụng |
@@ -309,6 +318,7 @@ Vũ khí (10 loại, mỗi loại nâng 5 cấp: +18% sát thương, -6% thời 
 | CarArt.kt | Vẽ 25 xe (có người lái xe máy, xích xe tăng) và 10 vũ khí, dùng cho trận đấu và gara |
 | Entities.kt | Kiểu dữ liệu: State, Upgrade, ItemType, Zombie, Obstacle, Boss, BossRock, Debris, Projectile, Particle, FloatText, Car... |
 | Rooms.kt | Chuỗi 30 phòng nhà kho: Power (15 sức mạnh), Foe, RoomBoss, RoomShot, Cash, Room (bục, quái, cửa), RoomRun (cấp, XP, sức mạnh, hàng chờ chọn), RoomRules (di chuyển, quái, trùm, vũ khí, sức mạnh, tiền) |
+| Missions.kt | Stat (bộ đếm trọn đời), 8 loại nhiệm vụ ngày x 3 mức, 16 thành tích, Missions.today()/forDay() |
 | Interior.kt | Màn trong nhà: phòng, đồ đạc đứng lên được (Platform), rương (Chest), zombie trong nhà, đạn vũ khí phụ trong nhà |
 | SideWeapons.kt | 7 vũ khí phụ của tài xế (SideWeapon): giá, ải mở, sát thương, tốc độ, tầm, cận chiến/bay cong |
 | Sfx.kt | Hiệu ứng âm thanh tổng hợp ra WAV (cache theo phiên bản), phát bằng SoundPool khi đã nạp xong, có ưu tiên và giãn cách |
@@ -379,7 +389,7 @@ cd tools/dev/preview && gradle walk      # tài xế đứng yên khi bão đi q
 
 | Phiên | Tiêu đề | Phạm vi |
 |---|---|---|
-| #2 | Đua Xe Sinh Tồn #2 — v5.0→v6.0: lá chắn đi bộ, bão khi đi bộ, thanh âm lượng, map trong nhà + vũ khí phụ, chuỗi 30 phòng kiểu Earn to Die Rogue | v5.1, v6.0 + bài thử preview `inside`, `walk`, `rooms` |
+| #2 | Đua Xe Sinh Tồn #2 — v5.0→v6.1: lá chắn đi bộ, bão khi đi bộ, thanh âm lượng, map trong nhà + vũ khí phụ, chuỗi 30 phòng kiểu Earn to Die Rogue, menu bản đồ, nhiệm vụ, thành tích, phòng nghỉ | v5.1, v6.0, v6.1 + bài thử preview `inside`, `walk`, `rooms` |
 | #1 | Đua Xe Sinh Tồn #1 — v1.0→v5.0: tạo game, kiểu Earn to Die, bão 3 bo, nhạc, trùm cuối, 20 bản đồ, gara 25 xe, 20 kiểu đường, giao diện thép, tiếng động cơ, ngọc đỏ, lô cốt, cốt truyện, cây kỹ năng, tài xế lục soát, xe nổ tài xế chạy tiếp, nhảy, đổi vị trí phím | Từ đầu đến v5.0 + tài liệu bàn giao, công cụ tools/dev, quy tắc CLAUDE.md |
 
 - Quy tắc làm việc (đặt tiêu đề phiên, tự lưu tiến trình khi ngữ cảnh ≥ 90% rồi nhắc mở chat mới) nằm trong CLAUDE.md ở gốc repo.
