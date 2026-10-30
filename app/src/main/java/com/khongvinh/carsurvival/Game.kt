@@ -24,7 +24,7 @@ import kotlin.random.Random
 class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
     companion object {
         /** Shown on the menu so the installed build is easy to check. */
-        const val VERSION = "6.1"
+        const val VERSION = "7.0"
 
         const val VIRTUAL_HEIGHT = 720f
         const val METER = 30f
@@ -122,6 +122,12 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
     val roomProjectiles = ArrayList<Projectile>()
     private val roomRules = RoomRules(this)
 
+    /** Camp, defences, nights and the day actions (v7). */
+    val campaign = Campaign(this)
+
+    /** Fuel in the tank when the drive began (to know how much was burnt). */
+    private var driveFuel0 = 0f
+
     /** Seconds until the rooms start after the car is lost (-1 = not counting). */
     private var roomsIn = -1f
 
@@ -199,6 +205,7 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
     val goalM get() = goalX / METER
 
     init {
+        campaign.load()
         sfx.enabled = true
         save.refreshMissions()
         save.stageSel = save.stageSel.coerceIn(1, maxStartStage())
@@ -231,16 +238,83 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
 
     /** Starts a run, after the region's story chapter the first time. */
     private fun play() {
-        val r = Themes.of(save.stageSel.coerceIn(1, maxStartStage())).region
+        val r = campaign.region
         val bit = 1 shl (r.ordinal + 1)
         if (save.storySeen and bit == 0) {
             showStory(listOf(Story.chapter(r))) {
                 save.storySeen = save.storySeen or bit
                 save.save()
-                startRun()
+                openCamp()
             }
         } else {
-            startRun()
+            openCamp()
+        }
+    }
+
+    // --------------------------------------------------------------- camp
+
+    /** The camp screen of the current day (also where every run comes back to). */
+    fun openCamp() {
+        rooms = null
+        inside = null
+        boss = null
+        driver.out = false
+        dyingT = 0f
+        loadStage(campaign.zone)
+        zombies.clear(); obstacles.clear(); items.clear(); debris.clear(); shots.clear()
+        particles.clear(); texts.clear(); roomProjectiles.clear(); beams.clear()
+        campaign.selSlot = -1
+        save.save()
+        if (save.distM >= Campaign.GOAL_M) {
+            setState(State.VICTORY)
+            return
+        }
+        setState(State.CAMP)
+    }
+
+    /** Called by [Campaign] when the night is won or lost. */
+    fun nightOver() {
+        save.bestStage = max(save.bestStage, min(STAGES, save.nights / 2))
+        save.save()
+        setState(State.CAMP)
+    }
+
+    /** Day action: drive the camp further along the road, as far as the fuel lasts. */
+    private fun startDrive() {
+        save.stageSel = campaign.zone
+        save.vehicle = Vehicles.of(VehicleClass.entries[save.carTier.coerceIn(0, 4)], 0).id
+        startRun()
+        boss = null
+        buildings.clear()
+        stormX = -1e9f
+        car.fuel = min(car.maxFuel, save.fuel.toFloat())
+        driveFuel0 = car.fuel
+        texts.clear()
+        texts.add(FloatText("LÊN ĐƯỜNG! ⛽ ${car.fuel.toInt()}L", car.x + 300f, car.y - 160f, 0xFFFFD740.toInt()).also { it.life = 2.2f })
+    }
+
+    /** The drive is over (tank dry, flipped, wrecked, fell, or the leg's end): camp right here. */
+    private fun endDrive() {
+        flushDamage()
+        val m = (max(car.x, if (driver.out) driver.x else 0f) / METER).toInt().coerceIn(0, goalM.toInt())
+        val used = (driveFuel0 - car.fuel).toInt().coerceAtLeast(0)
+        save.money += runMoney
+        save.gems += runGems
+        save.addStat(Stat.KILLS, kills)
+        save.addStat(Stat.MONEY, runMoney)
+        save.addStat(Stat.GEMS, runGems)
+        campaign.driveDone(m, used)
+        openCamp()
+    }
+
+    /** Leaving a run from the pause menu. */
+    private fun quitRun() {
+        if (rooms != null) {
+            rooms = null
+            campaign.expeditionDone(false)
+            openCamp()
+        } else {
+            endDrive()
         }
     }
 
@@ -260,7 +334,7 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
 
     // --------------------------------------------------------------- flow
 
-    fun stageGoalM(s: Int) = 600f + (s - 1) * 30f
+    fun stageGoalM(s: Int) = 1500f
 
     /** Map (look, region, monsters) of the stage being played or previewed. */
     val theme get() = Themes.of(stage)
@@ -279,7 +353,7 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
     }
 
     fun startRun() {
-        loadStage(save.stageSel.coerceIn(1, maxStartStage()))
+        loadStage(save.stageSel.coerceIn(1, STAGES))
         val ct = save.vehicleType
         vehicle = ct
         val sk = save.skills
@@ -852,14 +926,17 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
 
     // ------------------------------------------------------------- rooms
 
-    /** Out of the car and into the warehouse: 30 rooms, power-ups, bosses. */
-    private fun startRooms(arrived: Boolean, note: String? = null) {
+    /** Day action: on foot through a few warehouse rooms to break crates for parts, scrap and fuel. */
+    private fun startExpedition() {
+        val arrived = true
+        val note: String? = "LỤC SOÁT KHO HÀNG"
         noFuelT = 0f
-        flushDamage()
         inside = null
-        val run = RoomRun(stage, region, stage * 977 + save.day * 31)
-        if (arrived) maxDist = goalM
+        loadStage(campaign.zone)
+        kills = 0; runMoney = 0; runGems = 0
+        val run = RoomRun(campaign.zone, campaign.region, save.day * 977 + save.nights * 31, total = 6, bossLast = save.day % 3 == 0)
         rooms = run
+        setState(State.PLAYING)
         val d = driver
         d.out = true
         d.maxHp = 100f + stage * 4f + Skills.total(save.skills, SkillStat.HP) * 0.5f
@@ -878,7 +955,7 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
         updateControls()
         intense = true
         // the merchant waits at the door; reaching the station earns a second box
-        run.merchantQueued = if (arrived) 2 else 1
+        run.merchantQueued = 1
         texts.add(FloatText(note ?: if (arrived) "TỚI TRẠM! VÀO KHO HÀNG" else "XE HỎNG! CHẠY VÀO KHO HÀNG", d.x + 400f, -300f, 0xFFFFD740.toInt()).also { it.size = 46f; it.life = 2.2f })
         sfx.play(Sfx.S.GO)
     }
@@ -888,16 +965,19 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
         roomRules.update(run, dt, leanBack, leanFwd, jumpHeld)
         updateEffects(dt)
         if (d.hp <= 0f) {
-            driverDown("Gục ở phòng ${run.index}/${RoomRun.TOTAL}")
+            driverDown("Gục ở phòng ${run.index}/${run.total}")
             return
         }
         val rm = run.room
         if (rm.open && d.x > rm.exitX - 40f && d.y > -20f) {
-            if (run.index >= RoomRun.TOTAL) {
+            if (run.index >= run.total) {
                 save.addStat(Stat.ROOMS, 1)
-                bossKilled = bossKilled || boss == null || boss?.alive == false
+                save.money += runMoney
+                save.addStat(Stat.MONEY, runMoney)
+                save.addStat(Stat.KILLS, kills)
                 rooms = null
-                stageComplete()
+                campaign.expeditionDone(true)
+                openCamp()
                 return
             }
             save.addStat(Stat.ROOMS, 1)
@@ -1153,12 +1233,15 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
             pause(); true
         }
         State.MENU -> false
-        State.PICK -> true
+        State.PICK, State.SIEGE -> true
+        State.WORKSHOP -> {
+            setState(State.CAMP); true
+        }
         State.SOUND -> {
             save.save(); setState(soundBack); true
         }
         State.PAUSED -> {
-            endRun("Bỏ cuộc"); true
+            quitRun(); true
         }
         else -> {
             goMenu(); true
@@ -1190,7 +1273,8 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
         sfx.fxVol = save.volSfx / 100f
         sfx.engineMaster = save.volEngine / 100f
         when (state) {
-            State.MENU, State.MAPS, State.GARAGE, State.STORY, State.LAYOUT, State.MISSIONS -> music.play(Music.Track.CHILL, 1f)
+            State.MENU, State.MAPS, State.GARAGE, State.STORY, State.LAYOUT, State.MISSIONS, State.CAMP, State.WORKSHOP -> music.play(Music.Track.CHILL, 0.8f)
+            State.SIEGE -> music.play(Music.Track.INTENSE, 0.6f)
             State.SOUND -> music.play(if (soundBack == State.PAUSED && intense) Music.Track.INTENSE else Music.Track.CHILL, if (soundBack == State.PAUSED) 0.4f else 1f)
             // kept low in a run so the engine and the action carry the sound
             State.PLAYING -> music.play(if (intense) Music.Track.INTENSE else Music.Track.CHILL, 0.4f)
@@ -1203,6 +1287,14 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
         when (state) {
             State.PLAYING -> updatePlay(dt)
             State.PAUSED, State.SOUND, State.PICK -> {}
+            State.CAMP -> {
+                if (campaign.bannerT > 0f) campaign.bannerT -= dt
+                updateEffects(dt)
+            }
+            State.SIEGE -> {
+                campaign.updateSiege(dt)
+                updateEffects(dt)
+            }
             else -> {
                 updateEffects(dt)
                 updateDebris(dt)
@@ -1260,7 +1352,17 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
                 updateCamera(dt)
             }
             updateEffects(dt)
-            if (dyingT <= 0f) endRun(dyingReason)
+            if (dyingT <= 0f) {
+                if (rooms != null) {
+                    // carried back to camp; the money picked up is kept, half the loot is lost
+                    save.money += runMoney
+                    rooms = null
+                    campaign.expeditionDone(false)
+                    openCamp()
+                } else {
+                    endDrive()
+                }
+            }
             return
         }
         rooms?.let {
@@ -1276,7 +1378,7 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
         if (roomsIn > 0f) {
             roomsIn -= dt
             if (roomsIn <= 0f) {
-                startRooms(false)
+                endDrive()
                 return
             }
         }
@@ -1385,7 +1487,8 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
             if (c.flipT > 3f && !driver.out && !wrecked) {
                 // stuck on its roof: on foot into the warehouse
                 c.flipT = 0f
-                startRooms(false, "LẬT XE! CHẠY VÀO KHO HÀNG")
+                texts.add(FloatText("LẬT XE!", c.x, c.y - 150f, 0xFFFFAB40.toInt()))
+                endDrive()
                 return
             }
         } else {
@@ -1395,7 +1498,7 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
         if (c.fuel <= 0f && !driver.out && speed < 40f) {
             noFuelT += dt
             if (noFuelT > 1.5f) {
-                startRooms(false, "HẾT XĂNG! CHẠY VÀO KHO HÀNG")
+                endDrive()
                 return
             }
         } else {
@@ -1415,7 +1518,7 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
         }
         if (c.hp <= 0f && !wrecked && !tryRevive(false)) abandonCar(true)
         if (c.y > terrain.heightAt(c.x) + 400f && !tryRevive(false)) {
-            endRun("Rơi khỏi đường!"); return
+            endDrive(); return
         }
 
         val b = boss
@@ -1425,8 +1528,8 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
             if (c.vx > 0f) c.vx = -c.vx * 0.3f
         }
         if ((c.x >= goalX && !driver.out) || (driver.out && inside == null && driver.x >= goalX)) {
-            // at the station: on foot into the warehouse rooms
-            startRooms(true); return
+            // the end of this leg of the road: make camp here
+            endDrive(); return
         }
 
         updateCamera(dt)
@@ -1577,6 +1680,7 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
     }
 
     private fun updateStorm(dt: Float) {
+        if (stormX < -1e8f) return
         if (phase < PHASE_TIME.size) {
             phaseLeft -= dt
             if (phase == 2) {
@@ -2818,8 +2922,8 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
                 side.mapIndexed { i, (id, label) ->
                     Button(id, label, W - 214f, 84f + i * 82f, W - 24f, 152f + i * 82f, if (id == "reset") 0xFF4E342E.toInt() else 0xFF37474F.toInt())
                 } + listOf(
-                    Button("maps", "🗺  ẢI ${save.stageSel}: ${Themes.of(save.stageSel).name.uppercase()}  ▾", mx - 300f, 84f, mx + 300f, 148f, 0xFF3E2723.toInt()),
-                    Button("play", "CHẠY!", mx - 220f, H - 118f, mx + 220f, H - 26f, 0xFFF9A825.toInt()),
+                    Button("info", "🏕 NGÀY ${save.day} • ${campaign.region.title.uppercase()}", mx - 300f, 84f, mx + 300f, 148f, 0xFF3E2723.toInt()),
+                    Button("play", "VÀO TRẠI!", mx - 220f, H - 118f, mx + 220f, H - 26f, 0xFFF9A825.toInt()),
                 )
             }
             State.MISSIONS -> {
@@ -2849,6 +2953,22 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
                 Button("soundMenu", "🔊 CHỈNH ÂM THANH", W / 2 - 330f, H * 0.32f + 214f, W / 2 + 330f, H * 0.32f + 290f, 0xFF00897B.toInt()),
                 Button("layout", "🎮 ĐỔI VỊ TRÍ PHÍM", W / 2 - 330f, H * 0.32f + 304f, W / 2 + 330f, H * 0.32f + 376f, 0xFF37474F.toInt()),
             )
+            State.CAMP, State.SIEGE -> campButtons(green, grey)
+            State.WORKSHOP -> {
+                val l = ArrayList<Button>()
+                l.add(Button("camp", "◀ VỀ TRẠI", 24f, 20f, 270f, 90f, grey))
+                for (bp in Blueprints.all) {
+                    val r = workshopCard(bp.id)
+                    val have = save.bpParts[bp.id]
+                    val (label, color, on) = when {
+                        campaign.owned(bp) -> Triple("ĐÃ CÓ", green, false)
+                        have < bp.parts -> Triple("THIẾU MẢNH $have/${bp.parts}", grey, false)
+                        else -> Triple("LẮP RÁP ${bp.cost}$", 0xFFF9A825.toInt(), save.money >= bp.cost)
+                    }
+                    l.add(Button("asm${bp.id}", label, r[0] + 12f, r[3] - 62f, r[2] - 12f, r[3] - 12f, color, on))
+                }
+                l
+            }
             State.PICK -> rooms?.let { run -> run.choices.indices.map { i -> val r = pickCard(i, run.choices.size); Button("pick$i", "", r[0], r[1], r[2], r[3], 0) } } ?: emptyList()
             State.SOUND -> listOf(Button("soundDone", "XONG", W / 2 - 180f, H - 120f, W / 2 + 180f, H - 40f, green))
             State.STORY -> listOf(Button("skip", "BỎ QUA ›", W - 290f, H - 96f, W - 40f, H - 24f, grey))
@@ -2939,6 +3059,83 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
                 l.add(Button("skillBuy", label, W - 370f, H - 192f, W - 24f, H - 114f, color, on))
             }
         }
+        return l
+    }
+
+    // camp layout: a fixed view of x -150..2450 with the ground at 80% of the screen
+    val campZoom get() = W / 2600f
+    fun campX(wx: Float) = (wx + 150f) * campZoom
+    fun campY(wy: Float) = H * 0.8f + wy * campZoom
+
+    fun slotHit(i: Int): FloatArray {
+        val x = campX(Campaign.SLOT_X[i])
+        val y = campY(campaign.slotY(i) - 50f)
+        return floatArrayOf(x - 70f, y - 80f, x + 70f, y + 60f)
+    }
+
+    fun wallHit() = floatArrayOf(campX(Campaign.WALL_X - 10f), campY(-Campaign.WALL_H[save.wallLevel.coerceIn(0, 2)]), campX(Campaign.WALL_X + 70f), campY(0f))
+
+    /** Cell [k] of the build panel grid (2 rows x 4). */
+    fun buildCell(k: Int): FloatArray {
+        val w = min(360f, (W - 80f) / 4f - 10f)
+        val col = k % 4
+        val row = k / 4
+        val l = 40f + col * (w + 10f)
+        val t = H - 176f + row * 84f
+        return floatArrayOf(l, t, l + w, t + 74f)
+    }
+
+    fun workshopCard(i: Int): FloatArray {
+        val w = (W - 80f - 3 * 16f) / 4f
+        val col = i % 4
+        val row = i / 4
+        val l = 40f + col * (w + 16f)
+        val t = 106f + row * 200f
+        return floatArrayOf(l, t, l + w, t + 188f)
+    }
+
+    private fun campButtons(green: Int, grey: Int): List<Button> {
+        val l = ArrayList<Button>()
+        val sel = campaign.selSlot
+        if (sel >= 0) {
+            fun cell(k: Int, id: String, label: String, color: Int, on: Boolean) {
+                val r = buildCell(k)
+                l.add(Button(id, label, r[0], r[1], r[2], r[3], color, on))
+            }
+            if (sel == 99) {
+                val cost = campaign.wallRepairCost()
+                cell(0, "fixwall", "🔧 SỬA TƯỜNG $cost⚙", green, cost > 0 && save.scrap >= cost)
+                cell(3, "close", "✖ ĐÓNG", grey, true)
+                return l
+            }
+            val d = campaign.defs[sel]
+            if (d == null) {
+                var k = 0
+                for (t in DefType.entries) {
+                    if (sel < 2 && t.ground) continue
+                    if (k >= 7) break
+                    val ok = campaign.unlocked(t)
+                    cell(k++, "bld${t.ordinal}", if (ok) "${t.icon} ${t.title} ${t.cost}⚙" else "🔒 ${t.title}", if (ok) 0xFF37474F.toInt() else grey, ok && save.scrap >= t.cost)
+                }
+                cell(7, "close", "✖ ĐÓNG", grey, true)
+            } else {
+                val up = campaign.upgradeCost(d)
+                val canUp = d.level < 3 && d.type != DefType.MINE
+                cell(0, "up", if (canUp) "⬆ NÂNG CẤP ${up}⚙" else "CẤP TỐI ĐA", 0xFF8E24AA.toInt(), canUp && save.scrap >= up)
+                val fix = campaign.repairCost(d)
+                cell(1, "fix", "🔧 SỬA $fix⚙", green, fix > 0 && save.scrap >= fix)
+                cell(2, "sell", "♻ BÁN +${d.type.cost * d.level / 2}⚙", 0xFF6D4C41.toInt(), true)
+                cell(3, "close", "✖ ĐÓNG", grey, true)
+            }
+            return l
+        }
+        if (state == State.SIEGE) return l
+        l.add(Button("menu", "◀ MENU", 24f, 20f, 210f, 90f, grey))
+        l.add(Button("workshop", "🔧 XƯỞNG", 224f, 20f, 440f, 90f, 0xFF5D4037.toInt()))
+        val acted = save.dayActed
+        l.add(Button("expedition", "🔍 LỤC SOÁT", W - 660f, H - 104f, W - 450f, H - 20f, 0xFF1E88E5.toInt(), !acted))
+        l.add(Button("drive", "🚗 LÊN ĐƯỜNG", W - 440f, H - 104f, W - 230f, H - 20f, 0xFFF9A825.toInt(), !acted && save.fuel >= 3))
+        l.add(Button("night", "🌙 VÀO ĐÊM", W - 220f, H - 104f, W - 20f, H - 20f, 0xFF4527A0.toInt()))
         return l
     }
 
@@ -3144,15 +3341,33 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
         if (state == State.MENU && !confirmReset) {
             for (i in 1..4) if (inRect(navRect(i), x, y)) {
                 sfx.play(Sfx.S.CLICK)
-                openGarage()
-                garageTab = i - 1
+                if (i == 1) {
+                    setState(State.WORKSHOP)
+                } else {
+                    openGarage()
+                    garageTab = i - 1
+                }
                 return
             }
             if (inRect(menuIsland(), x, y)) {
                 sfx.play(Sfx.S.CLICK)
-                setState(State.MAPS)
+                play()
                 return
             }
+        }
+        if ((state == State.CAMP || state == State.SIEGE) && buttons().none { it.contains(x, y) }) {
+            for (i in 0 until Campaign.SLOTS) if (inRect(slotHit(i), x, y)) {
+                sfx.play(Sfx.S.CLICK)
+                campaign.selSlot = if (campaign.selSlot == i) -1 else i
+                return
+            }
+            if (inRect(wallHit(), x, y)) {
+                sfx.play(Sfx.S.CLICK)
+                campaign.selSlot = if (campaign.selSlot == 99) -1 else 99
+                return
+            }
+            campaign.selSlot = -1
+            return
         }
         if (state == State.MAPS) {
             for (i in 0 until STAGES) if (inRect(mapCard(i), x, y)) {
@@ -3253,7 +3468,7 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
                 }
             }
             "resume" -> setState(State.PLAYING)
-            "quit" -> endRun("Bỏ cuộc")
+            "quit" -> quitRun()
             "maps" -> setState(State.MAPS)
             "stPrev" -> {
                 save.stageSel = max(1, save.stageSel - 1); loadStage(save.stageSel)
@@ -3278,10 +3493,30 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
                 setState(soundBack)
             }
             "sideAct" -> pickSide(garageSide)
-            else -> if (btn.id.startsWith("claimM")) claimMission(btn.id.substring(6).toInt())
+            else -> if (btn.id.startsWith("bld")) {
+                campaign.build(campaign.selSlot, DefType.entries[btn.id.substring(3).toInt()])
+                campaign.selSlot = -1
+            } else if (btn.id.startsWith("asm")) campaign.assemble(Blueprints.all[btn.id.substring(3).toInt()])
+            else if (btn.id.startsWith("claimM")) claimMission(btn.id.substring(6).toInt())
             else if (btn.id.startsWith("claimA")) claimAchievement(btn.id.substring(6).toInt())
         }
         when (btn.id) {
+            "workshop" -> setState(State.WORKSHOP)
+            "camp" -> setState(State.CAMP)
+            "expedition" -> startExpedition()
+            "drive" -> startDrive()
+            "night" -> {
+                campaign.startNight()
+                setState(State.SIEGE)
+            }
+            "fixwall" -> campaign.repairWall()
+            "close" -> campaign.selSlot = -1
+            "up" -> campaign.upgrade(campaign.selSlot)
+            "fix" -> campaign.repair(campaign.selSlot)
+            "sell" -> {
+                campaign.sell(campaign.selSlot)
+                campaign.selSlot = -1
+            }
             "pick0" -> choosePick(0)
             "pick1" -> choosePick(1)
             "pick2" -> choosePick(2)

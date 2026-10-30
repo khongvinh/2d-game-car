@@ -22,26 +22,34 @@ import kotlin.math.sin
 import kotlin.random.Random
 
 /** Draws every game state with plain Canvas primitives (no bitmaps). */
-class Renderer(private val g: Game) {
-    private val fill = Paint(Paint.ANTI_ALIAS_FLAG)
-    private val stroke = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+class Renderer(internal val g: Game) {
+    internal val fill = Paint(Paint.ANTI_ALIAS_FLAG)
+    internal val stroke = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
         strokeCap = Paint.Cap.ROUND
         strokeJoin = Paint.Join.ROUND
     }
-    private val text = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+    internal val text = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         typeface = Typeface.DEFAULT_BOLD
         textAlign = Paint.Align.CENTER
         color = Color.WHITE
     }
-    private val path = Path()
-    private val r = RectF()
-    private val art = CarArt()
+    internal val path = Path()
+    internal val r = RectF()
+    internal val art = CarArt()
 
     fun render(c: Canvas) {
         art.time = g.anim
         val inn = g.interior
         val run = g.rooms
+        if (g.state == State.CAMP || g.state == State.SIEGE) {
+            drawCamp(c)
+            return
+        }
+        if (g.state == State.WORKSHOP) {
+            drawWorkshop(c)
+            return
+        }
         if (run != null && g.state != State.MENU && g.state != State.MAPS && g.state != State.GARAGE && g.state != State.STORY) {
             drawRooms(c, run)
         } else if (inn != null && g.state != State.MENU && g.state != State.MAPS && g.state != State.GARAGE && g.state != State.STORY) {
@@ -75,7 +83,7 @@ class Renderer(private val g: Game) {
 
     // ------------------------------------------------------------ backdrop
 
-    private fun drawBackground(c: Canvas) {
+    internal fun drawBackground(c: Canvas) {
         ensureShaders()
         val th = g.theme
         val W = g.W
@@ -485,7 +493,7 @@ class Renderer(private val g: Game) {
         Region.ALIEN -> 0xFF4A2F66.toInt()
     }
 
-    private fun shade(col: Int, f: Float) = Color.argb(
+    internal fun shade(col: Int, f: Float) = Color.argb(
         255, (((col shr 16) and 255) * f).toInt().coerceIn(0, 255), (((col shr 8) and 255) * f).toInt().coerceIn(0, 255), ((col and 255) * f).toInt().coerceIn(0, 255),
     )
 
@@ -1153,7 +1161,7 @@ class Renderer(private val g: Game) {
 
     // ------------------------------------------------------------- zombies
 
-    private fun drawZombie(c: Canvas, z: Zombie) {
+    internal fun drawZombie(c: Canvas, z: Zombie) {
         val px = if (g.driver.out) g.driver.x else g.car.x
         val dir = sign(px - z.x).let { if (it == 0f) -1f else it }
         c.save()
@@ -1168,7 +1176,7 @@ class Renderer(private val g: Game) {
 
     /** Regional monsters, origin at the feet (bats: bottom of the body). */
 
-    private fun zombieFigure(c: Canvas, w: Float, h: Float, shirt: Int, swing: Float, dir: Float, fat: Boolean) {
+    internal fun zombieFigure(c: Canvas, w: Float, h: Float, shirt: Int, swing: Float, dir: Float, fat: Boolean) {
         // charred in the volcano, pale ghouls at night
         val skin = when (g.theme.region) {
             Region.VOLCANO -> 0xFF8D6E63.toInt()
@@ -1479,7 +1487,7 @@ class Renderer(private val g: Game) {
         c.restore()
     }
 
-    private fun drawDriverBody(c: Canvas, d: Driver, x: Float, y: Float, f: Float, swing: Float) {
+    internal fun drawDriverBody(c: Canvas, d: Driver, x: Float, y: Float, f: Float, swing: Float) {
         // shadow
         fill.color = 0x40000000
         c.drawOval(x - 20f, y - 4f, x + 20f, y + 4f, fill)
@@ -1845,7 +1853,7 @@ class Renderer(private val g: Game) {
     }
 
     /** A faceted red gem with a glint. */
-    private fun drawGem(c: Canvas, x: Float, y: Float, s: Float) {
+    internal fun drawGem(c: Canvas, x: Float, y: Float, s: Float) {
         val glow = 0.6f + 0.4f * sin(g.anim * 6f + x * 0.01f)
         fill.color = Color.argb((90 * glow).toInt(), 255, 60, 60)
         c.drawCircle(x, y, 30f * s, fill)
@@ -1953,7 +1961,7 @@ class Renderer(private val g: Game) {
         }
     }
 
-    private fun atan2Deg(y: Float, x: Float) = (kotlin.math.atan2(y, x) * 180f / PI.toFloat())
+    internal fun atan2Deg(y: Float, x: Float) = (kotlin.math.atan2(y, x) * 180f / PI.toFloat())
 
     // --------------------------------------------------------------- storm
 
@@ -2004,7 +2012,7 @@ class Renderer(private val g: Game) {
 
     // ----------------------------------------------------------------- HUD
 
-    private fun bar(c: Canvas, x: Float, y: Float, w: Float, frac: Float, color: Int, label: String) {
+    internal fun bar(c: Canvas, x: Float, y: Float, w: Float, frac: Float, color: Int, label: String) {
         text.textAlign = Paint.Align.CENTER
         text.textSize = 24f
         text.color = Color.WHITE
@@ -2102,7 +2110,7 @@ class Renderer(private val g: Game) {
         text.color = Color.WHITE
         val inn = g.interior
         if (inn != null) fitText(c, "🏠 ${Building.NAMES[inn.b.kind]} — ${inn.roomName(d.x)}  •  RƯƠNG ${inn.chests.count { it.opened }}/${inn.chests.size}  •  🧟 ${inn.zombiesLeft}", W / 2 + 17f, py + 44f, 24f, pr - pl + 70f)
-        else fitText(c, "${g.distanceM.toInt()}m / ${g.goalM.toInt()}m  •  ẢI ${g.stage} — MÀN ${g.levelInStage}/${Game.LEVELS_PER_STAGE}  •  NGÀY ${g.save.day}", W / 2 + 17f, py + 44f, 24f, pr - pl + 70f)
+        else fitText(c, "+${g.distanceM.toInt()}m  •  tổng ${g.save.distM + g.distanceM.toInt()}m / ${Campaign.GOAL_M}m  •  NGÀY ${g.save.day}", W / 2 + 17f, py + 44f, 24f, pr - pl + 70f)
 
         val closed = g.phase >= Game.PHASE_TIME.size
         val secs = ceil(g.phaseLeft).toInt()
@@ -2113,7 +2121,8 @@ class Renderer(private val g: Game) {
         }
         val gap = ((g.playerX - (if (d.out) 0f else Car.HALF_LEN) - g.stormX) / Game.METER).toInt()
         text.color = if (closed || g.phase == 2) 0xFFFF5252.toInt() else 0xFFEA80FC.toInt()
-        fitText(c, "🌪 $timer   •   Bão cách ${max(0, gap)}m", W / 2 + 17f, py + 84f, 28f, pr - pl + 70f)
+        if (g.stormX < -1e8f) fitText(c, "⛽ ${car.fuel.toInt()}L xăng   •   đi càng xa, trại mới càng gần trạm cứu hộ", W / 2 + 17f, py + 84f, 26f, pr - pl + 70f)
+        else fitText(c, "🌪 $timer   •   Bão cách ${max(0, gap)}m", W / 2 + 17f, py + 84f, 28f, pr - pl + 70f)
 
         // money & pause
         val moneyText = "+${g.runMoney}$  +${g.runGems}♦"
@@ -2252,7 +2261,7 @@ class Renderer(private val g: Game) {
         }
     }
 
-    private fun drawButton(c: Canvas, b: Button, held: Boolean) {
+    internal fun drawButton(c: Canvas, b: Button, held: Boolean) {
         val grow = if (held) 3f else 0f
         val l = b.l - grow
         val t = b.t - grow
@@ -2308,12 +2317,12 @@ class Renderer(private val g: Game) {
 
     // ------------------------------------------------------------ screens
 
-    private fun dim(c: Canvas, a: Int = 0xB0) {
+    internal fun dim(c: Canvas, a: Int = 0xB0) {
         fill.color = Color.argb(a, 0, 0, 0)
         c.drawRect(0f, 0f, g.W, g.H, fill)
     }
 
-    private fun title(c: Canvas, s: String, x: Float, y: Float, color: Int, size: Float = 76f, maxW: Float = g.W - 40f) {
+    internal fun title(c: Canvas, s: String, x: Float, y: Float, color: Int, size: Float = 76f, maxW: Float = g.W - 40f) {
         text.textAlign = Paint.Align.CENTER
         text.textSize = size
         val w = text.measureText(s)
@@ -2334,7 +2343,7 @@ class Renderer(private val g: Game) {
         c.restore()
     }
 
-    private fun drawMenuButtons(c: Canvas) {
+    internal fun drawMenuButtons(c: Canvas) {
         for (b in g.buttons()) {
             fill.color = 0x66000000
             r.set(b.l + 4f, b.t + 8f, b.r + 4f, b.b + 8f)
@@ -2376,7 +2385,7 @@ class Renderer(private val g: Game) {
         }
     }
 
-    private fun fitText(c: Canvas, s: String, x: Float, y: Float, size: Float, maxW: Float) {
+    internal fun fitText(c: Canvas, s: String, x: Float, y: Float, size: Float, maxW: Float) {
         text.textSize = size
         val w = text.measureText(s)
         if (w > maxW) text.textSize = size * maxW / w
@@ -2392,8 +2401,8 @@ class Renderer(private val g: Game) {
         garageNav(c, home = true)
         garageTopBar(c)
         val mx = g.menuCenterX()
-        val th = Themes.of(s.stageSel)
-        // floating island with the stage on it
+        val th = Themes.of(g.campaign.zone)
+        // floating island with the camp on it
         val isl = g.menuIsland()
         val bob = sin(g.anim * 1.6f) * 6f
         val top = 330f + bob
@@ -2445,35 +2454,33 @@ class Renderer(private val g: Game) {
         text.textAlign = Paint.Align.CENTER
         text.textSize = 34f
         text.color = 0xFF3E2723.toInt()
-        c.drawText("${s.stageSel}", mx - iw * 0.4f, top - 124f, text)
-        if (s.stageSel % 5 == 0) {
+        c.drawText("${s.distM / 1000}km", mx - iw * 0.4f, top - 124f, text)
+        if ((s.nights + 1) % 5 == 0) {
             text.textSize = 30f
             c.drawText("👹", mx - iw * 0.4f, top - 182f, text)
         }
         val d = g.driver
         drawDriverBody(c, d, mx + iw * 0.02f, top - 12f, 1f, sin(g.anim * 3f) * 3f)
-        // region progress: five stages, the skull at the boss
-        val reg = (s.stageSel - 1) / 5
+        // journey: 20 km to the rescue station, four regions on the way
         val bl = mx - 220f
         val br = mx + 220f
         val by = 548f
         fill.color = 0xCC1B1714.toInt()
         c.drawRoundRect(bl - 16f, by - 16f, br + 16f, by + 16f, 16f, 16f, fill)
-        val done = (s.bestStage - reg * 5).coerceIn(0, 5)
+        val prog = (s.distM / Campaign.GOAL_M.toFloat()).coerceIn(0f, 1f)
         fill.color = 0xFF29B6F6.toInt()
-        if (done > 0) c.drawRoundRect(bl - 12f, by - 10f, bl + (br - bl) * done / 5f, by + 10f, 10f, 10f, fill)
-        for (k in 1..5) {
-            val kx = bl + (br - bl) * (k - 0.5f) / 5f
-            val st = reg * 5 + k
-            fill.color = if (st == s.stageSel) 0xFFFFD740.toInt() else if (st <= s.bestStage) 0xFF69F0AE.toInt() else 0xFF546E7A.toInt()
-            c.drawCircle(kx, by, if (st == s.stageSel) 14f else 10f, fill)
-            if (k == 5) {
-                text.textSize = 30f
-                c.drawText("💀", br + 34f, by + 11f, text)
-            }
+        if (prog > 0f) c.drawRoundRect(bl - 12f, by - 10f, bl + (br - bl) * prog, by + 10f, 10f, 10f, fill)
+        for (k in 1..3) {
+            val kx = bl + (br - bl) * k / 4f
+            fill.color = if (prog >= k / 4f) 0xFF69F0AE.toInt() else 0xFF546E7A.toInt()
+            c.drawCircle(kx, by, 10f, fill)
         }
+        fill.color = 0xFFFFD740.toInt()
+        c.drawCircle(bl + (br - bl) * prog, by, 14f, fill)
+        text.textSize = 30f
+        c.drawText("🏁", br + 34f, by + 11f, text)
         text.color = 0xFFFFF3E0.toInt()
-        fitText(c, "${th.region.title} • ${th.road.name} • ${g.stageGoalM(s.stageSel).toInt()}m + ${RoomRun.TOTAL} phòng • kỷ lục ${s.best[s.stageSel]}m", mx, 596f, 22f, 640f)
+        fitText(c, "Đã sống sót ${s.nights} đêm • Đã đi ${s.distM}m / ${Campaign.GOAL_M}m • ⚙${s.scrap} • ⛽${s.fuel}L", mx, 596f, 22f, 640f)
         drawMenuButtons(c)
         // red dot when something can be claimed
         if (s.claimable() > 0) {
@@ -2776,7 +2783,7 @@ class Renderer(private val g: Game) {
         drawMenuButtons(c)
     }
 
-    private fun blend(a: Int, b: Int, t: Float): Int {
+    internal fun blend(a: Int, b: Int, t: Float): Int {
         val u = 1f - t
         return Color.argb(
             255,
@@ -2786,7 +2793,7 @@ class Renderer(private val g: Game) {
         )
     }
 
-    private fun card(c: Canvas, rc: FloatArray, selected: Boolean) {
+    internal fun card(c: Canvas, rc: FloatArray, selected: Boolean) {
         metalPanel(c, rc[0], rc[1], rc[2], rc[3], 18f)
         r.set(rc[0], rc[1], rc[2], rc[3])
         if (selected) {
@@ -2799,7 +2806,7 @@ class Renderer(private val g: Game) {
     // ------------------------------------------------------------- story
 
     /** Word-wraps [s] into lines no wider than [maxW]; returns the y after the last line. */
-    private fun wrapText(c: Canvas, s: String, x: Float, y: Float, maxW: Float, size: Float, lineH: Float): Float {
+    internal fun wrapText(c: Canvas, s: String, x: Float, y: Float, maxW: Float, size: Float, lineH: Float): Float {
         text.textSize = size
         var line = ""
         var yy = y
@@ -2944,7 +2951,7 @@ class Renderer(private val g: Game) {
     }
 
     /** Round metal nav buttons down the left side: home, vehicles, weapons, skills. */
-    private fun garageNav(c: Canvas, home: Boolean = false) {
+    internal fun garageNav(c: Canvas, home: Boolean = false) {
         for (i in 0..4) {
             val rc = g.navRect(i)
             val cx = (rc[0] + rc[2]) / 2
@@ -3011,7 +3018,7 @@ class Renderer(private val g: Game) {
         }
     }
 
-    private fun star(c: Canvas, x: Float, y: Float, r0: Float, color: Int) {
+    internal fun star(c: Canvas, x: Float, y: Float, r0: Float, color: Int) {
         path.reset()
         for (k in 0 until 10) {
             val rr = if (k % 2 == 0) r0 else r0 * 0.45f
@@ -3024,7 +3031,7 @@ class Renderer(private val g: Game) {
     }
 
     /** Player rank star with an XP bar, and the money / gem counters. */
-    private fun garageTopBar(c: Canvas) {
+    internal fun garageTopBar(c: Canvas) {
         val W = g.W
         val s = g.save
         val (lv, into, need) = Rank.of(s.xp)
@@ -3386,7 +3393,7 @@ class Renderer(private val g: Game) {
     }
 
     /** Label, bar (value and a white tick for what is in use now) and value text. */
-    private fun statRows(
+    internal fun statRows(
         c: Canvas,
         rows: List<Triple<String, Pair<Float, Float>, String>>,
         x0: Float,
@@ -3596,7 +3603,7 @@ class Renderer(private val g: Game) {
         )
     }
 
-    private fun hash(k: Int): Int = ((k * 73856093) xor ((k shr 2) * 19349663) xor 0x5bd1e995) and 0x7fffffff
+    internal fun hash(k: Int): Int = ((k * 73856093) xor ((k shr 2) * 19349663) xor 0x5bd1e995) and 0x7fffffff
 
 
     private fun cloud(c: Canvas, x: Float, y: Float, s: Float, color: Int) {
@@ -3656,7 +3663,7 @@ class Renderer(private val g: Game) {
     }
 
 
-    private fun drawDamageOverlay(c: Canvas) {
+    internal fun drawDamageOverlay(c: Canvas) {
         val car = g.car
         var a = 0f
         if (g.hurtFlash > 0f) a = min(1f, g.hurtFlash * 2.2f) * 0.85f
@@ -3672,14 +3679,14 @@ class Renderer(private val g: Game) {
     }
 
 
-    private fun glassPanel(c: Canvas, l: Float, t: Float, rr: Float, b: Float, radius: Float = 18f) =
+    internal fun glassPanel(c: Canvas, l: Float, t: Float, rr: Float, b: Float, radius: Float = 18f) =
         metalPanel(c, l, t, rr, b, min(radius, 16f))
 
     // --------------------------------------------------- rusty metal look
 
     private val platePath = Path()
 
-    private fun rivet(c: Canvas, x: Float, y: Float, rad: Float = 4f) {
+    internal fun rivet(c: Canvas, x: Float, y: Float, rad: Float = 4f) {
         fill.color = 0x88000000.toInt()
         c.drawCircle(x + 1f, y + 1.5f, rad, fill)
         fill.color = 0xFF9A9188.toInt()
@@ -3732,7 +3739,7 @@ class Renderer(private val g: Game) {
     }
 
     /** Metal frame with corner rivets around a dark well for content. */
-    private fun metalPanel(c: Canvas, l: Float, t: Float, rr: Float, b: Float, radius: Float = 16f) {
+    internal fun metalPanel(c: Canvas, l: Float, t: Float, rr: Float, b: Float, radius: Float = 16f) {
         metalPlate(c, l, t, rr, b, radius)
         fill.color = 0xD81B1917.toInt()
         c.drawRoundRect(l + 11f, t + 11f, rr - 11f, b - 11f, radius * 0.55f, radius * 0.55f, fill)
@@ -3746,7 +3753,7 @@ class Renderer(private val g: Game) {
     }
 
 
-    private fun chip(c: Canvas, s: String, x: Float, y: Float, size: Float, bg: Int, fg: Int): Float {
+    internal fun chip(c: Canvas, s: String, x: Float, y: Float, size: Float, bg: Int, fg: Int): Float {
         text.textSize = size
         val w = text.measureText(s) + size * 1.2f
         r.set(x, y, x + w, y + size * 1.6f)
@@ -3975,7 +3982,7 @@ class Renderer(private val g: Game) {
     }
 
 
-    private fun creatureFigure(c: Canvas, type: ZombieType, swing: Float, dir: Float, phase: Float) {
+    internal fun creatureFigure(c: Canvas, type: ZombieType, swing: Float, dir: Float, phase: Float) {
         val w = type.w
         val h = type.h
         val outline = 0xFF1B1B1B.toInt()
@@ -4090,7 +4097,7 @@ class Renderer(private val g: Game) {
     }
 
 
-    private fun drawBossAny(c: Canvas, b: Boss) {
+    internal fun drawBossAny(c: Canvas, b: Boss) {
         when (b.tier) {
             2 -> drawDragon(c, b)
             3 -> drawBatBoss(c, b)
@@ -4334,7 +4341,7 @@ class Renderer(private val g: Game) {
     // ------------------------------------------------------- hand weapons
 
     /** A hand weapon held at the origin, pointing along +x. */
-    private fun handWeapon(c: Canvas, w: SideWeapon, s: Float) {
+    internal fun handWeapon(c: Canvas, w: SideWeapon, s: Float) {
         c.save()
         c.scale(s, s)
         when (w) {
@@ -4400,7 +4407,7 @@ class Renderer(private val g: Game) {
     }
 
     /** Bullets, darts and arrows from the driver's hand weapon. */
-    private fun sideShot(c: Canvas, s: Projectile) {
+    internal fun sideShot(c: Canvas, s: Projectile) {
         val l = hypot(s.vx, s.vy).coerceAtLeast(1f)
         val ux = s.vx / l
         val uy = s.vy / l
@@ -5298,7 +5305,7 @@ class Renderer(private val g: Game) {
     }
 
     /** HUD over the rooms: level bar, room counter, health, power-ups, controls. */
-    private fun drawRoomHud(c: Canvas, run: RoomRun) {
+    internal fun drawRoomHud(c: Canvas, run: RoomRun) {
         val W = g.W
         val d = g.driver
         // level bar across the top
@@ -5317,8 +5324,8 @@ class Renderer(private val g: Game) {
         c.drawText("Cấp ${run.level}", l + 16f, 38f, text)
         // room counter
         text.textAlign = Paint.Align.CENTER
-        val bossRoom = run.index % 10 == 0
-        val label = "🚪 Phòng ${run.index} / ${RoomRun.TOTAL}${if (bossRoom) "  👹" else if (run.room.rest) "  • PHÒNG NGHỈ" else ""}"
+        val bossRoom = run.room.boss
+        val label = "🚪 Phòng ${run.index} / ${run.total}${if (bossRoom) "  👹" else if (run.room.rest) "  • PHÒNG NGHỈ" else ""}"
         text.textSize = 28f
         val tw = text.measureText(label)
         glassPanel(c, W / 2 - tw / 2 - 24f, 56f, W / 2 + tw / 2 + 24f, 100f, 16f)
@@ -5359,7 +5366,7 @@ class Renderer(private val g: Game) {
             px += 50f
             if (px > W * 0.4f) break
         }
-        if (run.roomNoteT > 0f && run.index % 10 == 0) {
+        if (run.roomNoteT > 0f && run.room.boss) {
             title(c, "PHÒNG TRÙM!", W / 2, g.H * 0.36f, 0xFFFF5252.toInt(), 64f)
         }
         if (g.state == State.PLAYING && g.dyingT <= 0f) {
@@ -5373,7 +5380,7 @@ class Renderer(private val g: Game) {
     }
 
     /** Floating stick: where the thumb went down, and the knob following it. */
-    private fun drawJoystick(c: Canvas) {
+    internal fun drawJoystick(c: Canvas) {
         if (!g.driver.out) return
         val on = g.joyId >= 0
         val bx = if (on) g.joyX else 190f
@@ -5395,7 +5402,7 @@ class Renderer(private val g: Game) {
     }
 
     /** Level-up power-ups, the merchant's mystery boxes, or the boss upgrade. */
-    private fun drawPick(c: Canvas, run: RoomRun) {
+    internal fun drawPick(c: Canvas, run: RoomRun) {
         val W = g.W
         dim(c, 0xC8)
         val (head, sub) = when (run.pickKind) {

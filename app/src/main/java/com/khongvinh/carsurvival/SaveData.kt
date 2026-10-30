@@ -9,7 +9,7 @@ class SaveData(context: Context) {
         const val PARTS_NEEDED = 5
     }
 
-    private val prefs = context.getSharedPreferences("car_survival_v3", Context.MODE_PRIVATE)
+    private val prefs = context.getSharedPreferences("dxst_v7", Context.MODE_PRIVATE)
 
     var money = prefs.getInt("money", 0)
 
@@ -40,6 +40,31 @@ class SaveData(context: Context) {
     var volMusic = prefs.getInt("volMusic", if (music) 50 else 0)
     var volSfx = prefs.getInt("volSfx", if (sound) 65 else 0)
     var volEngine = prefs.getInt("volEngine", if (sound) 100 else 0)
+
+    // ---------------------------------------------------------- camp (v7)
+
+    /** Metres travelled from the start (the camp stands here), nights survived. */
+    var distM = prefs.getInt("distM", 0)
+    var nights = prefs.getInt("nights", 0)
+
+    /** Scrap builds defences; fuel (litres = seconds of gas) lets the car move the camp. */
+    var scrap = prefs.getInt("scrap", 120)
+    var fuel = prefs.getInt("fuel", 12)
+
+    /** Parts found per [Blueprints.all] id, and assembled blueprints (bits). */
+    val bpParts = IntArray(Blueprints.all.size) { prefs.getInt("bp$it", 0) }
+    var bpOwned = prefs.getInt("bpOwned", 0)
+    var carTier = prefs.getInt("carTier", 0)
+    var wallLevel = prefs.getInt("wallLv", 0)
+
+    /** Defence on each camp slot: [DefType] ordinal (-1 empty), level, hp left. */
+    val slotType = IntArray(Campaign.SLOTS) { prefs.getInt("sT$it", if (it == 0) DefType.MG.ordinal else if (it == 2) DefType.WOOD.ordinal else -1) }
+    val slotLevel = IntArray(Campaign.SLOTS) { prefs.getInt("sL$it", if (it == 0 || it == 2) 1 else 0) }
+    val slotHp = IntArray(Campaign.SLOTS) { prefs.getInt("sH$it", 0) }
+    var wallHpSaved = prefs.getInt("wallHp", 0)
+
+    /** The day's action (expedition or drive) is used up. */
+    var dayActed = prefs.getBoolean("dayActed", false)
 
     /** Lifetime counters per [Stat]. */
     val life = IntArray(Stat.entries.size) { prefs.getInt("life$it", 0) }
@@ -78,7 +103,7 @@ class SaveData(context: Context) {
     fun missionDone(i: Int) = missionProgress(i) >= missionTarget(i)
     fun missionText(i: Int) = Missions.kinds[missionKind[i]].text.format(missionTarget(i))
 
-    fun achProgress(i: Int): Int = Missions.achievements[i].stat?.let { life[it.ordinal] } ?: bestStage
+    fun achProgress(i: Int): Int = Missions.achievements[i].stat?.let { life[it.ordinal] } ?: nights
     fun achDone(i: Int) = achProgress(i) >= Missions.achievements[i].target
 
     /** Missions and achievements waiting to be claimed (red dot on the menu). */
@@ -205,6 +230,12 @@ class SaveData(context: Context) {
         side = 0
         life.fill(0)
         missionDay = -1
+        distM = 0; nights = 0; scrap = 120; fuel = 12
+        bpParts.fill(0); bpOwned = 0; carTier = 0; wallLevel = 0
+        slotType.fill(-1); slotLevel.fill(0); slotHp.fill(0)
+        slotType[0] = DefType.MG.ordinal; slotLevel[0] = 1
+        slotType[2] = DefType.WOOD.ordinal; slotLevel[2] = 1
+        wallHpSaved = 0; dayActed = false
         achClaimed = 0
         bestScore = 0
         records.clear()
@@ -248,6 +279,21 @@ class SaveData(context: Context) {
         e.putInt("volMusic", volMusic)
         e.putInt("volSfx", volSfx)
         e.putInt("volEngine", volEngine)
+        e.putInt("distM", distM)
+        e.putInt("nights", nights)
+        e.putInt("scrap", scrap)
+        e.putInt("fuel", fuel)
+        bpParts.forEachIndexed { i, v -> e.putInt("bp$i", v) }
+        e.putInt("bpOwned", bpOwned)
+        e.putInt("carTier", carTier)
+        e.putInt("wallLv", wallLevel)
+        for (i in 0 until Campaign.SLOTS) {
+            e.putInt("sT$i", slotType[i])
+            e.putInt("sL$i", slotLevel[i])
+            e.putInt("sH$i", slotHp[i])
+        }
+        e.putInt("wallHp", wallHpSaved)
+        e.putBoolean("dayActed", dayActed)
         life.forEachIndexed { i, v -> e.putInt("life$i", v) }
         e.putInt("mDay", missionDay)
         for (i in 0 until 3) {

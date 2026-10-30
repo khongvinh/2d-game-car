@@ -1,6 +1,6 @@
 # TỔNG HỢP TIẾN TRÌNH DỰ ÁN "ĐUA XE SINH TỒN"
 
-Tài liệu bàn giao để tiếp tục làm việc ở phiên chat mới mà không bị thiếu sót. Cập nhật đến phiên bản v6.1 (ngày 30/10/2026).
+Tài liệu bàn giao để tiếp tục làm việc ở phiên chat mới mà không bị thiếu sót. Cập nhật đến phiên bản v7.0 (ngày 30/10/2026). TỪ v7.0 GAME ĐÃ LÀM LẠI THÀNH KIỂU THỦ TRẠI — xem mục v7.0 trước tiên; các mục v1–v6 là lịch sử.
 
 ## 1. Thông tin chung
 
@@ -12,8 +12,8 @@ Tài liệu bàn giao để tiếp tục làm việc ở phiên chat mới mà k
 | Ngôn ngữ / công nghệ | Kotlin + Canvas (SurfaceView), không engine, không thư viện ngoài, không file ảnh/âm thanh |
 | Repo GitHub | khongvinh/2d-game-car |
 | Nhánh làm việc | claude/2d-driving-game-f0kpjk (chưa có Pull Request, chưa merge) |
-| Commit mới nhất | xem git log nhánh làm việc (v6.1: lái ngắn rồi vào kho, màn hình chính kiểu bản đồ, lái buôn, nhiệm vụ ngày, thành tích, phòng nghỉ) |
-| Phiên bản hiện tại | v6.1 (versionCode 17) — số phiên bản hiện góc dưới trái màn hình chính (Game.VERSION, nhớ tăng mỗi bản) |
+| Commit mới nhất | xem git log nhánh làm việc (v7.0: làm lại thành game thủ trại — ngày lục soát/lên đường, đêm thủ thành) |
+| Phiên bản hiện tại | v7.0 (versionCode 18) — số phiên bản hiện góc dưới trái màn hình chính (Game.VERSION, nhớ tăng mỗi bản) |
 | Build tự động | GitHub Actions "Build APK" (.github/workflows/android.yml) — đang xanh, xuất artifact DuaXeSinhTon-apk |
 | Khóa ký | app/debug.keystore (cố định, mật khẩu android) nên các bản cài đè lên nhau được |
 
@@ -204,7 +204,7 @@ Tài liệu bàn giao để tiếp tục làm việc ở phiên chat mới mà k
 - Kiểm tra (tools/dev/preview `gradle rooms`, thêm `-Pa=god` để bất tử): bot bất tử qua đủ 30 phòng ở ải 1/6/10 (~4 phút/lượt, cấp 12–15, 250–330 quái); bot thường qua ải 1 (còn 9 máu), ải 6 (còn 105/199), gục ở phòng 10 ải 10. `gradle drive`: tới trạm thì vào lái buôn (State.PICK).
 - Còn có thể làm tiếp theo video: màn hình chính dạng bản đồ vùng có thanh tiến độ, nhiệm vụ hằng ngày, thành tích, quà miễn phí, nhân vật lái buôn vẽ hình, phòng nghỉ có bàn đồ nghề, cây kỹ năng dài vô tận mở bằng tiền.
 
-### v6.1 — Lái ngắn rồi vào kho, màn hình chính kiểu bản đồ, lái buôn, nhiệm vụ ngày, thành tích, phòng nghỉ (hiện tại)
+### v6.1 — Lái ngắn rồi vào kho, màn hình chính kiểu bản đồ, lái buôn, nhiệm vụ ngày, thành tích, phòng nghỉ
 - Phản hồi người dùng: "cài 6.0 rồi mà chơi không thay đổi gì mấy" — vì kho chỉ mở khi tới trạm/xe nổ; hết xăng/lật xe thì vẫn đi bộ trên đường như cũ; menu/gara không đổi; không có số phiên bản. Người dùng chọn: lái ngắn rồi vào kho; làm cả 4 phần giống video (bản đồ, lái buôn có hình, nhiệm vụ + thành tích, phòng nghỉ).
 - Đường ngắn lại: stageGoalM = 600 + 30 x (ải - 1) (ải 1 = 600m ~26 giây ga hết cỡ, ải 20 = 1170m). Hết xăng và xe dừng (< 40) quá 1,5 giây → "HẾT XĂNG! CHẠY VÀO KHO HÀNG"; lật quá 3 giây → "LẬT XE! CHẠY VÀO KHO HÀNG" (thay cho bò ra đi bộ). Tự xuống xe đi bộ lục nhà ven đường vẫn như cũ.
 - Màn hình chính (drawMenu mới, giống video): 5 nút tròn bên trái (Nhà đang sáng, Xe, Vũ khí, Kỹ năng, Vũ khí phụ → mở gara đúng tab), thanh trên (sao cấp + XP, ngọc, tiền), băng tên "🗺 ẢI n: TÊN MAP ▾" (chạm → chọn map), đảo nổi có núi, biển số ải (👹 ải trùm), xác xe và tài xế (chạm đảo → chọn map), thanh tiến độ 5 ải của vùng có đầu lâu 💀, dòng "vùng • kiểu đường • m + 30 phòng • kỷ lục", nút vàng to "CHẠY!", cột phải: 📋 NHIỆM VỤ (chấm đỏ số việc nhận được), 🏆 THÀNH TÍCH, 📖 CỐT TRUYỆN, 🔊 ÂM THANH, 🎮 PHÍM, ↺ CHƠI LẠI; "v6.1" góc dưới trái. Bỏ nút GARA và bảng xếp hạng ở menu (bảng xếp hạng chuyển vào tab XẾP HẠNG).
@@ -213,7 +213,22 @@ Tài liệu bàn giao để tiếp tục làm việc ở phiên chat mới mà k
 - Phòng nghỉ: phòng 7, 14, 21, 28 không có quái, cửa mở sẵn, giữa phòng có BÀN ĐỒ NGHỀ (bảng dụng cụ, hộp đồ, đèn bàn); bước tới bàn → bảng "BÀN ĐỒ NGHỀ" chọn 1: Băng bó (hồi 50% máu), Mài vũ khí (+1 Sát thương+, đầy thì +1 Tốc bắn+), Đổi vũ khí (cầm vũ khí phụ kế tiếp đã có; chưa có thì +1 Đạn kép). Mỗi phòng nghỉ dùng 1 lần. HUD ghi "• PHÒNG NGHỈ".
 - Kiểm tra: `gradle drive` ải 1/3 tới trạm sau 26–31 giây rồi vào lái buôn; `gradle rooms -Pa=god` qua 30 phòng ở ải 1/6/10 (có phòng nghỉ); `gradle inside` chụp menu mới, nhiệm vụ, thành tích.
 
-## 3. Luật chơi hiện tại (v6.1)
+### v7.0 — LÀM LẠI: thủ trại sinh tồn (hiện tại)
+- Yêu cầu: "Bỏ kiểu chạy bo đi, làm y như video sinh tồn. Khi thu thập đủ mảnh cho xe/súng/pháo đài/bệ phòng thủ thì hẵng chạy, chạy tới đâu phòng thủ tới đó. Làm lại từ đầu hết." Người dùng chọn: THỦ TRẠI LÀ CHÍNH; khi phòng thủ CHỈ DỰNG BỆ (tower defense, nhân vật không đánh); đồ họa dùng ẢNH AI từ script (chưa có ảnh — game tạm vẽ bằng code); BẮT ĐẦU LẠI TỪ ĐẦU (lưu mới prefs "dxst_v7").
+- Kèm theo: sửa script Python cho Google Colab tạo asset (tools/assets/tao_asset_colab.py): key lấy từ Colab Secrets/getpass, lưu Google Drive "MyDrive/DuaXeSinhTon_assets" (chạy lại bỏ qua file đã có), Recraft style digital_illustration (vector_illustration trả SVG — lỗi của script gốc), xóa phông fal.ai BiRefNet, ElevenLabs sound-generation; 101 hình (nhân vật, zombie, xe, mảnh, vũ khí, bệ phòng thủ, vật phẩm, sức mạnh, giao diện, nền) + 30 âm thanh/nhạc; tự thử lại khi lỗi; nén zip. Khi có asset: người dùng để trên Drive, trợ lý tải về (connector Google Drive) và nạp vào game.
+- VÒNG CHƠI (Campaign.kt, CampDraw.kt): menu "VÀO TRẠI!" → State.CAMP (ngày). Mỗi ngày chọn 1 việc: 🔍 LỤC SOÁT (6 phòng nhà kho kiểu video, có lái buôn, sức mạnh, rương) hoặc 🚗 LÊN ĐƯỜNG (cần ≥ 3L xăng); hoặc bỏ qua. Rồi 🌙 VÀO ĐÊM → State.SIEGE: zombie từ phải tràn sang, bệ tự bắn. Thắng đêm → ngày mới (+tiền giết quái, +phế liệu 15 + 4 x đêm, +ngọc 2 + đêm/3). Tường vỡ → "TRẠI THẤT THỦ": mất rào/bệ dưới đất, mất nửa phế liệu, tường còn 50%, sang ngày mới. Đích: đi đủ 12.000m tới trạm cứu hộ (VICTORY). Không còn bão, ải, trùm đường, nhà ven đường.
+- Tài nguyên: tiền $ (giết quái), ⚙ phế liệu (dựng/nâng/sửa bệ; khởi đầu 120), ⛽ xăng (lít = giây ga; khởi đầu 12L), ♦ ngọc (cây kỹ năng), mảnh ghép theo bản thiết kế.
+- Trại (nhìn cố định x -150..2450, zoom W/2600, mặt đất 80% màn hình): lều, xe hiện tại, thùng lửa, chòi canh, TƯỜNG ở x 700 (gỗ 320 / sắt 650 / bê tông 1100 máu; cao 230/260/290). 7 ô: 0 = trên tường, 1 = chòi canh (chỉ đặt súng), 2–6 = trước tường x 920..1680 (đặt được mọi thứ). Khởi đầu có Súng máy trên tường và Rào gỗ ô 2. Chạm ô → bảng dựng (2 hàng x 4); chạm bệ → NÂNG CẤP (tối đa 3 sao, giá = giá gốc x (cấp+1)/2 + 20, máu/sát thương +50%/cấp), SỬA, BÁN (hoàn 50%); chạm tường → SỬA TƯỜNG. Dựng được cả trong đêm.
+- 8 loại bệ (DefType; ⚙ giá, máu, tầm, sát thương, nạp): Rào gỗ 25 (160, chặn), Súng máy 60 (90, 760, 1,3, 0,16 giây), Rào gai 45 (220, chặn + cứa 7/giây), Pháo 120 (980, 9, 1,6 giây, nổ 120), Súng lửa 110 (420, 0,8 mỗi 0,09 giây + đốt), Tesla 140 (500, sét 3 con 4,5 + làm chậm), Cối 130 (300–1600, 12, 2,6 giây, nổ 170), Mìn 30 (nổ 1 lần 30, bán kính 160). Rào gỗ & súng máy có sẵn; 6 loại còn lại phải đủ mảnh rồi lắp ở XƯỞNG.
+- Đêm n: số đợt min(6, 3 + n/3), mỗi đợt 5 + 2n + 2 x đợt + 3 x vùng con, cách 5 giây; quái theo vùng (dơi bay qua rào đánh thẳng tường; 18% phun axit đứng xa 380); máu = gốc x 7 x (1 + 0,2n + 0,3 x vùng); cắn 7 + 0,9n /giây (béo x1,8). Đêm chia hết cho 5 có TRÙM (đồ tể to, 300 x (1 + 0,25n) máu, cắn x4). Quái chặn bởi bệ dưới đất xa nhất (trừ mìn) rồi tới tường.
+- XƯỞNG (State.WORKSHOP, nút 🔧 XƯỞNG hoặc nút tròn Xe ở menu): 12 bản thiết kế (Blueprints): 4 xe (Xe con gỉ sét 5 mảnh/300$, Bán tải 6/1200, Bọc thép 7/2700, Xe tăng 8/4800 — dùng Vehicles.of(dòng, 0)), 6 bệ (Rào gai 3, Mìn 3, còn lại 5 mảnh; giá = giá ⚙ x 3 $), 2 tường (sắt 5/600$, bê tông 7/1500$). Lưu bp0.., bpOwned, carTier, wallLv.
+- LỤC SOÁT: RoomRun(total = 6, trùm phòng cuối nếu ngày chia hết 3), mỗi phòng 2–3 rương (một số trên bục, phải nhảy); chạm rương: +4..11 + đêm/2 ⚙, 40% +2..4L xăng, 35% 1 mảnh (thiết kế còn thiếu, ưu tiên xe 35%). Về trại khi qua cửa phòng 6; gục thì giữ nửa phế liệu/xăng, mất mảnh. Phòng nghỉ (phòng 7, 14…) không xuất hiện trong chuyến 6 phòng.
+- LÊN ĐƯỜNG: lái xe (vật lý cũ, quái/vật cản/lô cốt trên đường, đoạn tối đa 1500m), bình = min(bình xe, xăng có). Hết xăng & dừng, lật 3 giây, xe nổ, rơi, hoặc hết đoạn → dựng trại mới tại chỗ: +mét đi được, xăng bị trừ, bệ dưới đất bỏ lại, tường đầy máu. Vùng theo quãng đường: Sa mạc 0–3000m, Núi lửa 3000–6000, Rừng đêm 6000–9000, Hành tinh lạ 9000–12000; độ khó đường zone = 1 + mét/600.
+- Menu: nút "🏕 NGÀY n • VÙNG", đảo nổi có biển "x km", thanh hành trình tới 🏁, dòng "Đã sống sót n đêm • Đã đi Xm / 12000m • ⚙ • ⛽", nút VÀO TRẠI!; nút tròn Xe → Xưởng. Nhiệm vụ/thành tích đổi: "Sống sót n đêm", "Lục soát xong n chuyến", "Tới trạm cứu hộ (12km)".
+- Kiểm tra: tools/dev/preview `gradle camp` (trại → dựng súng → 3 đêm → lục soát 6 phòng → đêm 4 → lên đường 403m → trại mới → xưởng). Các bài thử cũ `inside`, `rooms`, `drive`, `walk` dùng luồng cũ (tap0 → ải), nay không còn đúng.
+- Còn làm tiếp: nạp ảnh/âm thanh AI khi người dùng tạo xong; cân bằng độ khó sau khi chơi thử (đêm 1–2 hiện khá dễ); vẽ trại theo vùng (núi lửa/đêm/ngoài hành tinh); bỏ code cũ không dùng (bão, nhà ven đường, ải, gara xe cũ).
+
+## 3. Luật chơi cũ trước v7.0 (v6.1, để tham khảo)
 
 ### Điều khiển
 | Nút | Tác dụng |
@@ -318,6 +333,9 @@ Vũ khí (10 loại, mỗi loại nâng 5 cấp: +18% sát thương, -6% thời 
 | CarArt.kt | Vẽ 25 xe (có người lái xe máy, xích xe tăng) và 10 vũ khí, dùng cho trận đấu và gara |
 | Entities.kt | Kiểu dữ liệu: State, Upgrade, ItemType, Zombie, Obstacle, Boss, BossRock, Debris, Projectile, Particle, FloatText, Car... |
 | Rooms.kt | Chuỗi 30 phòng nhà kho: Power (15 sức mạnh), Foe, RoomBoss, RoomShot, Cash, Room (bục, quái, cửa), RoomRun (cấp, XP, sức mạnh, hàng chờ chọn), RoomRules (di chuyển, quái, trùm, vũ khí, sức mạnh, tiền) |
+| Campaign.kt | v7: DefType (8 bệ), Blueprint/Blueprints (12 bản thiết kế), Def, Campaign (trại, ô, dựng/nâng/sửa/bán, đêm & đợt zombie, bắn, lục soát, lên đường) |
+| CampDraw.kt | v7: vẽ trại ngày/đêm, tường 3 cấp, bệ, zombie tấn công, HUD trại, bảng dựng, xưởng (hàm mở rộng của Renderer) |
+| tools/assets/tao_asset_colab.py | Script Google Colab tạo ảnh (Recraft + fal.ai xóa phông) và âm thanh (ElevenLabs) |
 | Missions.kt | Stat (bộ đếm trọn đời), 8 loại nhiệm vụ ngày x 3 mức, 16 thành tích, Missions.today()/forDay() |
 | Interior.kt | Màn trong nhà: phòng, đồ đạc đứng lên được (Platform), rương (Chest), zombie trong nhà, đạn vũ khí phụ trong nhà |
 | SideWeapons.kt | 7 vũ khí phụ của tài xế (SideWeapon): giá, ải mở, sát thương, tốc độ, tầm, cận chiến/bay cong |
@@ -389,7 +407,7 @@ cd tools/dev/preview && gradle walk      # tài xế đứng yên khi bão đi q
 
 | Phiên | Tiêu đề | Phạm vi |
 |---|---|---|
-| #2 | Đua Xe Sinh Tồn #2 — v5.0→v6.1: lá chắn đi bộ, bão khi đi bộ, thanh âm lượng, map trong nhà + vũ khí phụ, chuỗi 30 phòng kiểu Earn to Die Rogue, menu bản đồ, nhiệm vụ, thành tích, phòng nghỉ | v5.1, v6.0, v6.1 + bài thử preview `inside`, `walk`, `rooms` |
+| #2 | Đua Xe Sinh Tồn #2 — v5.0→v7.0: lá chắn đi bộ, âm lượng, nhà kho 30 phòng kiểu Earn to Die Rogue, menu bản đồ, nhiệm vụ, LÀM LẠI thành thủ trại (ngày lục soát/lên đường, đêm thủ thành), script tạo asset AI | v5.1→v7.0 + bài thử preview `inside`, `walk`, `rooms`, `camp` |
 | #1 | Đua Xe Sinh Tồn #1 — v1.0→v5.0: tạo game, kiểu Earn to Die, bão 3 bo, nhạc, trùm cuối, 20 bản đồ, gara 25 xe, 20 kiểu đường, giao diện thép, tiếng động cơ, ngọc đỏ, lô cốt, cốt truyện, cây kỹ năng, tài xế lục soát, xe nổ tài xế chạy tiếp, nhảy, đổi vị trí phím | Từ đầu đến v5.0 + tài liệu bàn giao, công cụ tools/dev, quy tắc CLAUDE.md |
 
 - Quy tắc làm việc (đặt tiêu đề phiên, tự lưu tiến trình khi ngữ cảnh ≥ 90% rồi nhắc mở chat mới) nằm trong CLAUDE.md ở gốc repo.

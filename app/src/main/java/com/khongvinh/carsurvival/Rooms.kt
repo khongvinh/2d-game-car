@@ -78,12 +78,11 @@ class Zap(val pts: FloatArray) {
 }
 
 /** One room of the run: platforms, decor, monsters and the doors. */
-class Room(val index: Int, stage: Int, region: Region, seed: Int) {
+class Room(val index: Int, stage: Int, region: Region, seed: Int, val boss: Boolean, val rest: Boolean, bossKind: Int = 1) {
     private val rnd = Random(seed)
-    val boss = index % 10 == 0
 
-    /** Rooms 7, 14, 21, 28: no monsters, a workbench in the middle. */
-    val rest = index % 7 == 0
+    /** Loot crates: x, height of the surface it sits on, opened (0/1). */
+    val crates = ArrayList<FloatArray>()
     var benchUsed = false
     val width = if (boss) 2000f else 1900f + rnd.nextInt(5) * 140f
     val platforms = ArrayList<Platform>()
@@ -115,6 +114,18 @@ class Room(val index: Int, stage: Int, region: Region, seed: Int) {
             x += w + 160f + rnd.nextFloat() * 180f
         }
         if (rest) platforms.clear()
+        if (!rest) {
+            // two or three crates to break open, some up on the ledges
+            repeat(2 + rnd.nextInt(2)) {
+                val up = platforms.isNotEmpty() && rnd.nextFloat() < 0.4f
+                if (up) {
+                    val p = platforms[rnd.nextInt(platforms.size)]
+                    crates.add(floatArrayOf((p.l + p.r) / 2, p.top, 0f))
+                } else {
+                    crates.add(floatArrayOf(400f + rnd.nextFloat() * (width - 700f), 0f, 0f))
+                }
+            }
+        }
         if (!boss) {
             var dx = 250f
             while (dx < width - 250f) {
@@ -124,7 +135,7 @@ class Room(val index: Int, stage: Int, region: Region, seed: Int) {
         }
         val hpMul = 1f + 0.06f * (stage - 1) + 0.03f * index
         if (boss) {
-            val kind = when (index) { 10 -> 0; 20 -> 1; else -> 2 }
+            val kind = bossKind
             roomBoss = RoomBoss(kind, width - 420f, if (stage % 5 == 0) stage / 5 else (region.ordinal + 1), hpMul)
             repeat(2 + index / 10) { foes.add(spawn(stage, region, 500f + it * 300f, -1, hpMul)) }
         } else if (!rest) {
@@ -167,14 +178,15 @@ class Room(val index: Int, stage: Int, region: Region, seed: Int) {
 }
 
 /** A whole run of rooms after the drive, with its level, power-ups and timers. */
-class RoomRun(val stage: Int, val region: Region, private val seed: Int) {
+class RoomRun(val stage: Int, val region: Region, private val seed: Int, val total: Int = 6, private val bossLast: Boolean = false) {
     companion object {
-        const val TOTAL = 30
         val MERCHANT_AFTER = intArrayOf(5, 15, 25)
     }
 
     var index = 1
-    var room = Room(1, stage, region, seed)
+    var room = make(1)
+
+    private fun make(i: Int) = Room(i, stage, region, seed + i * 101, boss = (i == total && bossLast) || i % 10 == 0, rest = i % 7 == 0 && i < total, bossKind = if (i % 20 == 0) 1 else if (i % 10 == 0) 0 else Random(seed + i).nextInt(2))
     var level = 1
     var xp = 0
     val xpNeed get() = 4 + level * 3
@@ -203,7 +215,7 @@ class RoomRun(val stage: Int, val region: Region, private val seed: Int) {
 
     fun nextRoom() {
         index++
-        room = Room(index, stage, region, seed + index * 101)
+        room = make(index)
         fade = 1f
         roomNoteT = 2f
     }
@@ -270,6 +282,11 @@ class RoomRules(private val g: Game) {
         if (rm.rest && !rm.benchUsed && abs(d.x - rm.benchX) < 90f && d.y > -10f) {
             rm.benchUsed = true
             run.benchQueued = true
+        }
+        // crates burst open when the player touches them
+        for (cr in rm.crates) if (cr[2] == 0f && abs(d.x - cr[0]) < 60f && abs(d.y + cr[1]) < 50f) {
+            cr[2] = 1f
+            g.campaign.lootCrate(cr[0], -cr[1] - 40f)
         }
         // all clear: maybe a second wave from the doors, then the exit opens
         val bossAlive = rm.roomBoss?.alive == true
@@ -677,7 +694,7 @@ class RoomRules(private val g: Game) {
             repeat(10) { run.room.cash.add(Cash(b.x, -b.h / 2, rnd(-300f, 300f), -rnd(300f, 700f), (20 * g.monsterRewardMul).toInt())) }
             g.texts.add(FloatText("HẠ TRÙM!", b.x, -b.h - 60f, 0xFFFFD740.toInt()).also { it.size = 60f })
             gainXp(run, 10)
-            if (run.index < RoomRun.TOTAL) run.upgradeQueued++ // Damage+ or Heal+ after the fight
+            if (run.index < run.total) run.upgradeQueued++ // Damage+ or Heal+ after the fight
         }
     }
 

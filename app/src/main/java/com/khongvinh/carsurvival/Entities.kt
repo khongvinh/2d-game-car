@@ -2,7 +2,7 @@ package com.khongvinh.carsurvival
 
 import kotlin.math.min
 
-enum class State { MENU, MAPS, GARAGE, STORY, LAYOUT, SOUND, MISSIONS, PLAYING, PAUSED, PICK, RESULT, STAGE_DONE, VICTORY }
+enum class State { MENU, MAPS, GARAGE, STORY, LAYOUT, SOUND, MISSIONS, CAMP, SIEGE, WORKSHOP, PLAYING, PAUSED, PICK, RESULT, STAGE_DONE, VICTORY }
 
 enum class ItemType(val icon: String, val color: Int) {
     COIN("$", 0xFFFFC107.toInt()),

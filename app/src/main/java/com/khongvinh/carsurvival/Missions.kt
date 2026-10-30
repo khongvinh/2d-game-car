@@ -11,7 +11,7 @@ enum class Stat(val unit: String) {
     STAGES("ải"),
     GEMS("ngọc"),
     METERS("m"),
-    HOUSES("nhà"),
+    HOUSES("chuyến"),
 }
 
 class MissionKind(val stat: Stat, val text: String, val targets: IntArray, val gems: IntArray)
@@ -25,13 +25,13 @@ object Missions {
         MissionKind(Stat.ROOMS, "Vượt qua %d phòng", intArrayOf(10, 25, 45), intArrayOf(6, 12, 18)),
         MissionKind(Stat.BOSSES, "Hạ %d trùm", intArrayOf(1, 2, 3), intArrayOf(8, 14, 20)),
         MissionKind(Stat.MONEY, "Kiếm %d$", intArrayOf(500, 1500, 3000), intArrayOf(6, 10, 16)),
-        MissionKind(Stat.STAGES, "Vượt %d ải", intArrayOf(1, 1, 2), intArrayOf(10, 10, 20)),
+        MissionKind(Stat.STAGES, "Sống sót %d đêm", intArrayOf(1, 2, 3), intArrayOf(8, 14, 20)),
         MissionKind(Stat.GEMS, "Nhặt %d ngọc đỏ", intArrayOf(15, 30, 50), intArrayOf(5, 9, 14)),
         MissionKind(Stat.METERS, "Lái xe %dm", intArrayOf(1000, 2500, 5000), intArrayOf(5, 9, 14)),
-        MissionKind(Stat.HOUSES, "Lục sạch %d nhà", intArrayOf(1, 2, 4), intArrayOf(6, 10, 16)),
+        MissionKind(Stat.HOUSES, "Lục soát xong %d chuyến", intArrayOf(1, 2, 4), intArrayOf(6, 10, 16)),
     )
 
-    /** [Achievement.stat] null = stages cleared ([SaveData.bestStage]). */
+    /** [Achievement.stat] null = nights survived ([SaveData.nights]). */
     val achievements = listOf(
         Achievement("Diệt 100 zombie", Stat.KILLS, 100, 10),
         Achievement("Diệt 1.000 zombie", Stat.KILLS, 1000, 40),
@@ -41,14 +41,14 @@ object Missions {
         Achievement("Qua 1.000 phòng", Stat.ROOMS, 1000, 100),
         Achievement("Hạ 3 trùm", Stat.BOSSES, 3, 15),
         Achievement("Hạ 30 trùm", Stat.BOSSES, 30, 60),
-        Achievement("Vượt ải 1", null, 1, 10),
-        Achievement("Vượt ải 5", null, 5, 30),
-        Achievement("Vượt ải 10", null, 10, 60),
-        Achievement("Vượt ải 20", null, 20, 150),
+        Achievement("Sống sót 1 đêm", null, 1, 10),
+        Achievement("Sống sót 5 đêm", null, 5, 30),
+        Achievement("Sống sót 10 đêm", null, 10, 60),
+        Achievement("Sống sót 25 đêm", null, 25, 150),
         Achievement("Kiếm 10.000$", Stat.MONEY, 10000, 20),
         Achievement("Kiếm 100.000$", Stat.MONEY, 100000, 80),
-        Achievement("Lục sạch 10 nhà", Stat.HOUSES, 10, 15),
-        Achievement("Lái xe 20km", Stat.METERS, 20000, 20),
+        Achievement("Lục soát xong 10 chuyến", Stat.HOUSES, 10, 15),
+        Achievement("Tới trạm cứu hộ (12km)", Stat.METERS, 12000, 200),
     )
 
     /** Local calendar day (Vietnam time) so missions roll over at midnight. */

@@ -11,8 +11,8 @@ android {
         applicationId = "com.khongvinh.carsurvival"
         minSdk = 24
         targetSdk = 35
-        versionCode = 17
-        versionName = "6.1"
+        versionCode = 18
+        versionName = "7.0"
     }
 
     signingConfigs {
