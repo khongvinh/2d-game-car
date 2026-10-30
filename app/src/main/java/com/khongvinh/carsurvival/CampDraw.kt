@@ -16,7 +16,7 @@ internal fun Renderer.drawCamp(c: Canvas) {
     val W = g.W
     val H = g.H
     val night = g.state == State.SIEGE
-    drawBackground(c)
+    if (!backdrop(c, Sprites.background(cp.region))) drawBackground(c)
     if (night) {
         fill.color = 0x99101830.toInt()
         c.drawRect(0f, 0f, W, H, fill)
@@ -41,11 +41,13 @@ internal fun Renderer.drawCamp(c: Canvas) {
     tent(c, 40f, 0xFF8D6E63.toInt())
     tent(c, 260f, 0xFF6D4C41.toInt())
     val v = Vehicles.of(VehicleClass.entries[s.carTier.coerceIn(0, 4)], 0)
-    c.save()
-    c.translate(140f, -60f)
-    c.scale(0.9f, 0.9f)
-    art.draw(c, v, 0f, 0f, 0f, 0f, -0.3f, false, s.weaponType, false)
-    c.restore()
+    if (!sprite(c, Sprites.CARS[s.carTier.coerceIn(0, 4)], 150f, 4f, 130f)) {
+        c.save()
+        c.translate(140f, -60f)
+        c.scale(0.9f, 0.9f)
+        art.draw(c, v, 0f, 0f, 0f, 0f, -0.3f, false, s.weaponType, false)
+        c.restore()
+    }
     // fire barrel
     fill.color = 0xFF5D4037.toInt()
     c.drawRect(560f, -70f, 610f, 0f, fill)
@@ -107,7 +109,10 @@ internal fun Renderer.drawCamp(c: Canvas) {
     // monsters
     for (f in cp.foes) {
         val zz = f.z
-        if (cp.isBoss(f)) {
+        val pic = if (cp.isBoss(f)) "boss_brute" else Sprites.zombie(zz.type)
+        if (sprite(c, pic, zz.x, zz.y + 4f, if (cp.isBoss(f)) 220f else zz.type.h * 1.3f, flip = true)) {
+            // drawn from the AI picture, facing the camp
+        } else if (cp.isBoss(f)) {
             c.save()
             c.translate(zz.x, 0f)
             c.scale(-2.2f, 2.2f)
@@ -252,7 +257,14 @@ private fun Renderer.drawWall(c: Canvas, level: Int, hpF: Float) {
 
 private fun Renderer.drawDef(c: Canvas, d: Def, x: Float, y: Float) {
     val hit = d.flash > 0f
-    when (d.type) {
+    val h = when {
+        d.type == DefType.MINE -> 34f
+        d.type.blocks -> 120f
+        else -> 130f
+    }
+    if (sprite(c, Sprites.def(d.type), x, y + 4f, h, alpha = if (hit) 170 else 255)) {
+        // picture from the asset pack
+    } else when (d.type) {
         DefType.WOOD -> {
             for (k in 0..2) {
                 fill.color = if (hit) Color.WHITE else if (k % 2 == 0) 0xFF8D6E63.toInt() else 0xFFA1887F.toInt()
@@ -430,6 +442,13 @@ internal fun Renderer.drawWorkshop(c: Canvas) {
         text.color = Color.WHITE
         val kind = when (bp.kind) { Blueprint.CAR -> "🚗"; Blueprint.WALL -> "🧱"; else -> DefType.entries[bp.ref].icon }
         fitText(c, "$kind ${bp.title}", cx, r[1] + 40f, 26f, r[2] - r[0] - 20f)
+        val pic = when (bp.kind) {
+            Blueprint.CAR -> Sprites.CARS[bp.ref.coerceIn(0, 4)]
+            Blueprint.WALL -> "def_wall_metal"
+            else -> Sprites.def(DefType.entries[bp.ref])
+        }
+        spriteBox(c, pic, r[0] + 10f, r[1] + 52f, r[0] + 70f, r[1] + 92f)
+        spriteBox(c, when (bp.kind) { Blueprint.CAR -> "part_engine"; Blueprint.WALL -> "part_brick"; else -> "part_gear" }, r[2] - 60f, r[1] + 52f, r[2] - 14f, r[1] + 92f)
         val have = min(bp.parts, s.bpParts[bp.id])
         // part pips
         val pw = 22f

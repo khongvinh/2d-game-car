@@ -24,7 +24,7 @@ import kotlin.random.Random
 class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
     companion object {
         /** Shown on the menu so the installed build is easy to check. */
-        const val VERSION = "7.0"
+        const val VERSION = "7.1"
 
         const val VIRTUAL_HEIGHT = 720f
         const val METER = 30f

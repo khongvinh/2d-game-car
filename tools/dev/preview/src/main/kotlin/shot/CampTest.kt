@@ -7,6 +7,7 @@ import kotlin.math.abs
 /** The v7 loop: camp, build, a night, an expedition, a drive, the workshop. */
 fun main() {
     out = java.io.File("../out/shots").also { it.mkdirs() }
+    Sprites.open = { p -> java.io.File("../../../app/src/main/assets/$p").takeIf { it.exists() }?.inputStream() }
     val ctx = Context()
     val save = SaveData(ctx)
     save.storySeen = 63
@@ -62,6 +63,7 @@ fun main() {
         if (crate != null && crate[1] > 0f && abs(dx) < 200f) g.touchDown(6, j.cx, j.cy)
         tick(g, 0.1f); t += 0.1f
         if (t > 5f && t < 5.11f) shot(g, "v7_loot")
+        if (g.state == State.PICK && t < 3f) shot(g, "v7_pick")
     }
     g.touchUp(5); g.touchUp(6)
     println("after expedition t=${t.toInt()} state=${g.state} scrap=${save.scrap} fuel=${save.fuel} parts=${save.bpParts.toList()} banner=${g.campaign.banner} ${g.campaign.bannerSub}")

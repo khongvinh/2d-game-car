@@ -11,6 +11,15 @@ class MainActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON or WindowManager.LayoutParams.FLAG_FULLSCREEN)
+        // pictures and sounds from app/src/main/assets (missing ones are drawn/synthesised in code)
+        val am = assets
+        Sprites.open = { path ->
+            try {
+                am.open(path)
+            } catch (_: Exception) {
+                null
+            }
+        }
         gameView = GameView(this)
         setContentView(gameView)
         hideSystemUi()

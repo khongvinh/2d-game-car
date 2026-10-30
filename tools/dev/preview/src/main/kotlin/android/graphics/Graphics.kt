@@ -39,6 +39,7 @@ class Paint(@Suppress("UNUSED_PARAMETER") flags: Int = 0) {
         get() = color ushr 24
         set(v) { color = (color and 0xFFFFFF) or ((v and 255) shl 24) }
     var style = Style.FILL
+    var isFilterBitmap = false
     var strokeWidth = 1f
     var strokeCap = Cap.BUTT
     var strokeJoin = Join.MITER
@@ -55,6 +56,17 @@ class Paint(@Suppress("UNUSED_PARAMETER") flags: Int = 0) {
         return w
     }
 }
+
+class Bitmap(val img: java.awt.image.BufferedImage) {
+    val width get() = img.width
+    val height get() = img.height
+}
+
+object BitmapFactory {
+    fun decodeStream(s: java.io.InputStream): Bitmap? = javax.imageio.ImageIO.read(s)?.let { Bitmap(it) }
+}
+
+class Rect(var left: Int = 0, var top: Int = 0, var right: Int = 0, var bottom: Int = 0)
 
 class RectF {
     var left = 0f; var top = 0f; var right = 0f; var bottom = 0f
@@ -120,6 +132,18 @@ class Canvas(private val g: Graphics2D) {
     fun drawRect(l: Float, t: Float, r: Float, b: Float, p: Paint) = draw(Rectangle2D.Float(minOf(l, r), minOf(t, b), Math.abs(r - l), Math.abs(b - t)), p)
     fun drawRoundRect(l: Float, t: Float, r: Float, b: Float, rx: Float, ry: Float, p: Paint) = draw(RoundRectangle2D.Float(l, t, r - l, b - t, rx * 2, ry * 2), p)
     fun drawRoundRect(rc: RectF, rx: Float, ry: Float, p: Paint) = drawRoundRect(rc.left, rc.top, rc.right, rc.bottom, rx, ry, p)
+    fun drawBitmap(b: Bitmap, @Suppress("UNUSED_PARAMETER") src: Rect?, dst: RectF, p: Paint?) {
+        val old = g.composite
+        val a = ((p?.alpha ?: 255) / 255f) * layerAlpha
+        if (a < 1f) g.composite = AlphaComposite.getInstance(AlphaComposite.SRC_OVER, a.coerceIn(0f, 1f))
+        g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR)
+        val t = g.transform
+        g.translate(dst.left.toDouble(), dst.top.toDouble())
+        g.scale(((dst.right - dst.left) / b.width).toDouble(), ((dst.bottom - dst.top) / b.height).toDouble())
+        g.drawImage(b.img, 0, 0, null)
+        g.transform = t
+        g.composite = old
+    }
     fun drawCircle(x: Float, y: Float, r: Float, p: Paint) = draw(Ellipse2D.Float(x - r, y - r, r * 2, r * 2), p)
     fun drawOval(l: Float, t: Float, r: Float, b: Float, p: Paint) = draw(Ellipse2D.Float(l, t, r - l, b - t), p)
     fun drawLine(x0: Float, y0: Float, x1: Float, y1: Float, p: Paint) { apply(p); g.draw(Line2D.Float(x0, y0, x1, y1)) }

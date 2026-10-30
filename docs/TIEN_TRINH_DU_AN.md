@@ -1,6 +1,6 @@
 # TỔNG HỢP TIẾN TRÌNH DỰ ÁN "ĐUA XE SINH TỒN"
 
-Tài liệu bàn giao để tiếp tục làm việc ở phiên chat mới mà không bị thiếu sót. Cập nhật đến phiên bản v7.0 (ngày 30/10/2026). TỪ v7.0 GAME ĐÃ LÀM LẠI THÀNH KIỂU THỦ TRẠI — xem mục v7.0 trước tiên; các mục v1–v6 là lịch sử.
+Tài liệu bàn giao để tiếp tục làm việc ở phiên chat mới mà không bị thiếu sót. Cập nhật đến phiên bản v7.1 (ngày 30/10/2026). TỪ v7.0 GAME ĐÃ LÀM LẠI THÀNH KIỂU THỦ TRẠI — xem mục v7.0 trước tiên; các mục v1–v6 là lịch sử.
 
 ## 1. Thông tin chung
 
@@ -13,7 +13,7 @@ Tài liệu bàn giao để tiếp tục làm việc ở phiên chat mới mà k
 | Repo GitHub | khongvinh/2d-game-car |
 | Nhánh làm việc | claude/2d-driving-game-f0kpjk (chưa có Pull Request, chưa merge) |
 | Commit mới nhất | xem git log nhánh làm việc (v7.0: làm lại thành game thủ trại — ngày lục soát/lên đường, đêm thủ thành) |
-| Phiên bản hiện tại | v7.0 (versionCode 18) — số phiên bản hiện góc dưới trái màn hình chính (Game.VERSION, nhớ tăng mỗi bản) |
+| Phiên bản hiện tại | v7.1 (versionCode 19) — số phiên bản hiện góc dưới trái màn hình chính (Game.VERSION, nhớ tăng mỗi bản) |
 | Build tự động | GitHub Actions "Build APK" (.github/workflows/android.yml) — đang xanh, xuất artifact DuaXeSinhTon-apk |
 | Khóa ký | app/debug.keystore (cố định, mật khẩu android) nên các bản cài đè lên nhau được |
 
@@ -213,7 +213,7 @@ Tài liệu bàn giao để tiếp tục làm việc ở phiên chat mới mà k
 - Phòng nghỉ: phòng 7, 14, 21, 28 không có quái, cửa mở sẵn, giữa phòng có BÀN ĐỒ NGHỀ (bảng dụng cụ, hộp đồ, đèn bàn); bước tới bàn → bảng "BÀN ĐỒ NGHỀ" chọn 1: Băng bó (hồi 50% máu), Mài vũ khí (+1 Sát thương+, đầy thì +1 Tốc bắn+), Đổi vũ khí (cầm vũ khí phụ kế tiếp đã có; chưa có thì +1 Đạn kép). Mỗi phòng nghỉ dùng 1 lần. HUD ghi "• PHÒNG NGHỈ".
 - Kiểm tra: `gradle drive` ải 1/3 tới trạm sau 26–31 giây rồi vào lái buôn; `gradle rooms -Pa=god` qua 30 phòng ở ải 1/6/10 (có phòng nghỉ); `gradle inside` chụp menu mới, nhiệm vụ, thành tích.
 
-### v7.0 — LÀM LẠI: thủ trại sinh tồn (hiện tại)
+### v7.0 — LÀM LẠI: thủ trại sinh tồn
 - Yêu cầu: "Bỏ kiểu chạy bo đi, làm y như video sinh tồn. Khi thu thập đủ mảnh cho xe/súng/pháo đài/bệ phòng thủ thì hẵng chạy, chạy tới đâu phòng thủ tới đó. Làm lại từ đầu hết." Người dùng chọn: THỦ TRẠI LÀ CHÍNH; khi phòng thủ CHỈ DỰNG BỆ (tower defense, nhân vật không đánh); đồ họa dùng ẢNH AI từ script (chưa có ảnh — game tạm vẽ bằng code); BẮT ĐẦU LẠI TỪ ĐẦU (lưu mới prefs "dxst_v7").
 - Kèm theo: sửa script Python cho Google Colab tạo asset (tools/assets/tao_asset_colab.py): key lấy từ Colab Secrets/getpass, lưu Google Drive "MyDrive/DuaXeSinhTon_assets" (chạy lại bỏ qua file đã có), Recraft style digital_illustration (vector_illustration trả SVG — lỗi của script gốc), xóa phông fal.ai BiRefNet, ElevenLabs sound-generation; 101 hình (nhân vật, zombie, xe, mảnh, vũ khí, bệ phòng thủ, vật phẩm, sức mạnh, giao diện, nền) + 30 âm thanh/nhạc; tự thử lại khi lỗi; nén zip. Khi có asset: người dùng để trên Drive, trợ lý tải về (connector Google Drive) và nạp vào game.
 - VÒNG CHƠI (Campaign.kt, CampDraw.kt): menu "VÀO TRẠI!" → State.CAMP (ngày). Mỗi ngày chọn 1 việc: 🔍 LỤC SOÁT (6 phòng nhà kho kiểu video, có lái buôn, sức mạnh, rương) hoặc 🚗 LÊN ĐƯỜNG (cần ≥ 3L xăng); hoặc bỏ qua. Rồi 🌙 VÀO ĐÊM → State.SIEGE: zombie từ phải tràn sang, bệ tự bắn. Thắng đêm → ngày mới (+tiền giết quái, +phế liệu 15 + 4 x đêm, +ngọc 2 + đêm/3). Tường vỡ → "TRẠI THẤT THỦ": mất rào/bệ dưới đất, mất nửa phế liệu, tường còn 50%, sang ngày mới. Đích: đi đủ 12.000m tới trạm cứu hộ (VICTORY). Không còn bão, ải, trùm đường, nhà ven đường.
@@ -227,6 +227,14 @@ Tài liệu bàn giao để tiếp tục làm việc ở phiên chat mới mà k
 - Menu: nút "🏕 NGÀY n • VÙNG", đảo nổi có biển "x km", thanh hành trình tới 🏁, dòng "Đã sống sót n đêm • Đã đi Xm / 12000m • ⚙ • ⛽", nút VÀO TRẠI!; nút tròn Xe → Xưởng. Nhiệm vụ/thành tích đổi: "Sống sót n đêm", "Lục soát xong n chuyến", "Tới trạm cứu hộ (12km)".
 - Kiểm tra: tools/dev/preview `gradle camp` (trại → dựng súng → 3 đêm → lục soát 6 phòng → đêm 4 → lên đường 403m → trại mới → xưởng). Các bài thử cũ `inside`, `rooms`, `drive`, `walk` dùng luồng cũ (tap0 → ải), nay không còn đúng.
 - Còn làm tiếp: nạp ảnh/âm thanh AI khi người dùng tạo xong; cân bằng độ khó sau khi chơi thử (đêm 1–2 hiện khá dễ); vẽ trại theo vùng (núi lửa/đêm/ngoài hành tinh); bỏ code cũ không dùng (bão, nhà ven đường, ải, gara xe cũ).
+
+### v7.1 — Ảnh/âm thanh AI (hiện tại)
+- Script tạo asset đổi sang MIỄN PHÍ (Recraft bắt mua token): ảnh FLUX.1-schnell qua gradio_client (Space black-forest-labs/FLUX.1-schnell, api "/infer", tham số prompt/seed/randomize_seed/width/height/num_inference_steps=4; ảnh vuông 1024x1024, ngang 1344x768), xóa phông rembg (session "isnet-general-use") + tự cắt sát vật thể chừa 8px; nền & biểu tượng sức mạnh giữ phông; âm thanh ElevenLabs (không bắt buộc). Secrets Colab: HF_TOKEN (khuyên dùng, nhiều lượt GPU hơn), ELEVENLABS_API_KEY. Hàm lay_key báo lỗi nếu ô Value có dấu cách/xuống dòng (người dùng từng dán nhầm đoạn code mẫu của Recraft vào Value). Hết lượt GPU (lỗi "quota/exceeded") thì dừng, chạy lại sẽ tiếp tục (bỏ qua file đã có). Bản người dùng đã chạy được lưu ở tools/assets/tao_asset_colab.py: cài thư viện ở ô riêng (!pip install -q gradio_client rembg onnxruntime), CHAY_THU = True, thư mục Drive "MyDrive/Colab_Notebooks/DuaXeSinhTon_assets".
+- Drive của người dùng: thư mục https://drive.google.com/drive/folders/14i1_kbJc9H1rZfqnH9T_pj3xFs0gynEw chứa DuaXeSinhTon_assets/, DuaXeSinhTon_assets.zip, notebook 2d-game-car.ipynb, tài liệu "code asset google lab" và bảng "Key API" (CHỨA KEY — KHÔNG mở/đọc). Trợ lý tải zip bằng connector Google Drive (download_file_content → file lưu vào tool-results), giải nén vào thư mục tạm, rồi chạy: python3 tools/assets/nhap_asset.py <thư mục DuaXeSinhTon_assets>.
+- Lần nhập đầu (bộ chạy thử, mỗi nhóm 1 file): survivor_idle, zombie_walker, car_motorbike, part_engine, wpn_pistol, def_barricade_wood, item_cash, pw_dual_magazine, ui_skull, bg_desert_far + sfx_pistol.mp3, music_menu.mp3. Nhận xét: chất lượng tốt, phông tách sạch; zombie quay mặt PHẢI (FLUX bỏ qua "facing left") — game coi mọi sprite là quay phải rồi lật; def_barricade_wood ra hình cột gỗ (nên tạo lại với mô tả khác).
+- tools/assets/nhap_asset.py: sprite thu nhỏ tối đa 384px PNG → app/src/main/assets/img/<tên>.png; nền (nhóm nen) 1280px JPEG q85 → img/<tên>.jpg; âm thanh → assets/sfx/, nhạc → assets/music/. build_apk.sh thêm "-A app/src/main/assets" cho aapt2 (Gradle trên CI tự đóng gói).
+- Game nạp theo TÊN (Sprites.kt): có file thì vẽ ảnh, thiếu thì vẽ bằng code như cũ — tạo thêm asset chỉ cần nhập là tự dùng. Sprites.open do MainActivity đặt (assets.open); SpriteDraw.kt: sprite(c, tên, cx, đáy, cao, lật), spriteBox(...), backdrop(...). Chỗ dùng: zombie (zombie_walker/runner/fat/bat, lật theo hướng người chơi; trùm đêm boss_brute), tài xế (survivor_idle / survivor_run khi chạy, cả ở menu), bệ trại (def_barricade_wood/spikes, def_turret_mg/cannon/flame/tesla/mortar, def_landmine), nền trại theo vùng (bg_desert_far, bg_city_ruins, bg_night_forest, bg_fortress), xe đậu ở trại (car_motorbike/sedan/pickup/bus/tank theo cấp xe), tiền rơi (item_cash), rương lục soát (item_crate — v7.0 quên vẽ rương, nay có hình hộp gỗ thay thế), thẻ & HUD sức mạnh (pw_*), thẻ vũ khí phụ (wpn_*), ông lái buôn (merchant), xưởng (ảnh xe/bệ + part_engine/part_gear/part_brick), dấu trùm ở menu (ui_skull). Âm thanh: Sfx.ASSET thay tiếng tổng hợp khi có mp3 (SHOOT←sfx_pistol, nổ←sfx_explosion, xu←sfx_coin…); nhạc mp3 CHƯA nối (Music vẫn tổng hợp).
+- Việc tiếp: người dùng đặt CHAY_THU = False để tạo đủ ~100 ảnh rồi trợ lý nhập lại; nối nhạc mp3 (MediaPlayer); tạo lại def_barricade_wood.
 
 ## 3. Luật chơi cũ trước v7.0 (v6.1, để tham khảo)
 
@@ -336,6 +344,8 @@ Vũ khí (10 loại, mỗi loại nâng 5 cấp: +18% sát thương, -6% thời 
 | Campaign.kt | v7: DefType (8 bệ), Blueprint/Blueprints (12 bản thiết kế), Def, Campaign (trại, ô, dựng/nâng/sửa/bán, đêm & đợt zombie, bắn, lục soát, lên đường) |
 | CampDraw.kt | v7: vẽ trại ngày/đêm, tường 3 cấp, bệ, zombie tấn công, HUD trại, bảng dựng, xưởng (hàm mở rộng của Renderer) |
 | tools/assets/tao_asset_colab.py | Script Google Colab tạo ảnh (Recraft + fal.ai xóa phông) và âm thanh (ElevenLabs) |
+| Sprites.kt / SpriteDraw.kt | v7.1: nạp ảnh AI theo tên từ assets/img, vẽ sprite/hộp/nền; bảng tên cho zombie, bệ, sức mạnh, vũ khí phụ, xe, nền |
+| tools/assets/nhap_asset.py | Nhập thư mục asset (từ Drive) vào app/src/main/assets, thu nhỏ ảnh |
 | Missions.kt | Stat (bộ đếm trọn đời), 8 loại nhiệm vụ ngày x 3 mức, 16 thành tích, Missions.today()/forDay() |
 | Interior.kt | Màn trong nhà: phòng, đồ đạc đứng lên được (Platform), rương (Chest), zombie trong nhà, đạn vũ khí phụ trong nhà |
 | SideWeapons.kt | 7 vũ khí phụ của tài xế (SideWeapon): giá, ải mở, sát thương, tốc độ, tầm, cận chiến/bay cong |
@@ -407,7 +417,7 @@ cd tools/dev/preview && gradle walk      # tài xế đứng yên khi bão đi q
 
 | Phiên | Tiêu đề | Phạm vi |
 |---|---|---|
-| #2 | Đua Xe Sinh Tồn #2 — v5.0→v7.0: lá chắn đi bộ, âm lượng, nhà kho 30 phòng kiểu Earn to Die Rogue, menu bản đồ, nhiệm vụ, LÀM LẠI thành thủ trại (ngày lục soát/lên đường, đêm thủ thành), script tạo asset AI | v5.1→v7.0 + bài thử preview `inside`, `walk`, `rooms`, `camp` |
+| #2 | Đua Xe Sinh Tồn #2 — v5.0→v7.1: lá chắn đi bộ, âm lượng, nhà kho 30 phòng kiểu Earn to Die Rogue, menu bản đồ, nhiệm vụ, LÀM LẠI thành thủ trại (ngày lục soát/lên đường, đêm thủ thành), script tạo asset AI | v5.1→v7.1 + bài thử preview `inside`, `walk`, `rooms`, `camp`; script asset Colab miễn phí; nhập ảnh AI |
 | #1 | Đua Xe Sinh Tồn #1 — v1.0→v5.0: tạo game, kiểu Earn to Die, bão 3 bo, nhạc, trùm cuối, 20 bản đồ, gara 25 xe, 20 kiểu đường, giao diện thép, tiếng động cơ, ngọc đỏ, lô cốt, cốt truyện, cây kỹ năng, tài xế lục soát, xe nổ tài xế chạy tiếp, nhảy, đổi vị trí phím | Từ đầu đến v5.0 + tài liệu bàn giao, công cụ tools/dev, quy tắc CLAUDE.md |
 
 - Quy tắc làm việc (đặt tiêu đề phiên, tự lưu tiến trình khi ngữ cảnh ≥ 90% rồi nhắc mở chat mới) nằm trong CLAUDE.md ở gốc repo.

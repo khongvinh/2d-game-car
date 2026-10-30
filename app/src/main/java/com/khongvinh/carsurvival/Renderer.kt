@@ -1164,6 +1164,8 @@ class Renderer(internal val g: Game) {
     internal fun drawZombie(c: Canvas, z: Zombie) {
         val px = if (g.driver.out) g.driver.x else g.car.x
         val dir = sign(px - z.x).let { if (it == 0f) -1f else it }
+        // AI sprites face right; turn them towards the player
+        if (sprite(c, Sprites.zombie(z.type), z.x, z.y + 4f, z.type.h * 1.3f, flip = dir < 0f)) return
         c.save()
         c.translate(z.x, z.y)
         when (z.type) {
@@ -1491,6 +1493,12 @@ class Renderer(internal val g: Game) {
         // shadow
         fill.color = 0x40000000
         c.drawOval(x - 20f, y - 4f, x + 20f, y + 4f, fill)
+        val moving = d.dir != 0f && g.state == State.PLAYING
+        val pic = if (moving && Sprites.has("survivor_run")) "survivor_run" else "survivor_idle"
+        if (sprite(c, pic, x, y + 4f - (if (moving) kotlin.math.abs(sin(d.walk)) * 4f else 0f), 108f, flip = f < 0f)) {
+            driverHp(c, d, x, y)
+            return
+        }
         // legs
         stroke.color = 0xFF283593.toInt()
         stroke.strokeWidth = 9f
@@ -1545,12 +1553,16 @@ class Renderer(internal val g: Game) {
             stroke.strokeWidth = 3f
             c.drawOval(x - 30f, y - 10f, x + 30f, y + 6f, stroke)
         }
-        // health
+        driverHp(c, d, x, y)
+    }
+
+    private fun driverHp(c: Canvas, d: Driver, x: Float, y: Float) {
+        if (g.state == State.MENU) return
         val hf = (d.hp / d.maxHp).coerceIn(0f, 1f)
         fill.color = 0xCC000000.toInt()
-        c.drawRoundRect(x - 30f, y - 118f, x + 30f, y - 106f, 4f, 4f, fill)
+        c.drawRoundRect(x - 30f, y - 124f, x + 30f, y - 112f, 4f, 4f, fill)
         fill.color = if (hf > 0.35f) 0xFF66BB6A.toInt() else 0xFFE53935.toInt()
-        c.drawRoundRect(x - 28f, y - 116f, x - 28f + 56f * hf, y - 108f, 3f, 3f, fill)
+        c.drawRoundRect(x - 28f, y - 122f, x - 28f + 56f * hf, y - 114f, 3f, 3f, fill)
     }
 
     /** Concrete pillbox: sandbags, a dome with a firing slit and a swinging machine gun. */
@@ -2455,7 +2467,7 @@ class Renderer(internal val g: Game) {
         text.textSize = 34f
         text.color = 0xFF3E2723.toInt()
         c.drawText("${s.distM / 1000}km", mx - iw * 0.4f, top - 124f, text)
-        if ((s.nights + 1) % 5 == 0) {
+        if ((s.nights + 1) % 5 == 0 && !spriteBox(c, "ui_skull", mx - iw * 0.4f - 24f, top - 226f, mx - iw * 0.4f + 24f, top - 178f)) {
             text.textSize = 30f
             c.drawText("👹", mx - iw * 0.4f, top - 182f, text)
         }
@@ -2566,6 +2578,7 @@ class Renderer(internal val g: Game) {
         val x = g.W - 170f
         val y = g.H + 10f
         val bob = sin(g.anim * 2f) * 3f
+        if (!sprite(c, "merchant", x - 40f, y + bob, 420f)) {
         c.save()
         c.translate(x, y + bob)
         // body
@@ -2616,6 +2629,7 @@ class Renderer(internal val g: Game) {
         c.drawLine(-36f, -322f, -12f, -316f, stroke)
         c.drawLine(36f, -322f, 12f, -316f, stroke)
         c.restore()
+        }
         // speech bubble
         val bl = 120f
         val bt = g.H - 140f
@@ -4451,12 +4465,14 @@ class Renderer(internal val g: Game) {
             val owned = s.ownsSide(w)
             card(c, rc, g.garageSide == w)
             val cx = (rc[0] + rc[2]) / 2
-            c.save()
-            c.translate(cx - 30f, rc[1] + 50f)
-            lockedLayer(c, !unlocked)
-            handWeapon(c, w, 1.4f)
-            c.restore()
-            c.restore()
+            if (!spriteBox(c, Sprites.side(w), rc[0] + 20f, rc[1] + 8f, rc[2] - 20f, rc[1] + 62f)) {
+                c.save()
+                c.translate(cx - 30f, rc[1] + 50f)
+                lockedLayer(c, !unlocked)
+                handWeapon(c, w, 1.4f)
+                c.restore()
+                c.restore()
+            }
             text.textAlign = Paint.Align.CENTER
             text.color = if (unlocked) Color.WHITE else 0xFF9E9E9E.toInt()
             fitText(c, w.title, cx, rc[1] + 84f, 22f, rc[2] - rc[0] - 14f)
@@ -5092,7 +5108,7 @@ class Renderer(internal val g: Game) {
                 path.reset()
                 path.moveTo(cs.x - 16f, cs.y); path.lineTo(cs.x, cs.y + 16f); path.lineTo(cs.x + 16f, cs.y); path.close()
                 c.drawPath(path, fill)
-            } else {
+            } else if (!sprite(c, "item_cash", cs.x, cs.y + 14f, 30f)) {
                 c.save()
                 c.translate(cs.x, cs.y)
                 c.rotate(sin(cs.t * 6f + cs.x) * 25f)
@@ -5104,6 +5120,23 @@ class Renderer(internal val g: Game) {
                 c.drawCircle(0f, 0f, 4f, fill)
                 c.restore()
             }
+        }
+        // loot crates still to open
+        for (cr in rm.crates) {
+            if (cr[2] != 0f || cr[0] < x0 || cr[0] > x1) continue
+            val cy = -cr[1]
+            if (!sprite(c, "item_crate", cr[0], cy, 64f)) {
+                fill.color = 0xFF8D6E63.toInt()
+                c.drawRect(cr[0] - 32f, cy - 56f, cr[0] + 32f, cy, fill)
+                stroke.color = 0xFF5D4037.toInt()
+                stroke.strokeWidth = 5f
+                c.drawRect(cr[0] - 32f, cy - 56f, cr[0] + 32f, cy, stroke)
+                c.drawLine(cr[0] - 30f, cy - 54f, cr[0] + 30f, cy - 2f, stroke)
+            }
+            text.textAlign = Paint.Align.CENTER
+            text.textSize = 26f
+            text.color = 0xFFFFD740.toInt()
+            c.drawText("?", cr[0], cy - 70f + sin(g.anim * 3f + cr[0]) * 5f, text)
         }
         // monsters, boss, player
         for (f in rm.foes) {
@@ -5357,7 +5390,7 @@ class Renderer(internal val g: Game) {
             c.drawRoundRect(px, 110f, px + 44f, 154f, 8f, 8f, fill)
             text.textSize = 24f
             text.color = Color.WHITE
-            c.drawText(p.icon, px + 22f, 140f, text)
+            if (!spriteBox(c, Sprites.power(p), px + 3f, 113f, px + 41f, 151f)) c.drawText(p.icon, px + 22f, 140f, text)
             if (n > 1) {
                 text.textSize = 16f
                 text.color = 0xFFFFD740.toInt()
@@ -5452,7 +5485,7 @@ class Renderer(internal val g: Game) {
             } else {
                 text.textSize = 76f
                 text.color = Color.WHITE
-                c.drawText(p.icon, cx, rc[1] + 132f, text)
+                if (!spriteBox(c, Sprites.power(p), cx - 78f, rc[1] + 38f, cx + 78f, rc[1] + 168f)) c.drawText(p.icon, cx, rc[1] + 132f, text)
                 text.color = Color.WHITE
                 fitText(c, p.title, cx, rc[1] + 236f, 30f, rc[2] - rc[0] - 24f)
                 text.color = 0xFFB0BEC5.toInt()

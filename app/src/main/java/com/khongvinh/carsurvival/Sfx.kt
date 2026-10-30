@@ -63,8 +63,11 @@ class Sfx(context: Context) {
             for (s in S.entries) {
                 try {
                     // generated once and kept in the cache, so later launches are instant
-                    val f = File(dir, "sfx_${VERSION}_${s.name.lowercase()}.wav")
-                    if (!f.exists() || f.length() < 64) writeWav(f, synth(s))
+                    // a recorded sound in assets/sfx wins over the synthesised one
+                    val rec = ASSET[s]?.let { name -> copyAsset("sfx/$name.mp3", File(dir, "asset_$name.mp3")) }
+                    val f = rec ?: File(dir, "sfx_${VERSION}_${s.name.lowercase()}.wav").also {
+                        if (!it.exists() || it.length() < 64) writeWav(it, synth(s))
+                    }
                     ids[s.ordinal] = pool.load(f.absolutePath, 1)
                 } catch (_: Exception) {
                 }
@@ -138,6 +141,14 @@ class Sfx(context: Context) {
 
     private companion object {
         const val VERSION = 4
+
+        /** Recorded effects (assets/sfx/<name>.mp3) used instead of the synthesised ones. */
+        val ASSET = mapOf(
+            S.SHOOT to "sfx_pistol", S.BOW to "sfx_bow", S.EXPLODE to "sfx_explosion", S.BOOM to "sfx_explosion",
+            S.SPLAT to "sfx_zombie_death", S.ROAR to "sfx_boss_roar", S.COIN to "sfx_coin", S.CLICK to "sfx_click",
+            S.WIN to "sfx_win", S.LOSE to "sfx_lose", S.STAGE to "sfx_level_up", S.POWER to "sfx_gem",
+            S.WOOD to "sfx_build", S.CATAPULT to "sfx_rocket", S.STORM to "sfx_wave_horn", S.HIT to "sfx_axe",
+        )
         val MIN_GAP_NS = LongArray(S.entries.size) { i ->
             when (S.entries[i]) {
                 S.SHOOT -> 90_000_000L
@@ -318,6 +329,14 @@ class Sfx(context: Context) {
             b.d[i] = s * 0.75f
         }
         return b
+    }
+
+    /** Copies an asset to [to] (once); null if the app has no such file. */
+    private fun copyAsset(path: String, to: File): File? {
+        if (to.exists() && to.length() > 0) return to
+        val inp = Sprites.open?.invoke(path) ?: return null
+        inp.use { i -> to.outputStream().use { o -> i.copyTo(o) } }
+        return to
     }
 
     private fun writeWav(f: File, b: Buf) {

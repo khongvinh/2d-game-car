@@ -5,13 +5,10 @@
 #  Âm thanh: ElevenLabs (không bắt buộc — bỏ trống key thì bỏ qua)
 #  Dán toàn bộ vào 1 ô rồi bấm Chạy. Chạy lại được: file đã có sẽ bỏ qua.
 # ============================================================
-import os, sys, time, zipfile, subprocess, tempfile
-from getpass import getpass
+import os, sys, time, zipfile, tempfile
 
-# ------------------------------------------------------------
-# 0. CÀI THƯ VIỆN (chỉ lần đầu, mất 1–2 phút)
-# ------------------------------------------------------------
-subprocess.run([sys.executable, "-m", "pip", "install", "-q", "gradio_client", "rembg", "onnxruntime", "pillow", "requests"], check=False)
+# Cài thư viện ở một ô riêng trước (chỉ lần đầu):
+#   !pip install -q gradio_client rembg onnxruntime
 import requests
 from PIL import Image
 from gradio_client import Client
@@ -34,6 +31,7 @@ def lay_key(ten, bat_buoc=False):
     if v and (any(ch.isspace() for ch in v) or len(v) > 300):
         raise SystemExit(f"❌ {ten} không đúng: ô Value phải chỉ chứa đúng chuỗi key (không dán đoạn code). Sửa trong 🔑 Secrets rồi chạy lại.")
     if not v and bat_buoc:
+        from getpass import getpass
         v = getpass(f"Nhập {ten}: ").strip()
     return v or None
 
@@ -49,14 +47,14 @@ LUU_VAO_DRIVE = True
 CHON_NHOM = ["nhan_vat", "zombie", "xe", "manh_xe", "vu_khi", "phong_thu",
              "vat_pham", "suc_manh", "giao_dien", "nen", "am_thanh", "nhac"]
 # True = mỗi nhóm chỉ tạo 1 file để xem thử phong cách
-CHAY_THU = False
+CHAY_THU = True
 # Model trên Hugging Face (Space miễn phí)
 SPACE = "black-forest-labs/FLUX.1-schnell"
 
 if LUU_VAO_DRIVE:
     from google.colab import drive
     drive.mount("/content/drive")
-    THU_MUC = "/content/drive/MyDrive/DuaXeSinhTon_assets"
+    THU_MUC = "/content/drive/MyDrive/Colab_Notebooks/DuaXeSinhTon_assets"
 else:
     THU_MUC = "/content/DuaXeSinhTon_assets"
 os.makedirs(THU_MUC, exist_ok=True)
