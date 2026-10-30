@@ -242,13 +242,19 @@ Tài liệu bàn giao để tiếp tục làm việc ở phiên chat mới mà k
 - nhap_asset.py nay giảm PNG còn 256 màu (giữ alpha) → img ~2MB thay vì ~10MB.
 - Nhạc mp3: Music phát music_menu (CHILL) và music_battle (INTENSE) bằng MediaPlayer lặp, mờ dần như cũ; VICTORY vẫn tổng hợp. Preview có MediaPlayer giả (im lặng).
 
-### v7.3 — Hết dải đen, gộp mục vũ khí, ảnh chuyển động (hiện tại)
+### v7.3 — Hết dải đen, gộp mục vũ khí, ảnh chuyển động
 - Phản hồi (kèm 3 ảnh chụp trên máy thật): màn hình lệch trái có dải đen lớn; ảnh asset chưa đồng bộ hết game; nhân vật/vũ khí đứng im — làm động hết; gara có 2 mục vũ khí rối — phân loại vũ khí lắp trên xe và vũ khí tài xế cầm.
 - Dải đen: là vùng camera/tai thỏ. MainActivity đặt layoutInDisplayCutoutMode = ALWAYS (API 30+) / SHORT_EDGES (API 28–29) để vẽ tràn.
 - Gara: còn 4 nút tròn (Nhà, Xe, Vũ khí, Kỹ năng); bỏ nút cung tên. Nút Vũ khí mở một màn với 2 thẻ trên cùng "🚗 GẮN TRÊN XE" (garageTab 1, vũ khí tự bắn khi lái) và "🧍 TÀI XẾ CẦM" (garageTab 3, vũ khí khi đi bộ/lục soát); nút "wsub0"/"wsub1". Menu: nút tròn Vũ khí → gara tab 1.
 - Chuyển động cho ảnh tĩnh (SpriteDraw.sprite thêm rot = nghiêng quanh chân, squash = co giãn): zombie lắc lư + nhún theo bước (dơi nghiêng mạnh hơn), tài xế chạy thì nghiêng người + nhún, đứng thì thở; bệ súng giật lùi + co khi bắn, rung khi bị đánh, súng đứng yên lắc nhẹ; xe đậu ở trại rung máy; ông lái buôn thở/lắc; biểu tượng sức mạnh & vũ khí trong bảng nổi lên xuống.
 - Đồng bộ ảnh: xe khi lái trên đường (và xe ở nền menu) dùng ảnh AI theo dòng xe, nghiêng theo thân xe, nảy theo nhún (mất vũ khí nóc vẽ code khi có ảnh); xe trên đảo menu dùng ảnh xe hiện tại; bảng chi tiết vũ khí tài xế dùng ảnh lớn.
 - Còn thiếu ảnh (chưa tải từ Drive): vũ khí trên xe wpn_rifle/minigun/rocket/flamethrower/laser (thẻ "GẮN TRÊN XE" vẫn vẽ code), các zombie spitter/armored/crawler/dog, boss_mutant_worm/tank_zombie, bg_warehouse/garage/menu_island/desert_road… — lần sau tải thêm và nối (WeaponType → wpn_*; nền nhà kho bg_warehouse; gara bg_garage).
+
+### v7.4 — Tải nốt ảnh AI từ Drive và nối vào game (hiện tại)
+- Tải nốt 47 ảnh còn lại (subagent, search_files trong thư mục con DuaXeSinhTon_assets id 1L_qlU9BEkzdTaZlP_JiuodXcmvyr_XRh) → nay app có đủ 101 ảnh (img ~4MB). Nhập: xếp bg_* vào thư mục nen, còn lại vào khac rồi chạy nhap_asset.py.
+- Nối vào game: zombie theo loại (LIZARD → zombie_dog, ALIEN → zombie_armored, BLOB → zombie_crawler); trùm đêm theo vùng (Sprites.foe: núi lửa boss_tank_zombie, hành tinh lạ boss_mutant_worm, còn lại boss_brute); vũ khí gắn trên xe (Sprites.weapon: SMG → wpn_rifle, Dao → wpn_axe, Nỏ → wpn_bow, Máy ném đá → wpn_dynamite, phun lửa/tên lửa/laser/nòng xoay → ảnh tương ứng) ở thẻ và bảng chi tiết, nổi lên xuống; 4 nút tròn (Sprites.NAV: ui_home, ui_garage, wpn_rifle, ui_skills); nền gara & xưởng bg_garage (phủ tối); nền phòng lục soát bg_warehouse (bỏ trời/núi/tường gạch vẽ code); nền menu bg_menu_island; trời đường sa mạc bg_desert_road; ngọc item_gem; vật cản xác xe car_wreck_burning; chòi canh trại def_watchtower; xưởng: mảnh xe part_engine/part_wheel, mảnh bệ part_gun_barrel.
+- Chưa dùng: zombie_spitter (ảnh chỉ có cái đầu — nên tạo lại cả người), car_monster/car_muscle, survivor_dead, def_build_slot/gate/generator/sandbags, item_ammo/blueprint/chest/fuel/medkit/scrap, các part_* khác, ui_gift/lock/mission/star/trophy.
+- Việc tiếp: tạo lại zombie_spitter; dùng tiếp các ảnh chưa dùng (nút nhiệm vụ/thành tích, xăng/phế liệu trên HUD); cân bằng độ khó; trại theo vùng.
 
 ## 3. Luật chơi cũ trước v7.0 (v6.1, để tham khảo)
 
@@ -431,6 +437,7 @@ cd tools/dev/preview && gradle walk      # tài xế đứng yên khi bão đi q
 
 | Phiên | Tiêu đề | Phạm vi |
 |---|---|---|
+| #3 | Đua Xe Sinh Tồn #3 — v7.3→v7.4: tải nốt ảnh AI từ Drive và nối vào game | v7.4: đủ 101 ảnh, ánh xạ zombie/trùm/vũ khí xe/nút tròn/nền |
 | #2 | Đua Xe Sinh Tồn #2 — v5.0→v7.3: lá chắn đi bộ, âm lượng, nhà kho 30 phòng kiểu Earn to Die Rogue, menu bản đồ, nhiệm vụ, LÀM LẠI thành thủ trại (ngày lục soát/lên đường, đêm thủ thành), script tạo asset AI | v5.1→v7.3 + bài thử preview `inside`, `walk`, `rooms`, `camp`; script asset Colab miễn phí; nhập ảnh AI |
 | #1 | Đua Xe Sinh Tồn #1 — v1.0→v5.0: tạo game, kiểu Earn to Die, bão 3 bo, nhạc, trùm cuối, 20 bản đồ, gara 25 xe, 20 kiểu đường, giao diện thép, tiếng động cơ, ngọc đỏ, lô cốt, cốt truyện, cây kỹ năng, tài xế lục soát, xe nổ tài xế chạy tiếp, nhảy, đổi vị trí phím | Từ đầu đến v5.0 + tài liệu bàn giao, công cụ tools/dev, quy tắc CLAUDE.md |
 

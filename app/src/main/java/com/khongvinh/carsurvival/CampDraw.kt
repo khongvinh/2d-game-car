@@ -57,6 +57,7 @@ internal fun Renderer.drawCamp(c: Canvas) {
         c.drawCircle(575f + k * 8f, fy, 10f - k, fill)
     }
     // watchtower under slot 1
+    if (!sprite(c, "def_watchtower", 470f, 6f, 300f)) {
     fill.color = 0xFF6D4C41.toInt()
     c.drawRect(420f, -190f, 432f, 0f, fill)
     c.drawRect(508f, -190f, 520f, 0f, fill)
@@ -65,6 +66,7 @@ internal fun Renderer.drawCamp(c: Canvas) {
     stroke.strokeWidth = 5f
     c.drawLine(426f, -180f, 514f, -20f, stroke)
     c.drawLine(514f, -180f, 426f, -20f, stroke)
+    }
     // the wall
     drawWall(c, s.wallLevel, cp.wallHp / cp.wallMax)
     // slots and what is built on them
@@ -109,7 +111,7 @@ internal fun Renderer.drawCamp(c: Canvas) {
     // monsters
     for (f in cp.foes) {
         val zz = f.z
-        val pic = if (cp.isBoss(f)) "boss_brute" else Sprites.zombie(zz.type)
+        val pic = Sprites.foe(f, cp.isBoss(f), cp.region)
         val sway = sin(zz.phase)
         if (sprite(c, pic, zz.x, zz.y + 4f - kotlin.math.abs(sway) * 5f, if (cp.isBoss(f)) 220f else zz.type.h * 1.3f, flip = true,
                 rot = sway * 6f, squash = 1f + 0.05f * kotlin.math.abs(sin(zz.phase * 2f)))) {
@@ -433,7 +435,10 @@ private fun Renderer.campHud(c: Canvas) {
 internal fun Renderer.drawWorkshop(c: Canvas) {
     val s = g.save
     val W = g.W
-    workshopRoom(c)
+    if (backdrop(c, "bg_garage")) {
+        fill.color = 0x77000000
+        c.drawRect(0f, 0f, W, g.H, fill)
+    } else workshopRoom(c)
     title(c, "XƯỞNG LẮP RÁP", W / 2, 70f, 0xFFFFD740.toInt(), 50f)
     text.textAlign = Paint.Align.RIGHT
     text.textSize = 26f
@@ -454,7 +459,7 @@ internal fun Renderer.drawWorkshop(c: Canvas) {
             else -> Sprites.def(DefType.entries[bp.ref])
         }
         spriteBox(c, pic, r[0] + 10f, r[1] + 52f, r[0] + 70f, r[1] + 92f)
-        spriteBox(c, when (bp.kind) { Blueprint.CAR -> "part_engine"; Blueprint.WALL -> "part_brick"; else -> "part_gear" }, r[2] - 60f, r[1] + 52f, r[2] - 14f, r[1] + 92f)
+        spriteBox(c, when (bp.kind) { Blueprint.CAR -> if (bp.id % 2 == 0) "part_engine" else "part_wheel"; Blueprint.WALL -> "part_brick"; else -> "part_gun_barrel" }, r[2] - 60f, r[1] + 52f, r[2] - 14f, r[1] + 92f)
         val have = min(bp.parts, s.bpParts[bp.id])
         // part pips
         val pw = 22f

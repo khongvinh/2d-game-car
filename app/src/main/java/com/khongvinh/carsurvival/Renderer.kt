@@ -54,6 +54,8 @@ class Renderer(internal val g: Game) {
             drawRooms(c, run)
         } else if (inn != null && g.state != State.MENU && g.state != State.MAPS && g.state != State.GARAGE && g.state != State.STORY) {
             drawInterior(c, inn)
+        } else if (g.state == State.MENU && backdrop(c, "bg_menu_island")) {
+            // menu: AI landscape behind the floating island
         } else {
             drawBackground(c)
             drawWorld(c)
@@ -88,46 +90,49 @@ class Renderer(internal val g: Game) {
         val th = g.theme
         val W = g.W
         val H = g.H
-        fill.alpha = 255 // a paint's alpha also fades its shader
-        fill.shader = skyShader
-        c.drawRect(0f, 0f, W, H, fill)
-        if (th.stars) {
-            for (k in 0 until 70) {
-                val h = hash(k * 97 + th.stage)
-                val sx = (h % 1600) / 1600f * W
-                val sy = ((h / 1600) % 400) / 400f * H * 0.55f
-                val tw = 0.5f + 0.5f * sin(g.anim * (1f + k % 3) + k)
-                fill.color = Color.argb((90 + 150 * tw).toInt(), 255, 255, 240)
-                c.drawCircle(sx, sy, 1.2f + (k % 3) * 0.7f, fill)
+        // desert road: the AI picture replaces the painted sky
+        if (!(th.region == Region.DESERT && backdrop(c, "bg_desert_road"))) {
+            fill.alpha = 255 // a paint's alpha also fades its shader
+            fill.shader = skyShader
+            c.drawRect(0f, 0f, W, H, fill)
+            if (th.stars) {
+                for (k in 0 until 70) {
+                    val h = hash(k * 97 + th.stage)
+                    val sx = (h % 1600) / 1600f * W
+                    val sy = ((h / 1600) % 400) / 400f * H * 0.55f
+                    val tw = 0.5f + 0.5f * sin(g.anim * (1f + k % 3) + k)
+                    fill.color = Color.argb((90 + 150 * tw).toInt(), 255, 255, 240)
+                    c.drawCircle(sx, sy, 1.2f + (k % 3) * 0.7f, fill)
+                }
             }
-        }
-        fill.alpha = 255 // a paint's alpha also fades its shader
-        fill.shader = sunShader
-        c.drawRect(0f, 0f, W, H * 0.8f, fill)
-        fill.shader = null
-        val sunX = W * 0.78f
-        val sunY = H * th.sunY
-        fill.color = th.sunColor
-        c.drawCircle(sunX, sunY, if (th.moon) 46f else 54f, fill)
-        if (th.moon) {
-            fill.color = 0x22000000
-            c.drawCircle(sunX - 14f, sunY - 8f, 10f, fill)
-            c.drawCircle(sunX + 12f, sunY + 14f, 7f, fill)
-            c.drawCircle(sunX + 6f, sunY - 18f, 5f, fill)
-        }
-        if (th.region == Region.ALIEN) {
-            // a ringed gas giant and a second moon
-            fill.color = 0xFF7E57C2.toInt()
-            c.drawCircle(W * 0.22f, H * 0.2f, 70f, fill)
-            fill.color = 0x55FFFFFF
-            c.drawOval(W * 0.22f - 70f, H * 0.2f - 30f, W * 0.22f + 10f, H * 0.2f - 5f, fill)
-            stroke.color = 0xAAE1BEE7.toInt()
-            stroke.strokeWidth = 5f
-            c.drawOval(W * 0.22f - 120f, H * 0.2f - 18f, W * 0.22f + 120f, H * 0.2f + 18f, stroke)
-            fill.color = 0xFFB2EBF2.toInt()
-            c.drawCircle(W * 0.6f, H * 0.12f, 18f, fill)
-        }
+            fill.alpha = 255 // a paint's alpha also fades its shader
+            fill.shader = sunShader
+            c.drawRect(0f, 0f, W, H * 0.8f, fill)
+            fill.shader = null
+            val sunX = W * 0.78f
+            val sunY = H * th.sunY
+            fill.color = th.sunColor
+            c.drawCircle(sunX, sunY, if (th.moon) 46f else 54f, fill)
+            if (th.moon) {
+                fill.color = 0x22000000
+                c.drawCircle(sunX - 14f, sunY - 8f, 10f, fill)
+                c.drawCircle(sunX + 12f, sunY + 14f, 7f, fill)
+                c.drawCircle(sunX + 6f, sunY - 18f, 5f, fill)
+            }
+            if (th.region == Region.ALIEN) {
+                // a ringed gas giant and a second moon
+                fill.color = 0xFF7E57C2.toInt()
+                c.drawCircle(W * 0.22f, H * 0.2f, 70f, fill)
+                fill.color = 0x55FFFFFF
+                c.drawOval(W * 0.22f - 70f, H * 0.2f - 30f, W * 0.22f + 10f, H * 0.2f - 5f, fill)
+                stroke.color = 0xAAE1BEE7.toInt()
+                stroke.strokeWidth = 5f
+                c.drawOval(W * 0.22f - 120f, H * 0.2f - 18f, W * 0.22f + 120f, H * 0.2f + 18f, stroke)
+                fill.color = 0xFFB2EBF2.toInt()
+                c.drawCircle(W * 0.6f, H * 0.12f, 18f, fill)
+            }
 
+        }
         // drifting clouds (smoke over the volcano, mist at night)
         for (k in 0 until 6) {
             val span = W + 700f
@@ -1328,7 +1333,7 @@ class Renderer(internal val g: Game) {
                 c.drawPath(path, fill)
             }
             ObstacleType.BUNKER -> drawBunker(c, o, l, t, w, h)
-            ObstacleType.WRECK -> {
+            ObstacleType.WRECK -> if (!sprite(c, "car_wreck_burning", o.x, t + h + 6f, h * 1.35f)) {
                 fill.color = 0xFF6D4C41.toInt()
                 path.reset()
                 path.moveTo(l, t + h - 14f); path.lineTo(l + 6f, t + 26f); path.lineTo(l + 50f, t + 22f)
@@ -1879,6 +1884,7 @@ class Renderer(internal val g: Game) {
 
     /** A faceted red gem with a glint. */
     internal fun drawGem(c: Canvas, x: Float, y: Float, s: Float) {
+        if (sprite(c, "item_gem", x, y + 20f * s + sin(g.anim * 4f + x * 0.01f) * 2f * s, 40f * s)) return
         val glow = 0.6f + 0.4f * sin(g.anim * 6f + x * 0.01f)
         fill.color = Color.argb((90 * glow).toInt(), 255, 60, 60)
         c.drawCircle(x, y, 30f * s, fill)
@@ -2893,6 +2899,12 @@ class Renderer(internal val g: Game) {
     private fun garageRoom(c: Canvas) {
         val W = g.W
         val H = g.H
+        if (backdrop(c, "bg_garage")) {
+            // AI picture of the workshop, darkened so the cards stay readable
+            fill.color = 0x66000000
+            c.drawRect(0f, 0f, W, H, fill)
+            return
+        }
         fill.color = 0xFF2A1F1A.toInt()
         c.drawRect(0f, 0f, W, H, fill)
         // bricks
@@ -3001,6 +3013,8 @@ class Renderer(internal val g: Game) {
             fill.color = Color.WHITE
             stroke.color = Color.WHITE
             stroke.strokeWidth = 5f
+            val ir = rad * 0.6f
+            if (spriteBox(c, Sprites.NAV[i], cx - ir, cy - ir + sin(g.anim * 2f + i) * 2f, cx + ir, cy + ir + sin(g.anim * 2f + i) * 2f)) continue
             when (i) {
                 0 -> { // house
                     path.reset()
@@ -3470,12 +3484,13 @@ class Renderer(internal val g: Game) {
             val owned = s.ownsWeapon(w.ordinal)
             card(c, rc, g.garageWeapon == w)
             val cx = (rc[0] + rc[2]) / 2
-            c.save()
-            c.translate(cx - 10f, rc[1] + 48f)
-            c.scale(1.25f, 1.25f)
             lockedLayer(c, !unlocked)
-            art.weaponArt(c, w)
-            c.restore()
+            val bob = if (g.garageWeapon == w) sin(g.anim * 3f) * 3f else 0f
+            if (!spriteBox(c, Sprites.weapon(w), rc[0] + 18f, rc[1] + 10f + bob, rc[2] - 18f, rc[1] + 70f + bob)) {
+                c.translate(cx - 10f, rc[1] + 48f)
+                c.scale(1.25f, 1.25f)
+                art.weaponArt(c, w)
+            }
             c.restore()
             text.textAlign = Paint.Align.CENTER
             text.color = if (unlocked) Color.WHITE else 0xFF9E9E9E.toInt()
@@ -3496,12 +3511,13 @@ class Renderer(internal val g: Game) {
         card(c, pr, false)
         val unlocked = s.weaponUnlocked(w)
         val owned = s.ownsWeapon(w.ordinal)
-        c.save()
-        c.translate(pr[0] + 110f, pr[1] + 110f)
-        c.scale(2.3f, 2.3f)
         lockedLayer(c, !unlocked)
-        art.weaponArt(c, w)
-        c.restore()
+        val bob = sin(g.anim * 2f) * 4f
+        if (!spriteBox(c, Sprites.weapon(w), pr[0] + 20f, pr[1] + 20f + bob, pr[0] + 230f, pr[1] + 200f + bob)) {
+            c.translate(pr[0] + 110f, pr[1] + 110f)
+            c.scale(2.3f, 2.3f)
+            art.weaponArt(c, w)
+        }
         c.restore()
         val tx = pr[0] + 250f
         text.textAlign = Paint.Align.LEFT
@@ -4955,10 +4971,17 @@ class Renderer(internal val g: Game) {
             Region.NIGHT -> intArrayOf(0xFF2B3A66.toInt(), 0xFF141C33.toInt())
             Region.ALIEN -> intArrayOf(0xFF7A4AA8.toInt(), 0xFF2E1A4A.toInt())
         }
-        fill.color = sky[1]
-        c.drawRect(0f, 0f, W, H, fill)
-        fill.color = sky[0]
-        c.drawRect(0f, H * 0.3f, W, H, fill)
+        val hall = Sprites.has("bg_warehouse")
+        if (hall) {
+            backdrop(c, "bg_warehouse")
+            fill.color = 0x44000000
+            c.drawRect(0f, 0f, W, H, fill)
+        } else {
+            fill.color = sky[1]
+            c.drawRect(0f, 0f, W, H, fill)
+            fill.color = sky[0]
+            c.drawRect(0f, H * 0.3f, W, H, fill)
+        }
         c.save()
         if (g.shake > 0f) {
             val s = g.shake * 30f
@@ -4970,64 +4993,66 @@ class Renderer(internal val g: Game) {
         val ceil = -600f
         val x0 = run.camX - 100f
         val x1 = run.camX + g.viewW + 100f
-        // far mesas outside
-        fill.color = shade(sky[0], 0.75f)
-        path.reset()
-        path.moveTo(x0 - 200f, 0f)
-        var mx = floor((x0 - 200f) / 260f) * 260f
-        while (mx < x1 + 300f) {
-            path.lineTo(mx, -330f - (hash(mx.toInt()) % 120))
-            path.lineTo(mx + 200f, -330f - (hash(mx.toInt()) % 120))
-            path.lineTo(mx + 260f, -180f)
-            mx += 260f
-        }
-        path.lineTo(x1 + 300f, 0f)
-        path.close()
-        c.drawPath(path, fill)
-        // the hall: plaster above, brick below, roof trusses
-        val plaster = when (rm.palette) { 0 -> 0xFFB79A78.toInt(); 1 -> 0xFFA88D70.toInt(); else -> 0xFF9C8C78.toInt() }
-        val brick = 0xFF7A3B2E.toInt()
-        fill.color = plaster
-        c.drawRect(0f, ceil, rm.width, -260f, fill)
-        fill.color = brick
-        c.drawRect(0f, -260f, rm.width, 0f, fill)
-        stroke.color = shade(brick, 0.75f)
-        stroke.strokeWidth = 2f
-        var by = -18f
-        var row = 0
-        while (by > -260f) {
-            c.drawLine(0f, by, rm.width, by, stroke)
-            var bx = if (row % 2 == 0) 0f else 30f
-            while (bx < rm.width) {
-                if (bx > x0 && bx < x1) c.drawLine(bx, by, bx, by + 18f, stroke)
-                bx += 60f
+        if (!hall) {
+            // far mesas outside
+            fill.color = shade(sky[0], 0.75f)
+            path.reset()
+            path.moveTo(x0 - 200f, 0f)
+            var mx = floor((x0 - 200f) / 260f) * 260f
+            while (mx < x1 + 300f) {
+                path.lineTo(mx, -330f - (hash(mx.toInt()) % 120))
+                path.lineTo(mx + 200f, -330f - (hash(mx.toInt()) % 120))
+                path.lineTo(mx + 260f, -180f)
+                mx += 260f
             }
-            by -= 18f; row++
-        }
-        fill.color = shade(plaster, 0.8f)
-        c.drawRect(0f, -268f, rm.width, -258f, fill)
-        // arched windows glowing with the evening
-        var wx = 260f
-        while (wx < rm.width - 200f) {
-            if (wx > x0 - 300f && wx < x1 + 300f) {
-                for (k in 0..2) {
-                    val l = wx + k * 92f
-                    fill.color = 0xFF3B2A20.toInt()
-                    c.drawRect(l - 6f, -540f, l + 80f, -300f, fill)
-                    fill.color = sky[0]
-                    c.drawRect(l, -500f, l + 74f, -306f, fill)
-                    r.set(l, -540f, l + 74f, -460f)
-                    c.drawArc(r, 180f, 180f, true, fill)
-                    fill.color = 0x55FFE0A0
-                    c.drawRect(l, -480f, l + 30f, -306f, fill)
-                    stroke.color = 0xFF3B2A20.toInt()
-                    stroke.strokeWidth = 4f
-                    c.drawLine(l + 37f, -540f, l + 37f, -306f, stroke)
-                    c.drawLine(l, -420f, l + 74f, -420f, stroke)
-                    c.drawLine(l, -360f, l + 74f, -360f, stroke)
+            path.lineTo(x1 + 300f, 0f)
+            path.close()
+            c.drawPath(path, fill)
+            // the hall: plaster above, brick below, roof trusses
+            val plaster = when (rm.palette) { 0 -> 0xFFB79A78.toInt(); 1 -> 0xFFA88D70.toInt(); else -> 0xFF9C8C78.toInt() }
+            val brick = 0xFF7A3B2E.toInt()
+            fill.color = plaster
+            c.drawRect(0f, ceil, rm.width, -260f, fill)
+            fill.color = brick
+            c.drawRect(0f, -260f, rm.width, 0f, fill)
+            stroke.color = shade(brick, 0.75f)
+            stroke.strokeWidth = 2f
+            var by = -18f
+            var row = 0
+            while (by > -260f) {
+                c.drawLine(0f, by, rm.width, by, stroke)
+                var bx = if (row % 2 == 0) 0f else 30f
+                while (bx < rm.width) {
+                    if (bx > x0 && bx < x1) c.drawLine(bx, by, bx, by + 18f, stroke)
+                    bx += 60f
                 }
+                by -= 18f; row++
             }
-            wx += 760f
+            fill.color = shade(plaster, 0.8f)
+            c.drawRect(0f, -268f, rm.width, -258f, fill)
+            // arched windows glowing with the evening
+            var wx = 260f
+            while (wx < rm.width - 200f) {
+                if (wx > x0 - 300f && wx < x1 + 300f) {
+                    for (k in 0..2) {
+                        val l = wx + k * 92f
+                        fill.color = 0xFF3B2A20.toInt()
+                        c.drawRect(l - 6f, -540f, l + 80f, -300f, fill)
+                        fill.color = sky[0]
+                        c.drawRect(l, -500f, l + 74f, -306f, fill)
+                        r.set(l, -540f, l + 74f, -460f)
+                        c.drawArc(r, 180f, 180f, true, fill)
+                        fill.color = 0x55FFE0A0
+                        c.drawRect(l, -480f, l + 30f, -306f, fill)
+                        stroke.color = 0xFF3B2A20.toInt()
+                        stroke.strokeWidth = 4f
+                        c.drawLine(l + 37f, -540f, l + 37f, -306f, stroke)
+                        c.drawLine(l, -420f, l + 74f, -420f, stroke)
+                        c.drawLine(l, -360f, l + 74f, -360f, stroke)
+                    }
+                }
+                wx += 760f
+            }
         }
         // roof
         fill.color = 0xFF4A3A30.toInt()

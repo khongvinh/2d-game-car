@@ -36,8 +36,37 @@ object Sprites {
         ZombieType.RUNNER -> "zombie_runner"
         ZombieType.FAT -> "zombie_fat"
         ZombieType.BAT -> "zombie_bat"
-        else -> null
+        ZombieType.LIZARD -> "zombie_dog"
+        ZombieType.ALIEN -> "zombie_armored"
+        ZombieType.BLOB -> "zombie_crawler"
     }
+
+    /** Siege monster picture: night bosses have their own (by region). */
+    fun foe(f: Foe, boss: Boolean, r: Region) = when {
+        boss -> when (r) {
+            Region.VOLCANO -> "boss_tank_zombie"
+            Region.ALIEN -> "boss_mutant_worm"
+            else -> "boss_brute"
+        }
+        else -> zombie(f.z.type)
+    }
+
+    /** Car-mounted weapons. */
+    fun weapon(w: WeaponType) = when (w) {
+        WeaponType.PISTOL -> "wpn_pistol"
+        WeaponType.KNIFE -> "wpn_axe"
+        WeaponType.SMG -> "wpn_rifle"
+        WeaponType.CROSSBOW -> "wpn_bow"
+        WeaponType.SHOTGUN -> "wpn_shotgun"
+        WeaponType.CATAPULT -> "wpn_dynamite"
+        WeaponType.FLAMER -> "wpn_flamethrower"
+        WeaponType.ROCKET -> "wpn_rocket"
+        WeaponType.LASER -> "wpn_laser"
+        WeaponType.MINIGUN -> "wpn_minigun"
+    }
+
+    /** Round buttons: home, car, weapons, skills. */
+    val NAV = arrayOf("ui_home", "ui_garage", "wpn_rifle", "ui_skills")
 
     fun def(t: DefType) = when (t) {
         DefType.WOOD -> "def_barricade_wood"
