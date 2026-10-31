@@ -27,8 +27,29 @@ CUT_LEFT = {"survivor_run": 0.4}
 
 
 # pictures where the AI drew a second, smaller copy: keep only the big one
-ONLY_BIGGEST = {"car_sedan", "car_tank", "wpn_mount_rocket", "wpn_shotgun", "wpn_laser", "wpn_minigun", "part_chassis",
+ONLY_BIGGEST = {"car_sedan", "car_tank", "wpn_mount_rocket", "prop_catwalk", "wpn_smg", "wpn_shotgun", "wpn_laser", "wpn_minigun", "part_chassis",
                 "part_gun_barrel", "survivor_dead"}
+
+
+# pictures with several copies stacked one above the other: keep only the top one
+TOP_BAND = {"prop_catwalk", "wpn_smg"}
+
+
+def top_band(im):
+    """Crop to the first horizontal band of the picture that has content."""
+    a = np.array(im.getchannel("A")) > 40
+    rows = a.any(axis=1)
+    ys = np.nonzero(rows)[0]
+    if len(ys) == 0:
+        return im
+    y0 = ys[0]
+    y1 = y0
+    gap = max(6, im.height // 60)
+    while y1 + 1 < len(rows) and (rows[y1 + 1] or rows[y1 + 1: y1 + 1 + gap].any()):
+        y1 += 1
+    out = im.crop((0, y0, im.width, y1 + 1))
+    box = out.getchannel("A").getbbox()
+    return out.crop(box) if box else out
 
 
 def clean(im, crop=True, keep=0.3):
@@ -118,6 +139,8 @@ for group in sorted(os.listdir(src)):
                 if name in CUT_LEFT:
                     im = im.crop((int(im.width * CUT_LEFT[name]), 0, im.width, im.height))
                 im = clean(im, keep=0.75 if name in ONLY_BIGGEST else 0.3)
+                if name in TOP_BAND:
+                    im = top_band(im)
                 if name in FACING_LEFT:
                     im = im.transpose(Image.FLIP_LEFT_RIGHT)
                 # full colour, but no bigger than the screen ever shows it: a

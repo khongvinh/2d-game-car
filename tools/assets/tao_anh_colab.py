@@ -132,7 +132,7 @@ HINH = [
     ("nhan_vat", "survivor_jump", "male survivor, red cap, brown leather jacket, blue jeans, holding pistol, jumping", True, VUONG),
     ("nhan_vat", "survivor_shoot", "male survivor, red cap, brown leather jacket, blue jeans, boots, aiming pistol forward", "nguoi", DOC),
     ("nhan_vat", "survivor_hurt", "male survivor, red cap, leather jacket, blue jeans, flinching in pain", True, VUONG),
-    ("nhan_vat", "survivor_ride", "male survivor, red cap, red leather jacket, blue jeans, sitting, riding motorbike pose, no motorbike", "nguoi", DOC),
+    ("nhan_vat", "survivor_ride", "one man sitting, red cap, red leather jacket, blue jeans, knees bent, hands forward, no vehicle", "nguoi", DOC),
     ("nhan_vat", "survivor_dead", "male survivor in red cap lying knocked out on the ground", True, VUONG),
     ("nhan_vat", "merchant", "burly merchant, red bandana, beard, green vest, hook hand", True, VUONG),
     # --- Zombie và trùm ---
@@ -174,7 +174,7 @@ HINH = [
     ("vu_khi", "wpn_rifle", "assault rifle", True, VUONG),
     ("vu_khi", "wpn_minigun", "rotary minigun", True, VUONG),
     ("vu_khi", "wpn_rocket", "rocket launcher", True, VUONG),
-    ("vu_khi", "wpn_flamethrower", "single handheld flamethrower, horizontal, no fire, no vehicle", True, VUONG),
+    ("vu_khi", "wpn_flamethrower", "one handheld flamethrower gun, one object, horizontal, no fire", True, VUONG),
     ("vu_khi", "wpn_laser", "sci-fi laser rifle", True, VUONG),
     ("vu_khi", "wpn_bow", "wooden bow with arrow, no person, " + NGANG_HAN, True, VUONG),
     ("vu_khi", "wpn_spear", "long spear, iron tip, horizontal, no person, " + NGANG_HAN, True, NGANG),
@@ -267,12 +267,12 @@ HINH = [
 
     # --- Bổ sung: súng lắp trên xe, chướng ngại, trại, tường (trước đây vẽ code) ---
     ("sung_xe", "wpn_mount_pistol", "twin heavy pistols, " + SUNG_XE, True, NGANG),
-    ("sung_xe", "wpn_mount_knife", "two curved steel blades on a bracket, no vehicle, " + NGANG_HAN, True, NGANG),
+    ("sung_xe", "wpn_mount_knife", "one pair of steel blades, one object, " + NGANG_HAN, True, NGANG),
     ("sung_xe", "wpn_mount_smg", "submachine gun, drum magazine, " + SUNG_XE, True, NGANG),
     ("sung_xe", "wpn_mount_crossbow", "heavy crossbow ballista, " + SUNG_XE, True, NGANG),
     ("sung_xe", "wpn_mount_shotgun", "double barrel shotgun, " + SUNG_XE, True, NGANG),
     ("sung_xe", "wpn_mount_catapult", "small catapult arm with rock, " + SUNG_XE, True, NGANG),
-    ("sung_xe", "wpn_mount_flamer", "single flamethrower turret, " + SUNG_XE, True, NGANG),
+    ("sung_xe", "wpn_mount_flamer", "one flamethrower on a turret, " + SUNG_XE, True, NGANG),
     ("sung_xe", "wpn_mount_rocket", "single rocket launcher tube, " + SUNG_XE, True, NGANG),
     ("sung_xe", "wpn_mount_laser", "laser cannon, blue coils, " + SUNG_XE, True, NGANG),
     ("sung_xe", "wpn_mount_minigun", "six-barrel minigun, " + SUNG_XE, True, NGANG),
@@ -281,17 +281,14 @@ HINH = [
     ("do_dac", "obs_bunker", "concrete pillbox bunker, gun slit, sandbags, " + NGANG_HAN, True, NGANG),
     ("do_dac", "def_wall_wood", "tall narrow wall panel, sharpened wooden logs, solid, front view", True, DOC),
     ("do_dac", "def_wall_concrete", "tall narrow grey concrete wall block, thick, filled, solid, front view", True, DOC),
-    ("do_dac", "prop_tent", "orange canvas camping tent, filled solid colors, " + NGANG_HAN, True, NGANG),
+    ("do_dac", "prop_tent", "one small triangular canvas tent, closed, " + NGANG_HAN, True, NGANG),
     ("do_dac", "prop_fire_barrel", "rusty campfire barrel, no fire", True, DOC),
 ]
 
 # Ảnh hỏng: xóa rồi vẽ lại MỘT lần cho mỗi ĐỢT (đổi DOT để vẽ lại đợt mới).
-# Đợt 4: ảnh vẫn lỗi sau đợt 3 (mô tả mới, gọn hơn) + 2 ảnh mới (survivor_ride, floor_warehouse vẽ nếu chưa có).
-DOT = "dot4"
-VE_LAI = {
-    "def_wall_metal", "def_wall_concrete", "prop_tent", "prop_catwalk", "fx_dust",
-    "wpn_mount_knife", "wpn_mount_flamer", "wpn_flamethrower", "wpn_smg",
-}
+# Đợt 5: chỉ những ảnh còn đáng thử lại (bụi, sàn nhà, tường sắt/bê tông: thôi, game vẽ code).
+DOT = "dot5"
+VE_LAI = {"survivor_ride", "wpn_mount_flamer", "wpn_mount_knife", "wpn_flamethrower", "prop_tent"}
 
 
 # 6. HÀM XỬ LÝ ÂM THANH

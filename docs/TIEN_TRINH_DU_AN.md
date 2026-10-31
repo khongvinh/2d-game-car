@@ -324,7 +324,7 @@ Tài liệu bàn giao để tiếp tục làm việc ở phiên chat mới mà k
 - Lý do hiệu ứng ra nền trắng: CAM có chữ "background" → đẩy mô hình khỏi "black background". Thêm CAM_SANG riêng cho chế độ "sang" (không cấm background, cấm "white background, scenery, mushroom cloud"); CAM chung thêm "multiple, collage".
 - Script: tao_anh_colab.py DOT "dot3" vẽ lại 15 ảnh hỏng trên với mô tả mới (single…, no car, solid…); tao_khung_hinh_colab.py DOT "dot3" vẽ lại survivor_run, boss_brute (IP-Adapter 0,9, trùm "huge hulking fat muscular… very wide body").
 
-### v8.3 — Sửa lỗi chơi thử v8.2, nhập ảnh đợt 3 (hiện tại)
+### v8.3 — Sửa lỗi chơi thử v8.2, nhập ảnh đợt 3
 - Phản hồi: nhân vật đi lùi; zombie lỗi bước chân, lỗi font chữ; nhà kho không có nền nhà, đồ lơ lửng, không nên có xe trong nhà; trùm/quái quá yếu, súng vô hạn đạn → bất tử; xe máy không thấy người lái, bánh không quay, súng cầm ngược; gara cũ thỉnh thoảng hiện lại.
 - Đi lùi: survivor_idle/run bộ mới quay TRÁI → thêm vào FACING_LEFT (--v2); chạy dùng survivor_run (2 chân tách) cắt chân.
 - Bước chân: nhịp bước tính theo QUÃNG ĐƯỜNG (stepPhase: 1 vòng = 0,95 x chiều cao) thay vì thời gian → chân không trượt (zombie đường/nhà kho/trại, trùm nhà kho).
@@ -335,6 +335,11 @@ Tài liệu bàn giao để tiếp tục làm việc ở phiên chat mới mà k
 - Gara cũ: bỏ hẳn tab xe (garageTab 0): nút Xe trong gara/menu → XƯỞNG; openGarage không bao giờ mở tab 0; garageTab mặc định 1.
 - Ảnh đợt 3 (31 file, 10:59–11:17Z): dùng def_barricade_spikes, def_wall_wood, wpn_mount_rocket (ONLY_BIGGEST), fx_spark (tách độ rực + mờ dần từ tâm). Bỏ: tường sắt/bê tông, lều, sàn treo (ra thang nâng), bụi, lửa, lửa nòng (lỗ đen), súng xe phun lửa/dao, súng phun lửa/tiểu liên tài xế; khung hình tài xế/trùm (3 lần vẫn không đồng đều → thôi, dùng cắt chân).
 - Script đợt 4 (chỉ cần chạy tao_anh_colab.py): DOT "dot4" vẽ lại 9 ảnh hỏng với mô tả mới + 2 ảnh mới survivor_ride (tài xế ngồi lái), floor_warehouse (sàn nhà kho). tao_khung_hinh_colab.py: VE_LAI rỗng.
+
+### v8.4 — Nhập ảnh đợt 4 (hiện tại)
+- Đợt 4 (11 file, 11:45–11:47Z): dùng prop_catwalk (sàn treo thanh thép vàng đen, kéo giãn theo bệ) và wpn_smg. nhap_asset: TOP_BAND = {prop_catwalk, wpn_smg} — AI vẽ nhiều bản xếp chồng gần bằng cỡ → cắt lấy dải trên cùng (top_band). Bỏ: survivor_ride (3 người kèm xe), floor_warehouse (ra bức tường), fx_dust (mây nấm), def_wall_metal/concrete (nét mờ), prop_tent (mái che chợ), wpn_mount_flamer/knife, wpn_flamethrower (nhiều vật). App 175 ảnh.
+- Dừng thử lại (giữ vẽ code vì đã ổn): bụi, sàn nhà kho, tường sắt/bê tông, khung hình tài xế/trùm.
+- Script đợt 5: DOT "dot5" chỉ vẽ lại survivor_ride, wpn_mount_flamer, wpn_mount_knife, wpn_flamethrower, prop_tent với mô tả "one … one object".
 
 ## 3. Luật chơi cũ trước v7.0 (v6.1, để tham khảo)
 
@@ -517,7 +522,7 @@ cd tools/dev/preview && gradle walk      # tài xế đứng yên khi bão đi q
 
 | Phiên | Tiêu đề | Phạm vi |
 |---|---|---|
-| #3 | Đua Xe Sinh Tồn #3 — v7.3→v8.3: ảnh AI đầy đủ, chân bước thật, ảnh gốc không nén, hiệu ứng bụi/lửa nòng, script asset v2 + khung hình chạy | v7.4: đủ 101 ảnh, ánh xạ zombie/trùm/vũ khí xe/nút tròn/nền; v7.5: Rig cắt hông, sửa ảnh quay trái/dính khói, trùm nhà kho bằng ảnh, tao_asset_colab_v2.py; v7.6: bụi/nhún/lửa nòng, khung hình tên_0..7, tao_khung_hinh_colab.py; v7.7: nhập bộ v2 + khung hình zombie, hiệu ứng ảnh nổ/lửa/tia điện, nền đường theo vùng; v7.8: sửa đi bộ, axit trúng rào, đạn súng máy thật + vỏ đạn, xe đúng hướng, menu, nút nhảy tròn, lục soát vô tận; v7.9: luật trại (lục soát luôn mở, đêm sau khi tới trạm), súng trên nóc xe, quái đường phun axit; v8.0: súng trên xe bằng ảnh AI, script bổ sung; v8.1: nhập 20 ảnh bổ sung, prompt dưới 77 token; v8.2: cài trọn bộ ảnh vẽ lại, gộp 2 script; v8.3: sửa đi lùi/bước chân/font, sàn nhà kho, đạn có hạn, trùm mạnh, xe máy có người lái, bỏ gara cũ |
+| #3 | Đua Xe Sinh Tồn #3 — v7.3→v8.4: ảnh AI đầy đủ, chân bước thật, ảnh gốc không nén, hiệu ứng bụi/lửa nòng, script asset v2 + khung hình chạy | v7.4: đủ 101 ảnh, ánh xạ zombie/trùm/vũ khí xe/nút tròn/nền; v7.5: Rig cắt hông, sửa ảnh quay trái/dính khói, trùm nhà kho bằng ảnh, tao_asset_colab_v2.py; v7.6: bụi/nhún/lửa nòng, khung hình tên_0..7, tao_khung_hinh_colab.py; v7.7: nhập bộ v2 + khung hình zombie, hiệu ứng ảnh nổ/lửa/tia điện, nền đường theo vùng; v7.8: sửa đi bộ, axit trúng rào, đạn súng máy thật + vỏ đạn, xe đúng hướng, menu, nút nhảy tròn, lục soát vô tận; v7.9: luật trại (lục soát luôn mở, đêm sau khi tới trạm), súng trên nóc xe, quái đường phun axit; v8.0: súng trên xe bằng ảnh AI, script bổ sung; v8.1: nhập 20 ảnh bổ sung, prompt dưới 77 token; v8.2: cài trọn bộ ảnh vẽ lại, gộp 2 script; v8.3: sửa đi lùi/bước chân/font, sàn nhà kho, đạn có hạn, trùm mạnh, xe máy có người lái, bỏ gara cũ; v8.4: ảnh đợt 4 (sàn treo, tiểu liên) |
 | #2 | Đua Xe Sinh Tồn #2 — v5.0→v7.3: lá chắn đi bộ, âm lượng, nhà kho 30 phòng kiểu Earn to Die Rogue, menu bản đồ, nhiệm vụ, LÀM LẠI thành thủ trại (ngày lục soát/lên đường, đêm thủ thành), script tạo asset AI | v5.1→v7.3 + bài thử preview `inside`, `walk`, `rooms`, `camp`; script asset Colab miễn phí; nhập ảnh AI |
 | #1 | Đua Xe Sinh Tồn #1 — v1.0→v5.0: tạo game, kiểu Earn to Die, bão 3 bo, nhạc, trùm cuối, 20 bản đồ, gara 25 xe, 20 kiểu đường, giao diện thép, tiếng động cơ, ngọc đỏ, lô cốt, cốt truyện, cây kỹ năng, tài xế lục soát, xe nổ tài xế chạy tiếp, nhảy, đổi vị trí phím | Từ đầu đến v5.0 + tài liệu bàn giao, công cụ tools/dev, quy tắc CLAUDE.md |
 
