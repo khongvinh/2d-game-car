@@ -46,8 +46,12 @@ fun main() {
     val run = g.rooms
     println("expedition: rooms=${run?.total} state=${g.state}")
     var t = 0f
+    var died = false
     while (g.rooms != null && t < 400f) {
-        g.driver.hp = g.driver.maxHp
+        // endless rooms: stay alive for 3 rooms, then let the driver fall (run ends, loot kept)
+        val idx = g.rooms?.index ?: 0
+        if (idx <= 3) g.driver.hp = g.driver.maxHp else if (!died) { g.driver.hp = 0f; died = true }
+        if (idx == 3 && t > 0f && g.state == State.PLAYING && g.rooms?.room?.foes?.size ?: 0 > 3) shot(g, "v7_room3")
         if (g.state == State.PICK) { tick(g, 0.45f); tap(g, "pick0"); t += 0.5f; continue }
         val r = g.rooms!!
         val rm = r.room

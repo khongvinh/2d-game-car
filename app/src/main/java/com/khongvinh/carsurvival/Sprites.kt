@@ -61,12 +61,13 @@ object Sprites {
         else -> 22f
     }
 
-    /** Road/room region boss by tier (1 brute, 2 dragon, 3 bat, 4 alien); null = drawn in code. */
+    /** Road/room region boss by tier (1 brute, 2 serpent, 3 bat, 4 hulk); null = drawn in code. */
     fun boss(tier: Int) = when (tier) {
         1 -> "boss_brute"
-        4 -> if (has("boss_mutant_worm")) "boss_mutant_worm" else null
-        else -> null
-    }
+        2 -> "boss_mutant_worm" // flying serpent of the volcano
+        3 -> "zombie_bat" // the giant bat
+        else -> "boss_tank_zombie"
+    }.takeIf { has(it) }
 
     /** Siege monster picture: night bosses have their own (by region). */
     fun foe(f: Foe, boss: Boolean, r: Region) = when {
@@ -174,10 +175,12 @@ class Rig(val body: Bitmap, val legA: Bitmap, val legB: Bitmap, val hip: Int, va
             b.getPixels(px, 0, w, 0, hip, w, h - hip)
             val col = IntArray(w)
             for (y in 0 until h - hip) for (x in 0 until w) if ((px[y * w + x] ushr 24) > 40) col[x]++
+            // ignore thin bits (a gun or hand hanging low): only columns with real leg mass count
+            val thick = maxOf(1, (col.maxOrNull() ?: 0) / 4)
             var l = 0
-            while (l < w && col[l] == 0) l++
+            while (l < w && col[l] < thick) l++
             var r = w - 1
-            while (r > l && col[r] == 0) r--
+            while (r > l && col[r] < thick) r--
             if (r - l < 8) return null
             var split = (l + r) / 2
             var best = Int.MAX_VALUE

@@ -457,11 +457,15 @@ class Campaign(private val g: Game) {
             val dmg = d.type.damage * d.dmgMul
             when (d.type) {
                 DefType.MG -> {
-                    hurt(t, dmg, true)
-                    tracers.add(floatArrayOf(x + cos(d.aim) * 40f, y + sin(d.aim) * 40f, tx, ty, 0.06f))
+                    // a real bullet flies to the target; the spent case jumps out
+                    val a = d.aim + (Random.nextFloat() - 0.5f) * 0.04f
+                    shots.add(RoomShot(x + cos(a) * 46f, y + sin(a) * 46f, cos(a) * 2400f, sin(a) * 2400f, 5, dmg).also { it.life = 0.6f })
+                    shell(x, y, d.aim, false)
                     g.sfx.play(Sfx.S.SHOOT, 0.25f)
                 }
                 DefType.CANNON -> {
+                    shell(x, y, d.aim, true)
+                    g.shake = max(g.shake, 0.05f)
                     shots.add(RoomShot(x + cos(d.aim) * 50f, y + sin(d.aim) * 50f, cos(d.aim) * 900f, sin(d.aim) * 900f, 3, dmg).also { it.life = 2f })
                     g.sfx.play(Sfx.S.CATAPULT, 0.5f)
                 }
@@ -502,16 +506,46 @@ class Campaign(private val g: Game) {
         for (s in shots) {
             if (!s.alive) continue
             s.life -= dt
-            if (s.kind != 3) s.vy += Game.G * dt
+            if (s.kind != 3 && s.kind != 5) s.vy += Game.G * dt
             s.x += s.vx * dt
             s.y += s.vy * dt
             when (s.kind) {
-                0 -> { // spit at the blocker or the wall
-                    if (s.y >= 0f || s.life <= 0f || s.x <= WALL_X + 40f) {
+                0 -> { // acid: splashes on the first barricade or turret it touches, the wall, or the ground
+                    var hitDef: Def? = null
+                    for (i in 2 until SLOTS) {
+                        val d = defs[i] ?: continue
+                        if (d.hp <= 0f || d.type == DefType.MINE) continue
+                        if (abs(SLOT_X[i] - s.x) < 52f && s.y > -(if (d.type.blocks) 110f else 130f)) { hitDef = d; break }
+                    }
+                    val wallHit = s.x <= WALL_X + 66f && s.y > -WALL_H[save.wallLevel.coerceIn(0, 2)]
+                    if (hitDef != null || wallHit || s.y >= 0f || s.life <= 0f) {
                         s.alive = false
-                        val (_, bd) = blockerAt(s.x + 60f)
-                        if (bd != null && abs(SLOT_X[bd.slot] - s.x) < 120f) bd.hp -= s.dmg else if (s.x < WALL_X + 140f) wallHp -= s.dmg
-                        g.particles.add(Particle(s.x, min(s.y, 0f), 0f, -40f, 0.4f, 0.4f, 12f, 0xFF76FF03.toInt()))
+                        if (hitDef != null) {
+                            // barricades soak the full splash, turrets are tougher metal
+                            hitDef.hp -= s.dmg * (if (hitDef.type.blocks) 1f else 0.5f)
+                            hitDef.flash = 0.12f
+                            if (hitDef.hp <= 0f) {
+                                defs[hitDef.slot] = null
+                                g.explodeAt(SLOT_X[hitDef.slot], -40f, 18)
+                                g.sfx.play(Sfx.S.WOOD)
+                            }
+                        } else if (wallHit) wallHp -= s.dmg
+                        repeat(8) {
+                            val a = Random.nextFloat() * 3.14f + 3.14f
+                            g.particles.add(Particle(s.x, min(s.y, 0f), cos(a) * 160f, sin(a) * 200f, 0.5f, 0.5f, 7f, 0xFF76FF03.toInt(), Game.G * 0.6f))
+                        }
+                        g.particles.add(Particle(s.x, min(s.y, 0f), 0f, -30f, 0.5f, 0.5f, 16f, 0xFF64DD17.toInt(), 0f, 1.5f))
+                    }
+                }
+                5 -> { // turret bullet: first monster in its path
+                    val hit = foes.firstOrNull { it.z.alive && abs(it.z.x - s.x) < it.z.type.w / 2 + 14f && s.y > it.z.y - it.z.type.h - 10f && s.y < it.z.y + 10f }
+                    if (hit != null) {
+                        s.alive = false
+                        hurt(hit, s.dmg, true)
+                        g.sparksAt(s.x, s.y)
+                    } else if (s.life <= 0f || s.y >= 0f) {
+                        s.alive = false
+                        if (s.y >= 0f) g.dustAt(s.x, 0f, 2, 60f)
                     }
                 }
                 3 -> { // cannon ball: bursts on the first monster or the ground
@@ -528,6 +562,13 @@ class Campaign(private val g: Game) {
             }
         }
         shots.removeAll { !it.alive }
+    }
+
+    /** A spent brass case (big for the cannon) flipping out behind the gun. */
+    private fun shell(x: Float, y: Float, aim: Float, big: Boolean) {
+        val back = if (cos(aim) >= 0f) -1f else 1f
+        g.particles.add(Particle(x + back * 10f, y - 6f, back * (80f + Random.nextFloat() * 90f), -(220f + Random.nextFloat() * 140f),
+            0.9f, 0.9f, if (big) 7f else 3.5f, 0xFFFFC107.toInt(), Game.G))
     }
 
     private fun blast(x: Float, y: Float, r: Float, dmg: Float) {
@@ -605,7 +646,7 @@ class Campaign(private val g: Game) {
     // ------------------------------------------------------------ day actions
 
     /** Back from an expedition: loot goes in (half of it if the driver fell). */
-    fun expeditionDone(ok: Boolean) {
+    fun expeditionDone(ok: Boolean, room: Int = 0) {
         val k = if (ok) 1f else 0.5f
         val sc = (lootScrap * k).toInt()
         val fu = (lootFuel * k).toInt()
@@ -620,7 +661,7 @@ class Campaign(private val g: Game) {
         if (ok) save.addStat(Stat.HOUSES, 1)
         save.dayActed = true
         store()
-        banner = if (ok) "VỀ TRẠI AN TOÀN!" else "BỊ HẠ GỤC — MẤT NỬA ĐỒ"
+        banner = if (room > 0) "VỀ TRẠI — ĐÃ QUA ${room - 1} PHÒNG" else if (ok) "VỀ TRẠI AN TOÀN!" else "BỊ HẠ GỤC — MẤT NỬA ĐỒ"
         bannerSub = "+$sc⚙  +${fu}L xăng" + (if (got.isNotEmpty()) "  •  " + got.joinToString("  ") else if (!ok) "  •  mảnh ghép bị mất" else "")
         bannerT = 5f
     }

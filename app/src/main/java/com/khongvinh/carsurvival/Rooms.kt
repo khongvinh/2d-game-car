@@ -133,13 +133,14 @@ class Room(val index: Int, stage: Int, region: Region, seed: Int, val boss: Bool
                 dx += 300f + rnd.nextFloat() * 320f
             }
         }
-        val hpMul = 1f + 0.06f * (stage - 1) + 0.03f * index
+        // every room is tougher than the last: more monsters, more health
+        val hpMul = 1f + 0.06f * (stage - 1) + 0.1f * (index - 1)
         if (boss) {
             val kind = bossKind
             roomBoss = RoomBoss(kind, width - 420f, if (stage % 5 == 0) stage / 5 else (region.ordinal + 1), hpMul)
-            repeat(2 + index / 10) { foes.add(spawn(stage, region, 500f + it * 300f, -1, hpMul)) }
+            repeat(2 + index / 4) { foes.add(spawn(stage, region, 500f + it * 260f, -1, hpMul)) }
         } else if (!rest) {
-            val n = min(14, 3 + index / 3 + stage / 3)
+            val n = min(26, 4 + index + stage / 3)
             for (k in 0 until n) {
                 val onPlat = platforms.isNotEmpty() && rnd.nextFloat() < 0.4f
                 if (onPlat) {
@@ -178,7 +179,10 @@ class Room(val index: Int, stage: Int, region: Region, seed: Int, val boss: Bool
 }
 
 /** A whole run of rooms after the drive, with its level, power-ups and timers. */
-class RoomRun(val stage: Int, val region: Region, private val seed: Int, val total: Int = 6, private val bossLast: Boolean = false) {
+class RoomRun(val stage: Int, val region: Region, private val seed: Int, val total: Int = 6, private val bossLast: Boolean = false, val bossEvery: Int = 10) {
+    /** Endless search: rooms never run out, the run ends when the driver falls. */
+    val endless get() = total == Int.MAX_VALUE
+
     companion object {
         val MERCHANT_AFTER = intArrayOf(5, 15, 25)
     }
@@ -186,7 +190,7 @@ class RoomRun(val stage: Int, val region: Region, private val seed: Int, val tot
     var index = 1
     var room = make(1)
 
-    private fun make(i: Int) = Room(i, stage, region, seed + i * 101, boss = (i == total && bossLast) || i % 10 == 0, rest = i % 7 == 0 && i < total, bossKind = if (i % 20 == 0) 1 else if (i % 10 == 0) 0 else Random(seed + i).nextInt(2))
+    private fun make(i: Int) = Room(i, stage, region, seed + i * 101, boss = (i == total && bossLast) || i % bossEvery == 0, rest = i % 7 == 0 && i < total, bossKind = if (i % (bossEvery * 2) == 0) 1 else if (i % bossEvery == 0) 0 else Random(seed + i).nextInt(2))
     var level = 1
     var xp = 0
     val xpNeed get() = 4 + level * 3
@@ -303,8 +307,8 @@ class RoomRules(private val g: Game) {
         if (!rm.open && rm.foes.isEmpty() && !bossAlive) {
             if (rm.wave2) {
                 rm.wave2 = false
-                val hpMul = 1f + 0.06f * (run.stage - 1) + 0.03f * run.index
-                repeat(2 + run.index / 8) {
+                val hpMul = 1f + 0.06f * (run.stage - 1) + 0.1f * (run.index - 1)
+                repeat(2 + run.index / 3) {
                     val fx = if (it % 2 == 0) rm.width - 200f else 200f
                     rm.foes.add(rm.spawn(run.stage, run.region, fx, -1, hpMul))
                 }
@@ -321,7 +325,7 @@ class RoomRules(private val g: Game) {
     private fun updateFoes(run: RoomRun, dt: Float) {
         val d = g.driver
         val rm = run.room
-        val bite = 8f + run.stage * 0.7f + run.index * 0.15f
+        val bite = 8f + run.stage * 0.7f + run.index * 0.6f
         for (f in rm.foes) {
             val z = f.z
             if (!z.alive) continue

@@ -78,7 +78,8 @@ src = sys.argv[1]
 V2 = "--v2" in sys.argv[2:]
 if V2:
     # bộ 2 phần lớn đã quay phải; mấy ảnh dưới đây AI vẫn vẽ quay trái
-    FACING_LEFT = {"survivor_shoot", "zombie_runner", "zombie_spitter", "zombie_crawler"}
+    FACING_LEFT = {"survivor_shoot", "zombie_runner", "zombie_spitter", "zombie_crawler",
+                   "car_sedan", "car_muscle", "car_monster", "car_tank"}
     CUT_LEFT = {}
 root = os.path.join(os.path.dirname(__file__), "..", "..", "app", "src", "main", "assets")
 img_dir = os.path.join(root, "img")

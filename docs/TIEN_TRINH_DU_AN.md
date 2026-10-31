@@ -274,7 +274,7 @@ Tài liệu bàn giao để tiếp tục làm việc ở phiên chat mới mà k
 - nhap_asset.py: tham số --v2 (bộ 2 vẽ quay phải, bỏ lật/cắt của bộ 1); nhóm khung_hinh lọc rác nhưng không cắt riêng từng khung.
 - Việc tiếp: người dùng chạy 2 script Colab (v2 rồi khung hình) → trợ lý tải về, `python3 tools/assets/nhap_asset.py <thư mục> --v2`, xem hướng ảnh, nối fx_* (nổ, máu, lửa) và nền đường theo vùng.
 
-### v7.7 — Nhập bộ ảnh v2 + khung hình chạy, hiệu ứng ảnh (hiện tại)
+### v7.7 — Nhập bộ ảnh v2 + khung hình chạy, hiệu ứng ảnh
 - Người dùng chạy xong 2 script Colab. Drive: DuaXeSinhTon_assets_v2 (id 1nPaaucPvla5PKYdqUsBh9t1s_Q3mZHSB, trong 14i1_kbJc9H1rZfqnH9T_pj3xFs0gynEw), 13 thư mục con, 183 PNG (khung_hinh 56 = 7 nhân vật x 8). Subagent tải về /tmp, trợ lý dựng thư mục nhập rồi chạy `nhap_asset.py <thư mục> --v2` → app có 158 ảnh (img ~44MB, APK ~48MB).
 - Đánh giá bộ v2: nhân vật/zombie/xe/đồ đạc đẹp, đồng bộ; zombie_spitter nay có cả người. Hỏng/bỏ: fx_blood (ra đầu lâu), fx_dust (ra xe), fx_muzzle (vệt chéo) — giữ hiệu ứng vẽ code; prop_catwalk, prop_shelf, prop_door_locked mờ nhạt — giữ vẽ code. fx_explosion/fx_spark/fx_fire có nền phong cảnh (không ra nền đen) → tách bằng độ rực màu (saturation), fx_fire cắt lấy 1 ngọn ở giữa. Bản vẽ lại trong do_dac (def_sandbags, def_barricade_wood, item_crate) được ưu tiên.
 - Khung hình chạy: dùng cho zombie_walker/runner/fat/spitter/armored. BỎ survivor_run_* (quần đổi màu giữa các khung → nhấp nháy) và boss_brute_* (ra người gầy, không giống ảnh gốc) — hai nhân vật này dùng Rig cắt chân từ ảnh gốc v2.
@@ -282,6 +282,17 @@ Tài liệu bàn giao để tiếp tục làm việc ở phiên chat mới mà k
 - Bộ nhớ: sprite tối đa 512px, khung hình 400px (đủ màu, không nén bảng màu) — ảnh 1024px bung ra 4MB RAM/ảnh dễ văng game; manifest thêm android:largeHeap="true".
 - Hiệu ứng ảnh (Game.fxs, Fx, Game.fxAt, Renderer.drawFx): explode() n ≥ 20 → fx_explosion (to dần, mờ dần 0,5 giây); sparks() đôi khi fx_spark; bleed() n ≥ 4 → fx_blood (nếu có); quái đang cháy (z.burnT / Foe.burnT) vẽ fx_fire phập phồng (đường, nhà kho, trại). Nền đường theo vùng: bg_desert_road / bg_volcano_road / bg_night_road / bg_alien_road. Nền menu phủ tối nhẹ.
 - Việc tiếp: chạy lại riêng các ảnh hỏng (đổi mô tả: hiệu ứng nên vẽ "on solid black background, nothing else"); tạo lại khung hình tài xế cho đồng màu (tăng DO_GIONG_MAU 0,8, mô tả màu quần áo cố định); cân bằng độ khó.
+
+### v7.8 — Sửa lỗi sau khi chơi thử v7.7 (hiện tại)
+- Phản hồi (ảnh + video máy thật): nhân vật đi 1 chân/lết; axit quái không trúng vật cản ban đêm; còn quái vẽ code, đâm xe văng ra quái cũ; xe ngược đầu chạy kì; súng phòng thủ bắn như đường thẳng, không nổ, không vỏ đạn; giao diện map lẫn cũ/mới; nút nhảy vuông; muốn lục soát không giới hạn phòng, quái nhiều/mạnh dần, chết thì về trại mang đồ.
+- Đi bộ: ảnh survivor_run v2 hai chân bắt chéo + Rig cắt nhầm vào khẩu súng → tài xế chạy dùng survivor_idle (2 chân tách) cắt chân, trừ khi có khung survivor_run_*; Rig bỏ cột mảnh (< 1/4 cột dày nhất) khi tìm vùng chân.
+- Đêm: axit (RoomShot kind 0) xét va chạm GIỮA ĐƯỜNG BAY với rào/bệ dưới đất (|dx| < 52, cao 110/130) và tường; trúng rào mất đủ, trúng bệ súng mất 50%; bắn tung giọt axit. Súng máy bắn ĐẠN THẬT (kind 5, 2400/giây, không trọng lực, vệt sáng) trúng quái đầu tiên trên đường + tia lửa; vỏ đạn đồng văng ra (Campaign.shell, pháo có vỏ to + rung màn hình); lửa đầu nòng trên bệ súng/pháo (Renderer.muzzle); đạn pháo/cối có vệt khói, nổ bằng fx_explosion.
+- Quái: xác văng khi đâm xe (Debris) vẽ bằng đúng ảnh AI của loại đó (smashZombie lưu CREATURE + loại); trùm đường: cấp 2 (rồng) → boss_mutant_worm bay, cấp 3 → zombie_bat phóng to, cấp 4 → boss_tank_zombie.
+- Xe: ảnh v2 car_sedan/muscle/monster/tank quay trái → nhap_asset --v2 lật; ảnh xe đặt theo CHIỀU DÀI (khoảng cách 2 bánh vật lý / 0,56) để bánh trong ảnh khớp bánh vật lý. Ảnh xe AI vẽ góc 3/4, nên tạo lại kiểu nhìn ngang hẳn nếu muốn đẹp hơn.
+- Menu: có nền bg_menu_island thì bỏ đảo nổi vẽ code; xe + tài xế + biển km đứng trên mặt đất của tranh nền (bóng đổ).
+- Nút NHẢY: nút tròn xanh có hình người nhảy (Renderer.roundButton, id "jump").
+- LỤC SOÁT VÔ TẬN: RoomRun(total = Int.MAX_VALUE, bossEvery = 6) — trùm mỗi 6 phòng (xen kẽ pháo/đồ tể), phòng nghỉ mỗi 7 phòng, lái buôn sau phòng 5/15/25; số quái min(26, 4 + phòng + vùng/3), đợt 2 thêm 2 + phòng/3, máu x(1 + 0,1 x (phòng - 1)), cắn 8 + 0,7 x vùng + 0,6 x phòng. Chết (hoặc thoát ở menu tạm dừng) → về trại MANG ĐỦ đồ đã lục (phế liệu, xăng, mảnh, tiền); banner "VỀ TRẠI — ĐÃ QUA n PHÒNG". HUD "Phòng n" (không còn /6).
+- Preview camp: bot giữ máu 3 phòng rồi cho gục; ảnh v7_room3.
 
 ## 3. Luật chơi cũ trước v7.0 (v6.1, để tham khảo)
 
@@ -464,7 +475,7 @@ cd tools/dev/preview && gradle walk      # tài xế đứng yên khi bão đi q
 
 | Phiên | Tiêu đề | Phạm vi |
 |---|---|---|
-| #3 | Đua Xe Sinh Tồn #3 — v7.3→v7.7: ảnh AI đầy đủ, chân bước thật, ảnh gốc không nén, hiệu ứng bụi/lửa nòng, script asset v2 + khung hình chạy | v7.4: đủ 101 ảnh, ánh xạ zombie/trùm/vũ khí xe/nút tròn/nền; v7.5: Rig cắt hông, sửa ảnh quay trái/dính khói, trùm nhà kho bằng ảnh, tao_asset_colab_v2.py; v7.6: bụi/nhún/lửa nòng, khung hình tên_0..7, tao_khung_hinh_colab.py; v7.7: nhập bộ v2 + khung hình zombie, hiệu ứng ảnh nổ/lửa/tia điện, nền đường theo vùng |
+| #3 | Đua Xe Sinh Tồn #3 — v7.3→v7.8: ảnh AI đầy đủ, chân bước thật, ảnh gốc không nén, hiệu ứng bụi/lửa nòng, script asset v2 + khung hình chạy | v7.4: đủ 101 ảnh, ánh xạ zombie/trùm/vũ khí xe/nút tròn/nền; v7.5: Rig cắt hông, sửa ảnh quay trái/dính khói, trùm nhà kho bằng ảnh, tao_asset_colab_v2.py; v7.6: bụi/nhún/lửa nòng, khung hình tên_0..7, tao_khung_hinh_colab.py; v7.7: nhập bộ v2 + khung hình zombie, hiệu ứng ảnh nổ/lửa/tia điện, nền đường theo vùng; v7.8: sửa đi bộ, axit trúng rào, đạn súng máy thật + vỏ đạn, xe đúng hướng, menu, nút nhảy tròn, lục soát vô tận |
 | #2 | Đua Xe Sinh Tồn #2 — v5.0→v7.3: lá chắn đi bộ, âm lượng, nhà kho 30 phòng kiểu Earn to Die Rogue, menu bản đồ, nhiệm vụ, LÀM LẠI thành thủ trại (ngày lục soát/lên đường, đêm thủ thành), script tạo asset AI | v5.1→v7.3 + bài thử preview `inside`, `walk`, `rooms`, `camp`; script asset Colab miễn phí; nhập ảnh AI |
 | #1 | Đua Xe Sinh Tồn #1 — v1.0→v5.0: tạo game, kiểu Earn to Die, bão 3 bo, nhạc, trùm cuối, 20 bản đồ, gara 25 xe, 20 kiểu đường, giao diện thép, tiếng động cơ, ngọc đỏ, lô cốt, cốt truyện, cây kỹ năng, tài xế lục soát, xe nổ tài xế chạy tiếp, nhảy, đổi vị trí phím | Từ đầu đến v5.0 + tài liệu bàn giao, công cụ tools/dev, quy tắc CLAUDE.md |
 

@@ -24,7 +24,7 @@ import kotlin.random.Random
 class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
     companion object {
         /** Shown on the menu so the installed build is easy to check. */
-        const val VERSION = "7.7"
+        const val VERSION = "7.8"
 
         const val VIRTUAL_HEIGHT = 720f
         const val METER = 30f
@@ -315,9 +315,11 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
 
     /** Leaving a run from the pause menu. */
     private fun quitRun() {
-        if (rooms != null) {
+        val run = rooms
+        if (run != null) {
+            save.money += runMoney
             rooms = null
-            campaign.expeditionDone(false)
+            campaign.expeditionDone(true, run.index)
             openCamp()
         } else {
             endDrive()
@@ -940,7 +942,8 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
         inside = null
         loadStage(campaign.zone)
         kills = 0; runMoney = 0; runGems = 0
-        val run = RoomRun(campaign.zone, campaign.region, save.day * 977 + save.nights * 31, total = 6, bossLast = save.day % 3 == 0)
+        // endless: room after room, each harder; a boss every 6th room; ends only when the driver falls
+        val run = RoomRun(campaign.zone, campaign.region, save.day * 977 + save.nights * 31, total = Int.MAX_VALUE, bossEvery = 6)
         rooms = run
         setState(State.PLAYING)
         val d = driver
@@ -971,7 +974,7 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
         roomRules.update(run, dt, leanBack, leanFwd, jumpHeld)
         updateEffects(dt)
         if (d.hp <= 0f) {
-            driverDown("Gục ở phòng ${run.index}/${run.total}")
+            driverDown("Gục ở phòng ${run.index}")
             return
         }
         val rm = run.room
@@ -1368,11 +1371,14 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
             }
             updateEffects(dt)
             if (dyingT <= 0f) {
-                if (rooms != null) {
-                    // carried back to camp; the money picked up is kept, half the loot is lost
+                val run = rooms
+                if (run != null) {
+                    // carried back to camp with everything found on the way
                     save.money += runMoney
+                    save.addStat(Stat.MONEY, runMoney)
+                    save.addStat(Stat.KILLS, kills)
                     rooms = null
-                    campaign.expeditionDone(false)
+                    campaign.expeditionDone(true, run.index)
                     openCamp()
                 } else {
                     endDrive()
@@ -1850,9 +1856,8 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
     private fun smashZombie(z: Zombie, vx: Float, vy: Float) {
         z.alive = false
         kills++
-        val kind = when (z.type) {
-            ZombieType.FAT -> Debris.FAT_ZOMBIE
-            ZombieType.WALKER, ZombieType.RUNNER -> Debris.ZOMBIE
+        val kind = when {
+            // every type keeps its kind so the flying body uses the same picture
             else -> Debris.CREATURE + z.type.ordinal
         }
         debris.add(Debris(kind, z.x, z.y - z.type.h / 2, vx, vy, 0f, rnd(-12f, 12f), z.type.w, z.type.h, z.shirt))

@@ -1161,7 +1161,12 @@ class Renderer(internal val g: Game) {
             c.translate(car.x, car.y)
             c.rotate(car.angle * 180f / PI.toFloat() + car.squat * 57f)
             val bounce = (car.compress[0] + car.compress[1]) * 0.25f
-            sprite(c, carPic, 0f, Car.WHEEL_Y + Car.WHEEL_R + 6f + bounce, if (v.cls == VehicleClass.MOTO) 118f else 104f)
+            // size the picture by length so its wheels sit over the physics wheels
+            // (AI cars have their wheels at about 22% and 78% of their length)
+            val bm = Sprites.get(carPic)!!
+            val len = (Car.WHEEL_X[1] - Car.WHEEL_X[0]) / 0.56f
+            val ph = if (v.cls == VehicleClass.MOTO) 118f else (len * bm.height / bm.width).coerceIn(70f, 150f)
+            sprite(c, carPic, (Car.WHEEL_X[0] + Car.WHEEL_X[1]) / 2, Car.WHEEL_Y + Car.WHEEL_R + 2f + bounce, ph)
             c.restore()
         } else if (!hurt) art.draw(c, v, car.x, car.y, car.angle, car.wheelRot, car.aim, car.boosting, w, false, car.compress, g.wrecked, car.squat, car.slashT)
         art.noRider = false
@@ -1286,6 +1291,17 @@ class Renderer(internal val g: Game) {
         c.save()
         c.translate(d.x, d.y)
         c.rotate(d.rot * 180f / PI.toFloat())
+        // flung monsters: the same AI picture they had while alive, tumbling
+        val pic = when {
+            d.kind == Debris.FAT_ZOMBIE -> if (d.h > 150f) "boss_brute" else "zombie_fat"
+            d.kind == Debris.ZOMBIE -> "zombie_walker"
+            d.kind >= Debris.CREATURE -> Sprites.zombie(ZombieType.entries[d.kind - Debris.CREATURE])
+            else -> null
+        }
+        if (pic != null && sprite(c, pic, 0f, d.h * 0.65f, d.h * 1.3f, alpha = a)) {
+            c.restore()
+            return
+        }
         when {
             d.kind == Debris.ZOMBIE || d.kind == Debris.FAT_ZOMBIE -> {
                 c.saveLayerAlpha(null, a)
@@ -1519,7 +1535,7 @@ class Renderer(internal val g: Game) {
     }
 
     /** Muzzle flash: the AI effect picture if there is one, else a hot star. */
-    private fun muzzle(c: Canvas, x: Float, y: Float, a: Float) {
+    internal fun muzzle(c: Canvas, x: Float, y: Float, a: Float) {
         c.save()
         c.translate(x, y)
         c.rotate(a * 180f / PI.toFloat())
@@ -1548,7 +1564,9 @@ class Renderer(internal val g: Game) {
         val pic = when {
             jumping && Sprites.has("survivor_jump") -> "survivor_jump"
             d.atkT > 0f && Sprites.has("survivor_shoot") -> "survivor_shoot"
-            moving && Sprites.has("survivor_run") -> "survivor_run"
+            // running: real frames if any, else the standing picture with its legs cut free
+            // (the AI running pose has its legs crossed, so it cannot step)
+            moving && Sprites.frames("survivor_run") > 0 -> "survivor_run"
             else -> "survivor_idle"
         }
         // legs really step (picture cut at the hip), body leans into the run
@@ -2338,7 +2356,47 @@ class Renderer(internal val g: Game) {
         }
     }
 
+    /** Round action button (jump): glossy disc with a running-man icon. */
+    private fun roundButton(c: Canvas, b: Button, held: Boolean) {
+        val cx = (b.l + b.r) / 2
+        val cy = (b.t + b.b) / 2
+        val rad = min(b.r - b.l, b.b - b.t) / 2 * (if (held) 0.94f else 1f)
+        fill.color = 0x66000000
+        c.drawCircle(cx + 3f, cy + 6f, rad, fill)
+        fill.color = 0xFF2B2622.toInt()
+        c.drawCircle(cx, cy, rad, fill)
+        fill.color = if (held) 0xFF4FC3F7.toInt() else 0xFF29B6F6.toInt()
+        c.drawCircle(cx, cy, rad - 7f, fill)
+        fill.color = 0x40FFFFFF
+        c.drawCircle(cx - rad * 0.2f, cy - rad * 0.25f, rad * 0.55f, fill)
+        stroke.color = 0xAAFFFFFF.toInt()
+        stroke.strokeWidth = 3f
+        c.drawCircle(cx, cy, rad - 7f, stroke)
+        // jumping figure
+        stroke.color = Color.WHITE
+        stroke.strokeWidth = rad * 0.11f
+        stroke.strokeCap = Paint.Cap.ROUND
+        val u = rad * 0.5f
+        fill.color = Color.WHITE
+        c.drawCircle(cx + u * 0.15f, cy - u * 0.9f, u * 0.22f, fill)
+        c.drawLine(cx + u * 0.05f, cy - u * 0.6f, cx - u * 0.15f, cy + u * 0.15f, stroke)
+        c.drawLine(cx - u * 0.15f, cy + u * 0.15f, cx - u * 0.75f, cy + u * 0.35f, stroke)
+        c.drawLine(cx - u * 0.15f, cy + u * 0.15f, cx + u * 0.35f, cy + u * 0.4f, stroke)
+        c.drawLine(cx + u * 0.35f, cy + u * 0.4f, cx + u * 0.25f, cy + u * 0.85f, stroke)
+        c.drawLine(cx, cy - u * 0.4f, cx + u * 0.6f, cy - u * 0.7f, stroke)
+        c.drawLine(cx, cy - u * 0.4f, cx - u * 0.55f, cy - u * 0.55f, stroke)
+        stroke.strokeCap = Paint.Cap.BUTT
+        // up arrow
+        path.reset()
+        path.moveTo(cx + u * 0.85f, cy - u * 0.2f); path.lineTo(cx + u * 0.65f, cy + u * 0.1f); path.lineTo(cx + u * 1.05f, cy + u * 0.1f); path.close()
+        c.drawPath(path, fill)
+    }
+
     internal fun drawButton(c: Canvas, b: Button, held: Boolean) {
+        if (b.id == "jump") {
+            roundButton(c, b, held)
+            return
+        }
         val grow = if (held) 3f else 0f
         val l = b.l - grow
         val t = b.t - grow
@@ -2482,8 +2540,14 @@ class Renderer(internal val g: Game) {
         // floating island with the camp on it
         val isl = g.menuIsland()
         val bob = sin(g.anim * 1.6f) * 6f
-        val top = 330f + bob
+        // with the AI landscape behind, the camp stands on its ground (no code-drawn floating island)
+        val bgMenu = Sprites.has("bg_menu_island")
+        val top = if (bgMenu) 470f else 330f + bob
         val iw = (isl[2] - isl[0]) / 2
+        if (bgMenu) {
+            fill.color = 0x66000000
+            c.drawOval(mx - iw * 0.85f, top - 16f, mx + iw * 0.85f, top + 16f, fill)
+        } else {
         fill.color = 0x40000000
         c.drawOval(mx - iw * 0.8f, 520f, mx + iw * 0.8f, 548f, fill)
         path.reset()
@@ -2516,6 +2580,7 @@ class Renderer(internal val g: Game) {
         c.drawRoundRect(mx - iw - 6f, top - 14f, mx + iw + 6f, top + 16f, 14f, 14f, fill)
         fill.color = th.crust[2]
         c.drawRect(mx - iw, top - 14f, mx + iw, top - 9f, fill)
+        }
         // wreck, signpost with a skull flag, the survivor
         if (!sprite(c, Sprites.CARS[s.carTier.coerceIn(0, 4)], mx + iw * 0.5f, top - 4f + sin(g.anim * 6f) * 1.5f, 96f)) {
             fill.color = 0xFF5D4037.toInt()
@@ -4193,6 +4258,7 @@ class Renderer(internal val g: Game) {
         val face = g.driver.x > x || (!g.driver.out && g.car.x > x)
         val ph = g.anim * 4f + x * 0.01f
         return if (name == "boss_brute") walkSprite(c, name, x, y, b.h * 1.1f, !face, ph, 16f, alpha, 3f)
+        else if (b.flying) sprite(c, name, x, b.cy + maxOf(b.h, b.w) * 0.55f, maxOf(b.h, b.w) * 1.1f, flip = !face, alpha = alpha, rot = sin(ph) * 8f, squash = 1f + 0.1f * sin(ph * 3f))
         else sprite(c, name, x, y + 6f, b.h * 1.1f, flip = !face, alpha = alpha, rot = sin(ph) * 3f, squash = 1f + 0.04f * sin(ph * 2f))
     }
 
@@ -5490,7 +5556,7 @@ class Renderer(internal val g: Game) {
         // room counter
         text.textAlign = Paint.Align.CENTER
         val bossRoom = run.room.boss
-        val label = "🚪 Phòng ${run.index} / ${run.total}${if (bossRoom) "  👹" else if (run.room.rest) "  • PHÒNG NGHỈ" else ""}"
+        val label = "🚪 Phòng ${run.index}${if (run.endless) "" else " / ${run.total}"}${if (bossRoom) "  👹" else if (run.room.rest) "  • PHÒNG NGHỈ" else ""}"
         text.textSize = 28f
         val tw = text.measureText(label)
         glassPanel(c, W / 2 - tw / 2 - 24f, 56f, W / 2 + tw / 2 + 24f, 100f, 16f)

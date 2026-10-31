@@ -154,11 +154,33 @@ internal fun Renderer.drawCamp(c: Canvas) {
     }
     for (sh in cp.shots) {
         when (sh.kind) {
-            0 -> {
-                fill.color = 0xFF76FF03.toInt()
-                c.drawCircle(sh.x, sh.y, 10f, fill)
+            0 -> { // acid blob dripping a trail
+                for (k in 1..3) {
+                    fill.color = Color.argb(150 - k * 40, 118, 255, 3)
+                    c.drawCircle(sh.x - sh.vx * 0.02f * k, sh.y - sh.vy * 0.02f * k, 9f - k * 2f, fill)
+                }
+                fill.color = 0xFF64DD17.toInt()
+                c.drawCircle(sh.x, sh.y, 11f, fill)
+                fill.color = 0xFFCCFF90.toInt()
+                c.drawCircle(sh.x - 3f, sh.y - 3f, 4f, fill)
+            }
+            5 -> { // glowing bullet with a short hot streak behind it
+                val l = 0.018f
+                stroke.color = 0x88FFB300.toInt()
+                stroke.strokeWidth = 7f
+                c.drawLine(sh.x - sh.vx * l, sh.y - sh.vy * l, sh.x, sh.y, stroke)
+                stroke.color = 0xFFFFF59D.toInt()
+                stroke.strokeWidth = 3.5f
+                c.drawLine(sh.x - sh.vx * l * 0.6f, sh.y - sh.vy * l * 0.6f, sh.x, sh.y, stroke)
+                fill.color = Color.WHITE
+                c.drawCircle(sh.x, sh.y, 3.5f, fill)
             }
             else -> {
+                // shell with a smoke trail
+                for (k in 1..4) {
+                    fill.color = Color.argb(90 - k * 18, 120, 110, 100)
+                    c.drawCircle(sh.x - sh.vx * 0.018f * k, sh.y - sh.vy * 0.018f * k, 8f + k * 3f, fill)
+                }
                 fill.color = 0xFF263238.toInt()
                 c.drawCircle(sh.x, sh.y, if (sh.kind == 4) 14f else 11f, fill)
                 fill.color = 0xFFFFAB40.toInt()
@@ -275,6 +297,10 @@ private fun Renderer.drawDef(c: Canvas, d: Def, x: Float, y: Float) {
     val kick = if (d.fireT > 0f) -8f else 0f
     val shake = if (hit) (kotlin.random.Random.nextFloat() - 0.5f) * 6f else 0f
     val idle = if (d.type.blocks || d.type == DefType.MINE) 0f else sin(g.anim * 1.5f + x) * 2f
+    if (d.fireT > 0f && (d.type == DefType.MG || d.type == DefType.CANNON)) {
+        val gy = y - 50f
+        muzzle(c, x + cos(d.aim) * (if (d.type == DefType.CANNON) 70f else 56f), gy + sin(d.aim) * 56f, d.aim)
+    }
     if (sprite(c, Sprites.def(d.type), x + kick + shake, y + 4f, h, alpha = if (hit) 170 else 255, rot = idle,
             squash = if (d.fireT > 0f) 0.96f else 1f)) {
         // picture from the asset pack
