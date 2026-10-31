@@ -55,7 +55,9 @@ class Renderer(internal val g: Game) {
         } else if (inn != null && g.state != State.MENU && g.state != State.MAPS && g.state != State.GARAGE && g.state != State.STORY) {
             drawInterior(c, inn)
         } else if (g.state == State.MENU && backdrop(c, "bg_menu_island")) {
-            // menu: AI landscape behind the floating island
+            // menu: AI landscape behind the floating island, dimmed so the island stands out
+            fill.color = 0x55000000
+            c.drawRect(0f, 0f, g.W, g.H, fill)
         } else {
             drawBackground(c)
             drawWorld(c)

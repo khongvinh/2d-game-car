@@ -5,7 +5,8 @@ Usage: python3 tools/assets/nhap_asset.py <thư mục DuaXeSinhTon_assets đã g
   --v2: bộ ảnh bản 2 (đã vẽ quay phải) — không lật/cắt theo bảng sửa của bộ 1.
   Thư mục khung_hinh/ (<tên>_0.png...): khung hình chạy, giữ nguyên khung bao chung.
 
-Pictures are kept at full quality (no palette, no JPEG): sprites as RGBA PNG,
+Pictures are kept in full colour (no palette, no JPEG): sprites as RGBA PNG at
+most 512 px (animation frames 400 px) so the phone does not run out of memory,
 backgrounds as PNG. Sprites are cleaned first: faint haze (smoke, dust) is
 dropped and stray blobs that are not attached to the main subject are erased,
 then the picture is cropped to the subject. Sounds go to sfx/, music to music/.
@@ -76,7 +77,9 @@ def clean(im, crop=True):
 src = sys.argv[1]
 V2 = "--v2" in sys.argv[2:]
 if V2:
-    FACING_LEFT, CUT_LEFT = set(), {}
+    # bộ 2 phần lớn đã quay phải; mấy ảnh dưới đây AI vẫn vẽ quay trái
+    FACING_LEFT = {"survivor_shoot", "zombie_runner", "zombie_spitter", "zombie_crawler"}
+    CUT_LEFT = {}
 root = os.path.join(os.path.dirname(__file__), "..", "..", "app", "src", "main", "assets")
 img_dir = os.path.join(root, "img")
 os.makedirs(img_dir, exist_ok=True)
@@ -98,11 +101,14 @@ for group in sorted(os.listdir(src)):
             elif group == "khung_hinh":
                 # animation frames share one bounding box: clean but never crop
                 im = clean(im.convert("RGBA"), crop=False)
+                im.thumbnail((400, 400))  # drawn ~120-220 px tall
                 if name.rsplit("_", 1)[0] in FACING_LEFT:
                     im = im.transpose(Image.FLIP_LEFT_RIGHT)
                 im.save(os.path.join(img_dir, name + ".png"), "PNG")
             elif group == "hieu_ung" and name.startswith("fx_") and name not in ("fx_blood", "fx_dust"):
-                im.convert("RGBA").save(os.path.join(img_dir, name + ".png"), "PNG")  # glow: keep soft edges
+                im = im.convert("RGBA")
+                im.thumbnail((512, 512))
+                im.save(os.path.join(img_dir, name + ".png"), "PNG")  # glow: keep soft edges
             else:
                 im = im.convert("RGBA")
                 if name in CUT_LEFT:
@@ -110,7 +116,9 @@ for group in sorted(os.listdir(src)):
                 im = clean(im)
                 if name in FACING_LEFT:
                     im = im.transpose(Image.FLIP_LEFT_RIGHT)
-                im.thumbnail((1024, 1024))
+                # full colour, but no bigger than the screen ever shows it: a
+                # 1024 px RGBA bitmap takes 4 MB of phone memory once decoded
+                im.thumbnail((512, 512))
                 im.save(os.path.join(img_dir, name + ".png"), "PNG")
             n += 1
         elif ext == ".mp3":
