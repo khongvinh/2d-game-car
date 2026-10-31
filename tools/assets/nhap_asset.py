@@ -26,7 +26,11 @@ FACING_LEFT = {"survivor_run", "zombie_walker", "boss_brute", "zombie_armored", 
 CUT_LEFT = {"survivor_run": 0.4}
 
 
-def clean(im, crop=True):
+# pictures where the AI drew a second, smaller copy: keep only the big one
+ONLY_BIGGEST = {"car_sedan", "car_tank"}
+
+
+def clean(im, crop=True, keep=0.3):
     """Erase haze and loose blobs around the subject, crop to what is left."""
     a = np.array(im)
     alpha = a[:, :, 3]
@@ -56,7 +60,7 @@ def clean(im, crop=True):
                 sizes.append(cnt)
     if len(sizes) > 2:
         big = max(sizes)
-        keep = np.array([s >= big * 0.3 for s in sizes])
+        keep = np.array([s >= big * keep for s in sizes])
         keep[0] = False
         mask = keep[lab]
         full = np.kron(mask, np.ones((k, k), bool))[: alpha.shape[0], : alpha.shape[1]]
@@ -79,7 +83,7 @@ V2 = "--v2" in sys.argv[2:]
 if V2:
     # bộ 2 phần lớn đã quay phải; mấy ảnh dưới đây AI vẫn vẽ quay trái
     FACING_LEFT = {"survivor_shoot", "zombie_runner", "zombie_spitter", "zombie_crawler",
-                   "car_sedan", "car_muscle", "car_monster", "car_tank"}
+                   "car_sedan", "car_muscle", "car_monster", "wpn_mount_laser", "wpn_mount_shotgun"}
     CUT_LEFT = {}
 root = os.path.join(os.path.dirname(__file__), "..", "..", "app", "src", "main", "assets")
 img_dir = os.path.join(root, "img")
@@ -114,7 +118,7 @@ for group in sorted(os.listdir(src)):
                 im = im.convert("RGBA")
                 if name in CUT_LEFT:
                     im = im.crop((int(im.width * CUT_LEFT[name]), 0, im.width, im.height))
-                im = clean(im)
+                im = clean(im, keep=0.75 if name in ONLY_BIGGEST else 0.3)
                 if name in FACING_LEFT:
                     im = im.transpose(Image.FLIP_LEFT_RIGHT)
                 # full colour, but no bigger than the screen ever shows it: a

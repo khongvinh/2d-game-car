@@ -99,105 +99,78 @@ VUONG = "1024x1024"
 NGANG = "1216x832"
 DOC = "832x1216"
 
-# Một phong cách chung cho MỌI ảnh để nhìn nhất quán
-PHONG_CACH_CHUNG = (
-    "2D mobile game art in the style of Earn to Die 2, hand-drawn comic illustration, "
-    "thick clean black outlines, flat cel shading with soft highlights, "
-    "gritty post-apocalyptic palette of dusty orange, rust brown, olive green and steel grey"
-)
-PHONG_CACH = (
-    PHONG_CACH_CHUNG + ", game sprite, single subject centered, whole subject inside the frame, "
-    "isolated on plain flat pure white background"
-)
-# Nhân vật & zombie: toàn thân nhìn ngang, hai chân dạng ra để game cắt ở hông cho chân bước
-PHONG_CACH_NGUOI = (
-    PHONG_CACH + ", full body from head to feet, strict side view profile, "
-    "legs clearly apart mid-stride with a visible gap between the legs, feet at the bottom, "
-    "one single character only"
-)
-PHONG_CACH_ICON = (
-    PHONG_CACH_CHUNG + ", square mobile game UI icon, bright readable colors, "
-    "single object centered, isolated on plain flat pure white background"
-)
-PHONG_CACH_NEN = (
-    PHONG_CACH_CHUNG + ", 2D side-scrolling game background, wide panoramic scene, "
-    "flat horizon, empty ground strip at the bottom, warm sunset light, no characters"
-)
-# Hiệu ứng vẽ trên nền ĐEN rồi lấy độ sáng làm độ trong (lửa, nổ, tia lửa)
-PHONG_CACH_SANG = (
-    PHONG_CACH_CHUNG + ", game visual effect sprite, single effect centered, glowing, "
-    "isolated on solid pure black background, black everywhere else, nothing else, "
-    "no scenery, no ground, no sky, no rocks, no clouds"
-)
-CAM = (
-    "text, words, letters, watermark, logo, signature, frame, border, multiple views, "
-    "character sheet, collage, duplicate, extra characters, crowd, smoke, dust cloud, "
-    "muzzle flash, motion lines, shadow, ground, floor, scenery, background objects, "
-    "cropped, cut off, blurry, photo, 3d render, realistic"
-)
-CAM_NEN = "text, watermark, logo, characters, people, zombies, frame, border, blurry, photo, 3d render"
+# Prompt kiểu TỪ KHÓA, ngắn: CLIP của SDXL chỉ đọc 77 token (gồm 2 token đầu/cuối),
+# phần vượt bị cắt mất. Mỗi prompt = mô tả (≤ ~30 token) + phong cách (~20 token) ≈ 45–60 token.
+PHONG_CACH_CHUNG = "comic game art, Earn to Die style, thick black outlines, cel shading, gritty post-apocalyptic colors"
+PHONG_CACH = PHONG_CACH_CHUNG + ", game sprite, single object centered, whole object in frame, clean edges, detailed, plain white background"
+PHONG_CACH_NGUOI = PHONG_CACH_CHUNG + ", full body, side view, facing right, legs apart, one character, white background"
+PHONG_CACH_ICON = "mobile game icon, comic style, Earn to Die style, bold black outline, cel shading, bright saturated colors, glossy highlight, clean edges, high detail, game UI asset, single object centered, plain white background"
+PHONG_CACH_NEN = PHONG_CACH_CHUNG + ", 2D side-scrolling game background, wide panorama, flat horizon, sunset light, no people"
+PHONG_CACH_SANG = PHONG_CACH_CHUNG + ", glowing game visual effect, bright core, single effect centered, nothing else, pure black background"
+CAM = "text, watermark, logo, cropped, 3d, photo, realistic, background, shadow, front view, facing left, extra limbs, duplicate"
+CAM_NEN = "text, watermark, logo, people, 3d, photo, blurry"
 
 # Chế độ (cột 4): True = xóa phông + lọc rác; False = giữ nguyên (nền, thẻ);
 # "sang" = vẽ trên nền đen, độ sáng thành độ trong (lửa/nổ);
 # "nguoi" = như True nhưng dùng mô tả toàn thân cho hoạt hình.
+
 # Hướng: mọi thứ QUAY PHẢI (đầu xe / nòng súng / mặt nhân vật về bên phải).
-NGANG_HAN = ("perfectly flat side elevation view, orthographic 2D profile, camera exactly level with the subject, "
-             "no perspective, facing right")
-SUNG_XE = ("heavy weapon mounted on a small swivel turret base for a car roof, " + NGANG_HAN +
-           ", barrel pointing straight to the right horizontally, whole weapon inside the frame")
+NGANG_HAN = "side view, facing right"
+SUNG_XE = "roof turret, side view, barrel right"
 HINH = [
     # --- Súng lắp trên xe (game xoay theo hướng ngắm; nòng phải chĩa sang phải) ---
-    ("sung_xe", "wpn_mount_pistol", "twin heavy pistols bolted side by side. " + SUNG_XE, True, NGANG),
-    ("sung_xe", "wpn_mount_knife", "pair of long sharp steel blades and spikes welded onto a bumper ram, pointing right, " + NGANG_HAN, True, NGANG),
-    ("sung_xe", "wpn_mount_smg", "submachine gun with drum magazine. " + SUNG_XE, True, NGANG),
-    ("sung_xe", "wpn_mount_crossbow", "big heavy crossbow ballista loaded with a bolt. " + SUNG_XE, True, NGANG),
-    ("sung_xe", "wpn_mount_shotgun", "double barrel combat shotgun. " + SUNG_XE, True, NGANG),
-    ("sung_xe", "wpn_mount_catapult", "small spring catapult arm holding a rock. " + SUNG_XE, True, NGANG),
-    ("sung_xe", "wpn_mount_flamer", "flamethrower with fuel tank and pilot flame nozzle. " + SUNG_XE, True, NGANG),
-    ("sung_xe", "wpn_mount_rocket", "rocket launcher pod loaded with a rocket. " + SUNG_XE, True, NGANG),
-    ("sung_xe", "wpn_mount_laser", "sci-fi laser cannon with glowing blue coils. " + SUNG_XE, True, NGANG),
-    ("sung_xe", "wpn_mount_minigun", "six-barrel rotary minigun. " + SUNG_XE, True, NGANG),
+    ("sung_xe", "wpn_mount_pistol", "twin heavy pistols, " + SUNG_XE, True, NGANG),
+    ("sung_xe", "wpn_mount_knife", "steel blades and spikes on a bumper ram, " + NGANG_HAN, True, NGANG),
+    ("sung_xe", "wpn_mount_smg", "submachine gun, drum magazine, " + SUNG_XE, True, NGANG),
+    ("sung_xe", "wpn_mount_crossbow", "heavy crossbow ballista, " + SUNG_XE, True, NGANG),
+    ("sung_xe", "wpn_mount_shotgun", "double barrel shotgun, " + SUNG_XE, True, NGANG),
+    ("sung_xe", "wpn_mount_catapult", "small catapult arm with rock, " + SUNG_XE, True, NGANG),
+    ("sung_xe", "wpn_mount_flamer", "flamethrower, fuel tank, " + SUNG_XE, True, NGANG),
+    ("sung_xe", "wpn_mount_rocket", "rocket launcher pod, " + SUNG_XE, True, NGANG),
+    ("sung_xe", "wpn_mount_laser", "laser cannon, blue coils, " + SUNG_XE, True, NGANG),
+    ("sung_xe", "wpn_mount_minigun", "six-barrel minigun, " + SUNG_XE, True, NGANG),
 
     # --- Vũ khí tài xế cầm: vẽ lại cho nằm ngang, không có người ---
-    ("vu_khi", "wpn_pistol", "single handgun lying horizontally, barrel pointing right, no hand, no person, " + NGANG_HAN, True, NGANG),
-    ("vu_khi", "wpn_bow", "wooden hunting bow with an arrow nocked, no person, " + NGANG_HAN, True, VUONG),
-    ("vu_khi", "wpn_spear", "long spear with a sharp iron tip, horizontal, tip pointing right, no person, " + NGANG_HAN, True, NGANG),
+    ("vu_khi", "wpn_pistol", "single handgun, horizontal, no hand, " + NGANG_HAN, True, NGANG),
+    ("vu_khi", "wpn_bow", "wooden bow with arrow, no person, " + NGANG_HAN, True, VUONG),
+    ("vu_khi", "wpn_spear", "long spear, iron tip, horizontal, no person, " + NGANG_HAN, True, NGANG),
 
     # --- Xe: vẽ lại nhìn NGANG HẲN (bản 2 bị chéo 3/4) ---
-    ("xe", "car_sedan", "rusty old orange sedan car with armor plates and bull bar, both wheels visible. " + NGANG_HAN, True, NGANG),
-    ("xe", "car_pickup", "armored orange pickup truck, both wheels visible. " + NGANG_HAN, True, NGANG),
-    ("xe", "car_bus", "armored orange school bus with welded metal plates and plow, all wheels visible. " + NGANG_HAN, True, NGANG),
-    ("xe", "car_tank", "olive military tank with tracks and cannon. " + NGANG_HAN, True, NGANG),
-    ("xe", "car_muscle", "black and orange muscle car with spikes, both wheels visible. " + NGANG_HAN, True, NGANG),
-    ("xe", "car_monster", "orange monster truck with huge wheels. " + NGANG_HAN, True, NGANG),
+    ("xe", "car_sedan", "rusty orange sedan, armor plates, bull bar, " + NGANG_HAN, True, NGANG),
+    ("xe", "car_pickup", "armored orange pickup truck, both wheels, " + NGANG_HAN, True, NGANG),
+    ("xe", "car_bus", "armored orange school bus, metal plates, plow, " + NGANG_HAN, True, NGANG),
+    ("xe", "car_tank", "olive military tank, tracks, cannon, " + NGANG_HAN, True, NGANG),
+    ("xe", "car_muscle", "black orange muscle car, spikes, both wheels, " + NGANG_HAN, True, NGANG),
+    ("xe", "car_monster", "orange monster truck, huge wheels, " + NGANG_HAN, True, NGANG),
 
     # --- Chướng ngại trên đường, trại, nhà kho (đang vẽ code) ---
-    ("do_dac", "obs_crate", "sturdy wooden crate with cross braces, front view", True, VUONG),
-    ("do_dac", "obs_barrel_explosive", "red explosive fuel barrel with a yellow hazard symbol, front view", True, DOC),
-    ("do_dac", "obs_bunker", "low concrete pillbox bunker with a gun slit, sandbags at the base. " + NGANG_HAN, True, NGANG),
-    ("do_dac", "def_wall_wood", "tall barricade wall of vertical sharpened logs and planks, front view, tall narrow", True, DOC),
-    ("do_dac", "def_wall_metal", "tall barricade wall of riveted scrap metal sheets, front view, tall narrow", True, DOC),
-    ("do_dac", "def_wall_concrete", "tall concrete wall segment with a parapet and rebar, front view, tall narrow", True, DOC),
-    ("do_dac", "prop_tent", "patched canvas survivor tent. " + NGANG_HAN, True, NGANG),
-    ("do_dac", "prop_fire_barrel", "rusty metal barrel used as a campfire, empty top, no fire", True, DOC),
-    ("do_dac", "prop_catwalk", "long thick steel catwalk platform with bold yellow and black hazard stripes on its edge, solid and opaque. " + NGANG_HAN, True, NGANG),
-    ("do_dac", "prop_shelf", "tall rusty metal warehouse shelf full of cardboard boxes, solid and opaque, front view", True, DOC),
-    ("do_dac", "prop_door_locked", "green metal door boarded up with wooden planks and a heavy chain and padlock, solid and opaque, front view", True, DOC),
+    ("do_dac", "obs_crate", "wooden crate, cross braces", True, VUONG),
+    ("do_dac", "obs_barrel_explosive", "red explosive barrel, yellow hazard sign", True, DOC),
+    ("do_dac", "obs_bunker", "concrete pillbox bunker, gun slit, sandbags, " + NGANG_HAN, True, NGANG),
+    ("do_dac", "def_wall_wood", "tall wall of sharpened logs, narrow", True, DOC),
+    ("do_dac", "def_wall_metal", "tall wall of riveted scrap metal, narrow", True, DOC),
+    ("do_dac", "def_wall_concrete", "tall concrete wall, parapet, rebar, narrow", True, DOC),
+    ("do_dac", "prop_tent", "patched canvas tent, " + NGANG_HAN, True, NGANG),
+    ("do_dac", "prop_fire_barrel", "rusty campfire barrel, no fire", True, DOC),
+    ("do_dac", "prop_catwalk", "long steel catwalk, yellow black hazard stripes, solid, " + NGANG_HAN, True, NGANG),
+    ("do_dac", "prop_shelf", "tall rusty warehouse shelf, cardboard boxes, solid", True, DOC),
+    ("do_dac", "prop_door_locked", "green metal door, boarded planks, chain, padlock, solid", True, DOC),
 
     # --- Hiệu ứng: vẽ trên nền ĐEN tuyền (chế độ "sang") ---
-    ("hieu_ung", "fx_muzzle", "single bright yellow orange gun muzzle flash burst pointing right, star shaped, centered", "sang", VUONG),
-    ("hieu_ung", "fx_explosion", "single round cartoon fireball explosion, orange and yellow flames, centered", "sang", VUONG),
-    ("hieu_ung", "fx_fire", "single tall cartoon flame, centered", "sang", DOC),
-    ("hieu_ung", "fx_spark", "single electric blue spark burst, centered", "sang", VUONG),
-    ("hieu_ung", "fx_blood", "single cartoon splash of dark red blood droplets, centered, no skull, no face", True, VUONG),
-    ("hieu_ung", "fx_dust", "single cartoon puff cloud of brown dust, centered, nothing else", True, VUONG),
+    ("hieu_ung", "fx_muzzle", "gun muzzle flash, yellow orange, star burst, pointing right", "sang", VUONG),
+    ("hieu_ung", "fx_explosion", "round fireball explosion, orange yellow", "sang", VUONG),
+    ("hieu_ung", "fx_fire", "single tall cartoon flame, orange yellow", "sang", DOC),
+    ("hieu_ung", "fx_spark", "electric blue spark burst", "sang", VUONG),
+    ("hieu_ung", "fx_blood", "dark red blood splash, droplets", True, VUONG),
+    ("hieu_ung", "fx_dust", "brown dust puff cloud", True, VUONG),
 ]
 
-# Ảnh bản 2 hỏng: xóa rồi vẽ lại (bỏ tên khỏi danh sách nếu đã ưng ảnh mới)
+# Ảnh hỏng: xóa rồi vẽ lại MỘT lần cho mỗi ĐỢT (đổi DOT để vẽ lại đợt mới).
+# Đợt 2: những ảnh đợt 1 ra sai (prompt cũ quá 77 token nên bị cắt mất phong cách).
+DOT = "dot2"
 VE_LAI = {
-    "wpn_pistol", "wpn_bow", "wpn_spear",
-    "car_sedan", "car_pickup", "car_bus", "car_tank", "car_muscle", "car_monster",
-    "prop_catwalk", "prop_shelf", "prop_door_locked",
+    "wpn_mount_pistol", "wpn_mount_knife", "wpn_mount_crossbow", "wpn_mount_flamer", "wpn_spear",
+    "car_monster", "def_wall_concrete", "prop_tent", "prop_catwalk", "prop_door_locked",
     "fx_muzzle", "fx_explosion", "fx_fire", "fx_spark", "fx_blood", "fx_dust",
 }
 
@@ -296,16 +269,44 @@ def sang_thanh_trong(duong_vao, duong_ra):
         ra = ra.crop(hop)
     ra.save(duong_ra, "PNG")
 
+
+def dem_token(p):
+    """Số token CLIP của prompt (cả 2 bộ mã hóa SDXL dùng cùng cách tách từ)."""
+    return len(pipe.tokenizer(p).input_ids)
+
+def kiem_tra_prompt():
+    """In cảnh báo các prompt vượt 77 token TRƯỚC khi vẽ (vượt thì bị cắt đuôi)."""
+    loi = 0
+    for nhom, ten, mo_ta, che_do, _ in HINH:
+        n = dem_token(f"{mo_ta}, {chon_phong_cach(nhom, che_do)[0]}")
+        if n > 77:
+            loi += 1
+            print(f"⚠️  {ten}: {n} token (> 77) — rút gọn mô tả")
+    print(f"🔎 Kiểm tra prompt: {len(HINH) - loi}/{len(HINH)} trong giới hạn 77 token")
+
+def chon_phong_cach(nhom, che_do):
+    if nhom == "nen":
+        return PHONG_CACH_NEN, CAM_NEN
+    if che_do == "sang":
+        return PHONG_CACH_SANG, CAM
+    if che_do == "nguoi":
+        return PHONG_CACH_NGUOI, CAM
+    if nhom in ("suc_manh", "giao_dien"):
+        return PHONG_CACH_ICON, CAM
+    return PHONG_CACH, CAM
+
 # 8. VÒNG LẶP CHẠY TỔNG HỢP
 def chay():
     xong, bo_qua = 0, 0
+
+    kiem_tra_prompt()
 
     # --- A. TẠO HÌNH ẢNH ---
     print("\n--- 🎨 BẮT ĐẦU TẠO HÌNH ẢNH ---")
     for nhom, ten, mo_ta, can_xoa_phong, kich_thuoc in HINH:
         os.makedirs(f"{THU_MUC}/{nhom}", exist_ok=True)
         dich = f"{THU_MUC}/{nhom}/{ten}.png"
-        da_lam = f"{THU_MUC}/_da_ve_lai.txt"
+        da_lam = f"{THU_MUC}/_da_ve_lai_{DOT}.txt"
         xong_roi = set(open(da_lam).read().split()) if os.path.exists(da_lam) else set()
         if os.path.exists(dich) and ten in VE_LAI and ten not in xong_roi:
             os.remove(dich)   # vẽ lại ảnh hỏng (chỉ một lần)
@@ -316,18 +317,9 @@ def chay():
             continue
 
         print(f"🎨 Đang vẽ GPU: {nhom}/{ten}...")
-        if nhom == "nen":
-            nen, cam = PHONG_CACH_NEN, CAM_NEN
-        elif can_xoa_phong == "sang":
-            nen, cam = PHONG_CACH_SANG, CAM
-        elif can_xoa_phong == "nguoi":
-            nen, cam = PHONG_CACH_NGUOI, CAM
-        elif nhom in ("suc_manh", "giao_dien"):
-            nen, cam = PHONG_CACH_ICON, CAM
-        else:
-            nen, cam = PHONG_CACH, CAM
+        nen, cam = chon_phong_cach(nhom, can_xoa_phong)
         try:
-            tam = tao_hinh_gpu(f"{mo_ta}. {nen}", kich_thuoc, cam, ten)
+            tam = tao_hinh_gpu(f"{mo_ta}, {nen}", kich_thuoc, cam, ten)
             if can_xoa_phong == "sang":
                 sang_thanh_trong(tam, dich)
             elif can_xoa_phong:

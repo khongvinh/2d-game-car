@@ -34,30 +34,24 @@ DO_BAM_SAT = 1.5
 SEED = 777
 DO_GIONG_MAU = 0.65   # IP-Adapter: cao = giống ảnh gốc hơn nhưng ít theo tư thế hơn (0.5-0.8)
 # Vẽ lại các nhân vật mà khung hình lần trước không đồng đều (giữ màu áo quần chặt hơn)
+DOT = "dot2"   # đổi để vẽ lại thêm một đợt
 VE_LAI = {"survivor_run": 0.85, "boss_brute": 0.85}   # tên -> DO_GIONG_MAU riêng
 
 # (tên ảnh gốc trong bộ v2, thư mục, mô tả, kiểu đi: "chay" | "di" | "lach")
+# Prompt kiểu TỪ KHÓA (CLIP chỉ đọc 77 token): mô tả + phong cách ≈ 45–60 token.
 NHAN_VAT = [
-    ("survivor_run", "nhan_vat", "male survivor, orange-red baseball cap, open brown leather jacket over a light blue t-shirt, "
-     "light blue denim jeans on both legs, brown boots, short dark beard, holding a pistol, same outfit in every frame", "chay"),
-    ("zombie_walker", "zombie", "shambling green-skinned zombie in torn plaid shirt and jeans, arms reaching forward", "di"),
-    ("zombie_runner", "zombie", "fast skinny grey zombie in rags", "chay"),
-    ("zombie_fat", "zombie", "huge fat bloated green zombie in torn overalls", "lach"),
-    ("zombie_spitter", "zombie", "hunched green zombie with swollen glowing acid throat", "di"),
-    ("zombie_armored", "zombie", "zombie wearing dented riot police armor and cracked helmet", "di"),
-    ("boss_brute", "zombie", "giant hulking muscular green zombie butcher boss, very broad shoulders and thick arms, "
-     "orange apron with blood stains, dark trousers, holding a huge meat cleaver, same outfit in every frame", "lach"),
+    ("survivor_run", "nhan_vat", "male survivor, red cap, brown leather jacket, light blue jeans, brown boots, beard, holding pistol", "chay"),
+    ("zombie_walker", "zombie", "green zombie, torn plaid shirt, jeans, arms forward", "di"),
+    ("zombie_runner", "zombie", "skinny grey zombie, torn rags", "chay"),
+    ("zombie_fat", "zombie", "huge fat green zombie, torn overalls", "lach"),
+    ("zombie_spitter", "zombie", "hunched green zombie, glowing acid throat", "di"),
+    ("zombie_armored", "zombie", "zombie in riot police armor, cracked helmet", "di"),
+    ("boss_brute", "zombie", "giant muscular green zombie butcher, orange bloody apron, dark trousers, huge cleaver", "lach"),
 ]
 
-PHONG_CACH = (
-    "2D mobile game art in the style of Earn to Die 2, hand-drawn comic illustration, "
-    "thick clean black outlines, flat cel shading, gritty post-apocalyptic palette, "
-    "game sprite, full body from head to feet, strict side view profile facing right, "
-    "one single character only, isolated on plain flat pure white background"
-)
-CAM = ("different clothes, changing colors, text, watermark, logo, frame, multiple views, character sheet, duplicate, extra limbs, "
-       "extra characters, smoke, dust, muzzle flash, motion lines, shadow, ground, scenery, "
-       "cropped, cut off, blurry, photo, 3d render, realistic, facing left, front view")
+PHONG_CACH = ("comic game art, Earn to Die style, thick black outlines, cel shading, game sprite, "
+              "full body, side view, facing right, same outfit, white background")
+CAM = "different clothes, text, watermark, cropped, 3d, photo, realistic, background, shadow, front view, facing left, extra limbs"
 
 # ---------- 1. Bộ xương OpenPose cho một vòng bước ----------
 # 18 điểm COCO: 0 mũi,1 cổ,2 vai P,3 khuỷu P,4 cổ tay P,5 vai T,6 khuỷu T,7 cổ tay T,
@@ -171,7 +165,7 @@ def loc_rac(anh):
 
 def chay():
     for ten, nhom, mo_ta, kieu in NHAN_VAT:
-        da_lam = f"{RA}/_da_ve_lai.txt"
+        da_lam = f"{RA}/_da_ve_lai_{DOT}.txt"
         xong_roi = set(open(da_lam).read().split()) if os.path.exists(da_lam) else set()
         lam_lai = ten in VE_LAI and ten not in xong_roi
         if os.path.exists(f"{RA}/{ten}_{SO_KHUNG - 1}.png") and not lam_lai:
@@ -188,7 +182,11 @@ def chay():
             xuong = ve_xuong(p)
             xuong.save(f"{RA}/_xuong/{ten}_{i}.png")
             print(f"🎞  {ten} khung {i + 1}/{SO_KHUNG}")
-            anh = pipe(prompt=f"{mo_ta}, {'running' if kieu == 'chay' else 'walking'}. {PHONG_CACH}",
+            p = f"{mo_ta}, {'running' if kieu == 'chay' else 'walking'}, {PHONG_CACH}"
+            if i == 0:
+                n = len(pipe.tokenizer(p).input_ids)
+                print(f"   🔎 prompt {n} token" + ("  ⚠️ > 77, sẽ bị cắt!" if n > 77 else ""))
+            anh = pipe(prompt=p,
                        negative_prompt=CAM, image=xuong, ip_adapter_image=nen_trang,
                        width=RONG, height=CAO, num_inference_steps=SO_BUOC, guidance_scale=DO_BAM_SAT,
                        controlnet_conditioning_scale=0.9,

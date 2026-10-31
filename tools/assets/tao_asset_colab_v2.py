@@ -106,77 +106,52 @@ VUONG = "1024x1024"
 NGANG = "1216x832"
 DOC = "832x1216"
 
-# Một phong cách chung cho MỌI ảnh để nhìn nhất quán
-PHONG_CACH_CHUNG = (
-    "2D mobile game art in the style of Earn to Die 2, hand-drawn comic illustration, "
-    "thick clean black outlines, flat cel shading with soft highlights, "
-    "gritty post-apocalyptic palette of dusty orange, rust brown, olive green and steel grey"
-)
-PHONG_CACH = (
-    PHONG_CACH_CHUNG + ", game sprite, single subject centered, whole subject inside the frame, "
-    "isolated on plain flat pure white background"
-)
-# Nhân vật & zombie: toàn thân nhìn ngang, hai chân dạng ra để game cắt ở hông cho chân bước
-PHONG_CACH_NGUOI = (
-    PHONG_CACH + ", full body from head to feet, strict side view profile, "
-    "legs clearly apart mid-stride with a visible gap between the legs, feet at the bottom, "
-    "one single character only"
-)
-PHONG_CACH_ICON = (
-    PHONG_CACH_CHUNG + ", square mobile game UI icon, bright readable colors, "
-    "single object centered, isolated on plain flat pure white background"
-)
-PHONG_CACH_NEN = (
-    PHONG_CACH_CHUNG + ", 2D side-scrolling game background, wide panoramic scene, "
-    "flat horizon, empty ground strip at the bottom, warm sunset light, no characters"
-)
-# Hiệu ứng vẽ trên nền ĐEN rồi lấy độ sáng làm độ trong (lửa, nổ, tia lửa)
-PHONG_CACH_SANG = (
-    PHONG_CACH_CHUNG + ", game visual effect sprite, single effect centered, glowing, "
-    "isolated on plain pure black background"
-)
-CAM = (
-    "text, words, letters, watermark, logo, signature, frame, border, multiple views, "
-    "character sheet, collage, duplicate, extra characters, crowd, smoke, dust cloud, "
-    "muzzle flash, motion lines, shadow, ground, floor, scenery, background objects, "
-    "cropped, cut off, blurry, photo, 3d render, realistic"
-)
-CAM_NEN = "text, watermark, logo, characters, people, zombies, frame, border, blurry, photo, 3d render"
+# Prompt kiểu TỪ KHÓA, ngắn: CLIP của SDXL chỉ đọc 77 token (gồm 2 token đầu/cuối),
+# phần vượt bị cắt mất. Mỗi prompt = mô tả (≤ ~30 token) + phong cách (~20 token) ≈ 45–60 token.
+PHONG_CACH_CHUNG = "comic game art, Earn to Die style, thick black outlines, cel shading, gritty post-apocalyptic colors"
+PHONG_CACH = PHONG_CACH_CHUNG + ", game sprite, single object centered, whole object in frame, clean edges, detailed, plain white background"
+PHONG_CACH_NGUOI = PHONG_CACH_CHUNG + ", full body, side view, facing right, legs apart, one character, white background"
+PHONG_CACH_ICON = "mobile game icon, comic style, Earn to Die style, bold black outline, cel shading, bright saturated colors, glossy highlight, clean edges, high detail, game UI asset, single object centered, plain white background"
+PHONG_CACH_NEN = PHONG_CACH_CHUNG + ", 2D side-scrolling game background, wide panorama, flat horizon, sunset light, no people"
+PHONG_CACH_SANG = PHONG_CACH_CHUNG + ", glowing game visual effect, bright core, single effect centered, nothing else, pure black background"
+CAM = "text, watermark, logo, cropped, 3d, photo, realistic, background, shadow, front view, facing left, extra limbs, duplicate"
+CAM_NEN = "text, watermark, logo, people, 3d, photo, blurry"
 
 # Chế độ (cột 4): True = xóa phông + lọc rác; False = giữ nguyên (nền, thẻ);
 # "sang" = vẽ trên nền đen, độ sáng thành độ trong (lửa/nổ);
 # "nguoi" = như True nhưng dùng mô tả toàn thân cho hoạt hình.
+
 HINH = [
     # --- Nhân vật ---
-    ("nhan_vat", "survivor_idle", "male survivor, red cap, brown leather jacket, blue jeans, brown boots, holding a pistol pointed down, standing relaxed with feet apart, facing right", "nguoi", DOC),
-    ("nhan_vat", "survivor_run", "male survivor, red cap, brown leather jacket, blue jeans, brown boots, running fast with a pistol, facing right", "nguoi", DOC),
-    ("nhan_vat", "survivor_jump", "male survivor, red cap, brown leather jacket, blue jeans, brown boots, jumping in the air with knees bent, holding a pistol, facing right", True, VUONG),
-    ("nhan_vat", "survivor_shoot", "male survivor, red cap, brown leather jacket, blue jeans, brown boots, aiming a pistol straight forward with both hands, feet apart, facing right", "nguoi", DOC),
-    ("nhan_vat", "survivor_hurt", "male survivor, red cap, brown leather jacket, blue jeans, flinching backwards in pain, facing right", True, VUONG),
+    ("nhan_vat", "survivor_idle", "male survivor, red cap, brown leather jacket, blue jeans, boots, pistol pointed down, standing", "nguoi", DOC),
+    ("nhan_vat", "survivor_run", "male survivor, red cap, brown leather jacket, blue jeans, boots, holding pistol, running", "nguoi", DOC),
+    ("nhan_vat", "survivor_jump", "male survivor, red cap, brown leather jacket, blue jeans, holding pistol, jumping", True, VUONG),
+    ("nhan_vat", "survivor_shoot", "male survivor, red cap, brown leather jacket, blue jeans, boots, aiming pistol forward", "nguoi", DOC),
+    ("nhan_vat", "survivor_hurt", "male survivor, red cap, leather jacket, blue jeans, flinching in pain", True, VUONG),
     ("nhan_vat", "survivor_dead", "male survivor in red cap lying knocked out on the ground", True, VUONG),
-    ("nhan_vat", "merchant", "burly merchant, red bandana, beard, green vest, spiked shoulder pad, hook hand, half body portrait", True, VUONG),
+    ("nhan_vat", "merchant", "burly merchant, red bandana, beard, green vest, hook hand", True, VUONG),
 
     # --- Zombie và trùm ---
-    ("zombie", "zombie_walker", "shambling green-skinned zombie in torn plaid shirt and jeans, arms reaching forward, walking, facing right", "nguoi", DOC),
-    ("zombie", "zombie_runner", "fast skinny grey zombie in rags sprinting, leaning forward, facing right", "nguoi", DOC),
-    ("zombie", "zombie_fat", "huge fat bloated green zombie in torn overalls, waddling, facing right", "nguoi", DOC),
-    ("zombie", "zombie_spitter", "hunched green zombie with swollen glowing acid throat and dripping mouth, walking, facing right", "nguoi", DOC),
-    ("zombie", "zombie_armored", "zombie wearing dented riot police armor and cracked helmet, walking, facing right", "nguoi", DOC),
+    ("zombie", "zombie_walker", "shambling green-skinned zombie in torn plaid shirt and jeans, arms reaching forward, walking", "nguoi", DOC),
+    ("zombie", "zombie_runner", "fast skinny grey zombie in rags sprinting, leaning forward", "nguoi", DOC),
+    ("zombie", "zombie_fat", "huge fat bloated green zombie in torn overalls, waddling", "nguoi", DOC),
+    ("zombie", "zombie_spitter", "hunched green zombie with swollen glowing acid throat and dripping mouth, walking", "nguoi", DOC),
+    ("zombie", "zombie_armored", "zombie wearing dented riot police armor and cracked helmet, walking", "nguoi", DOC),
     ("zombie", "zombie_bat", "mutant zombie bat flying, wings spread", True, VUONG),
-    ("zombie", "zombie_crawler", "legless zombie crawling on its hands, facing right", True, VUONG),
-    ("zombie", "zombie_dog", "rabid rotten zombie dog running, facing right", True, VUONG),
-    ("zombie", "boss_brute", "giant muscular butcher zombie boss with bloody apron and huge cleaver, walking, facing right", "nguoi", DOC),
-    ("zombie", "boss_mutant_worm", "giant pink mutant worm boss rearing up, round mouth full of teeth, facing right", True, VUONG),
-    ("zombie", "boss_tank_zombie", "massive hulking zombie boss with rusty metal plates bolted onto its body, walking, facing right", "nguoi", DOC),
+    ("zombie", "zombie_crawler", "legless zombie crawling on its hands", True, VUONG),
+    ("zombie", "zombie_dog", "rabid rotten zombie dog running", True, VUONG),
+    ("zombie", "boss_brute", "giant muscular butcher zombie boss with bloody apron and huge cleaver, walking", "nguoi", DOC),
+    ("zombie", "boss_mutant_worm", "giant pink mutant worm boss rearing up, round mouth full of teeth", True, VUONG),
+    ("zombie", "boss_tank_zombie", "massive hulking zombie boss with rusty metal plates bolted onto its body, walking", "nguoi", DOC),
 
     # --- Xe (nhìn ngang, đầu xe bên phải) ---
-    ("xe", "car_motorbike", "rusty dirt motorbike with rider seat, side view facing right", True, NGANG),
-    ("xe", "car_sedan", "rusty old sedan car with armor plates and bull bar, side view facing right", True, NGANG),
-    ("xe", "car_muscle", "black muscle car with spikes and roof gun, side view facing right", True, NGANG),
-    ("xe", "car_pickup", "armored pickup truck with mounted machine gun, side view facing right", True, NGANG),
-    ("xe", "car_bus", "armored school bus with welded metal plates and plow, side view facing right", True, NGANG),
-    ("xe", "car_monster", "monster truck with huge wheels and flamethrower, side view facing right", True, NGANG),
-    ("xe", "car_tank", "military tank with cannon, side view facing right", True, NGANG),
+    ("xe", "car_motorbike", "rusty dirt motorbike with rider seat", True, NGANG),
+    ("xe", "car_sedan", "rusty old sedan car with armor plates and bull bar", True, NGANG),
+    ("xe", "car_muscle", "black muscle car with spikes and roof gun", True, NGANG),
+    ("xe", "car_pickup", "armored pickup truck with mounted machine gun", True, NGANG),
+    ("xe", "car_bus", "armored school bus with welded metal plates and plow", True, NGANG),
+    ("xe", "car_monster", "monster truck with huge wheels and flamethrower", True, NGANG),
+    ("xe", "car_tank", "military tank with cannon", True, NGANG),
     ("xe", "car_wreck_burning", "burning wrecked pickup truck, side view", True, NGANG),
 
     # --- Mảnh ghép (thu thập đủ để lắp) ---
@@ -192,14 +167,14 @@ HINH = [
     ("manh_xe", "part_brick", "stack of bricks and cement bag for building", True, VUONG),
 
     # --- Vũ khí ---
-    ("vu_khi", "wpn_pistol", "handgun, side view facing right", True, VUONG),
-    ("vu_khi", "wpn_smg", "submachine gun, side view facing right", True, VUONG),
-    ("vu_khi", "wpn_shotgun", "pump shotgun, side view facing right", True, VUONG),
-    ("vu_khi", "wpn_rifle", "assault rifle, side view facing right", True, VUONG),
-    ("vu_khi", "wpn_minigun", "rotary minigun, side view facing right", True, VUONG),
-    ("vu_khi", "wpn_rocket", "rocket launcher, side view facing right", True, VUONG),
-    ("vu_khi", "wpn_flamethrower", "flamethrower with fuel tank, side view facing right", True, VUONG),
-    ("vu_khi", "wpn_laser", "sci-fi laser rifle, side view facing right", True, VUONG),
+    ("vu_khi", "wpn_pistol", "handgun", True, VUONG),
+    ("vu_khi", "wpn_smg", "submachine gun", True, VUONG),
+    ("vu_khi", "wpn_shotgun", "pump shotgun", True, VUONG),
+    ("vu_khi", "wpn_rifle", "assault rifle", True, VUONG),
+    ("vu_khi", "wpn_minigun", "rotary minigun", True, VUONG),
+    ("vu_khi", "wpn_rocket", "rocket launcher", True, VUONG),
+    ("vu_khi", "wpn_flamethrower", "flamethrower with fuel tank", True, VUONG),
+    ("vu_khi", "wpn_laser", "sci-fi laser rifle", True, VUONG),
     ("vu_khi", "wpn_bow", "hunting bow with arrow, side view", True, VUONG),
     ("vu_khi", "wpn_spear", "makeshift spear, diagonal", True, VUONG),
     ("vu_khi", "wpn_axe", "fire axe, diagonal", True, VUONG),
@@ -213,9 +188,9 @@ HINH = [
     ("phong_thu", "def_wall_metal", "scrap metal fortress wall segment", True, VUONG),
     ("phong_thu", "def_gate", "fortress gate made of scrap metal and car doors", True, VUONG),
     ("phong_thu", "def_watchtower", "wooden watchtower with sniper nest", True, VUONG),
-    ("phong_thu", "def_turret_mg", "machine gun turret on tripod base, facing right", True, VUONG),
-    ("phong_thu", "def_turret_cannon", "heavy cannon turret on armored base, facing right", True, VUONG),
-    ("phong_thu", "def_turret_flame", "flamethrower turret on base, facing right", True, VUONG),
+    ("phong_thu", "def_turret_mg", "machine gun turret on tripod base", True, VUONG),
+    ("phong_thu", "def_turret_cannon", "heavy cannon turret on armored base", True, VUONG),
+    ("phong_thu", "def_turret_flame", "flamethrower turret on base", True, VUONG),
     ("phong_thu", "def_turret_tesla", "tesla coil electric turret", True, VUONG),
     ("phong_thu", "def_turret_mortar", "mortar launcher turret", True, VUONG),
     ("phong_thu", "def_landmine", "landmine half buried in sand", True, VUONG),
@@ -394,9 +369,37 @@ def sang_thanh_trong(duong_vao, duong_ra):
         ra = ra.crop(hop)
     ra.save(duong_ra, "PNG")
 
+
+def dem_token(p):
+    """Số token CLIP của prompt (cả 2 bộ mã hóa SDXL dùng cùng cách tách từ)."""
+    return len(pipe.tokenizer(p).input_ids)
+
+def kiem_tra_prompt():
+    """In cảnh báo các prompt vượt 77 token TRƯỚC khi vẽ (vượt thì bị cắt đuôi)."""
+    loi = 0
+    for nhom, ten, mo_ta, che_do, _ in HINH:
+        n = dem_token(f"{mo_ta}, {chon_phong_cach(nhom, che_do)[0]}")
+        if n > 77:
+            loi += 1
+            print(f"⚠️  {ten}: {n} token (> 77) — rút gọn mô tả")
+    print(f"🔎 Kiểm tra prompt: {len(HINH) - loi}/{len(HINH)} trong giới hạn 77 token")
+
+def chon_phong_cach(nhom, che_do):
+    if nhom == "nen":
+        return PHONG_CACH_NEN, CAM_NEN
+    if che_do == "sang":
+        return PHONG_CACH_SANG, CAM
+    if che_do == "nguoi":
+        return PHONG_CACH_NGUOI, CAM
+    if nhom in ("suc_manh", "giao_dien"):
+        return PHONG_CACH_ICON, CAM
+    return PHONG_CACH, CAM
+
 # 8. VÒNG LẶP CHẠY TỔNG HỢP
 def chay():
     xong, bo_qua = 0, 0
+
+    kiem_tra_prompt()
 
     # --- A. TẠO HÌNH ẢNH ---
     print("\n--- 🎨 BẮT ĐẦU TẠO HÌNH ẢNH ---")
@@ -408,18 +411,9 @@ def chay():
             continue
 
         print(f"🎨 Đang vẽ GPU: {nhom}/{ten}...")
-        if nhom == "nen":
-            nen, cam = PHONG_CACH_NEN, CAM_NEN
-        elif can_xoa_phong == "sang":
-            nen, cam = PHONG_CACH_SANG, CAM
-        elif can_xoa_phong == "nguoi":
-            nen, cam = PHONG_CACH_NGUOI, CAM
-        elif nhom in ("suc_manh", "giao_dien"):
-            nen, cam = PHONG_CACH_ICON, CAM
-        else:
-            nen, cam = PHONG_CACH, CAM
+        nen, cam = chon_phong_cach(nhom, can_xoa_phong)
         try:
-            tam = tao_hinh_gpu(f"{mo_ta}. {nen}", kich_thuoc, cam, ten)
+            tam = tao_hinh_gpu(f"{mo_ta}, {nen}", kich_thuoc, cam, ten)
             if can_xoa_phong == "sang":
                 sang_thanh_trong(tam, dich)
             elif can_xoa_phong:
