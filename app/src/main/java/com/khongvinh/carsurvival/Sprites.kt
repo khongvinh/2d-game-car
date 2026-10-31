@@ -31,6 +31,17 @@ object Sprites {
 
     fun has(name: String) = get(name) != null
 
+    private val frameCount = HashMap<String, Int>()
+
+    /** Number of animation frames name_0, name_1, ... shipped for [name] (0 = none). */
+    fun frames(name: String): Int = synchronized(frameCount) {
+        frameCount.getOrPut(name) {
+            var n = 0
+            while (n < 16 && has("${name}_$n")) n++
+            n
+        }
+    }
+
     fun zombie(t: ZombieType) = when (t) {
         ZombieType.WALKER -> "zombie_walker"
         ZombieType.RUNNER -> "zombie_runner"

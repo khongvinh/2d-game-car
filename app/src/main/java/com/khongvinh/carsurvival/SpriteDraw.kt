@@ -71,7 +71,14 @@ internal fun Renderer.walkSprite(
     alpha: Int = 255,
     lean: Float = 0f,
 ): Boolean {
-    val rig = Rig.of(name ?: return false) ?: return sprite(c, name, cx, bottom, h, flip, alpha, lean)
+    if (name == null) return false
+    // real drawn frames win over the cut-out legs
+    val n = Sprites.frames(name)
+    if (n > 0 && stride > 0f) {
+        val k = ((phase / (2f * kotlin.math.PI.toFloat()) * n).toInt() % n + n) % n
+        return sprite(c, "${name}_$k", cx, bottom, h, flip, alpha, lean * 0.5f)
+    }
+    val rig = Rig.of(name) ?: return sprite(c, name, cx, bottom, h, flip, alpha, lean)
     val s = h / rig.h
     val sw = kotlin.math.sin(phase)
     val lift = kotlin.math.abs(sw)

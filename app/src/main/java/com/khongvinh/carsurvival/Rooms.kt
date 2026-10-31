@@ -244,13 +244,18 @@ class RoomRules(private val g: Game) {
         if (d.dir != 0f) {
             d.face = d.dir
             d.x = (d.x + d.dir * speed * dt).coerceIn(40f, rm.width - 40f)
+            val step = (d.walk / PI.toFloat()).toInt()
             d.walk += dt * 11f
+            if ((d.walk / PI.toFloat()).toInt() != step && d.air < 2f) g.dustAt(d.x - d.dir * 14f, d.y, 2, 50f)
         }
+        if (d.landT > 0f) d.landT -= dt
+        if (d.muzzleT > 0f) d.muzzleT -= dt
         val grounded = d.air <= 0.5f && d.vy >= 0f
         if (grounded) run.airJumps = run.lv(Power.JUMP2)
         if (jump && !run.jumpWas) {
             if (grounded) {
                 d.vy = -700f
+                g.dustAt(d.x, d.y, 6)
                 g.sfx.play(Sfx.S.CLICK, 0.4f)
             } else if (run.airJumps > 0) {
                 run.airJumps--
@@ -263,6 +268,11 @@ class RoomRules(private val g: Game) {
         d.vy += Game.G * dt
         val ground = rm.support(d.x, d.y)
         if (feet >= ground) {
+            // landing: dust and a quick squash, harder falls kick up more
+            if (d.vy > 380f) {
+                g.dustAt(d.x, ground, if (d.vy > 800f) 10 else 6, 160f)
+                d.landT = 0.16f
+            }
             feet = ground
             d.vy = 0f
         }
@@ -481,6 +491,7 @@ class RoomRules(private val g: Game) {
             })
         }
         g.particles.add(Particle(gx + cos(d.aim) * 26f, gy + sin(d.aim) * 26f, 0f, 0f, 0.06f, 0.06f, 9f, 0xFFFFE082.toInt()))
+        if (w != SideWeapon.BOW && w != SideWeapon.DART && w != SideWeapon.SPEAR) d.muzzleT = 0.07f
         g.sfx.play(if (w == SideWeapon.BOW || w == SideWeapon.DART) Sfx.S.BOW else Sfx.S.SHOOT, 0.35f)
     }
 

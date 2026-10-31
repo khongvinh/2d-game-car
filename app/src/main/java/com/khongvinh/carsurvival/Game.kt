@@ -24,7 +24,7 @@ import kotlin.random.Random
 class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
     companion object {
         /** Shown on the menu so the installed build is easy to check. */
-        const val VERSION = "7.5"
+        const val VERSION = "7.6"
 
         const val VIRTUAL_HEIGHT = 720f
         const val METER = 30f
@@ -1110,6 +1110,15 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
     internal fun bleedAt(x: Float, y: Float, n: Int) = bleed(x, y, n)
     internal fun sparksAt(x: Float, y: Float) = sparks(x, y)
     internal fun burstAt(x: Float, y: Float, color: Int, n: Int) = burst(x, y, color, n)
+
+    /** Puffs of dust at the feet (jumps, landings, footsteps). */
+    internal fun dustAt(x: Float, y: Float, n: Int, spread: Float = 120f) {
+        repeat(n) {
+            val life = rnd(0.35f, 0.6f)
+            val c = if (Random.nextBoolean()) 0xFFB8A99A.toInt() else 0xFF9E8E7E.toInt()
+            particles.add(Particle(x + rnd(-10f, 10f), y - 4f, rnd(-spread, spread), rnd(-90f, -20f), life, life, rnd(7f, 12f), c, -60f, 2.2f))
+        }
+    }
     internal fun explodeAt(x: Float, y: Float, n: Int) = explode(x, y, 0xFFFF6D00.toInt(), n)
     internal fun giveMoneyQuiet(n: Int) {
         runMoney += n

@@ -1506,6 +1506,27 @@ class Renderer(internal val g: Game) {
         c.restore()
     }
 
+    /** Muzzle flash: the AI effect picture if there is one, else a hot star. */
+    private fun muzzle(c: Canvas, x: Float, y: Float, a: Float) {
+        c.save()
+        c.translate(x, y)
+        c.rotate(a * 180f / PI.toFloat())
+        if (!spriteBox(c, "fx_muzzle", -6f, -22f, 50f, 22f)) {
+            path.reset()
+            for (k in 0 until 10) {
+                val rr = if (k % 2 == 0) (if (k == 0) 34f else 18f) else 7f
+                val t = k * PI.toFloat() / 5
+                if (k == 0) path.moveTo(cos(t) * rr, sin(t) * rr) else path.lineTo(cos(t) * rr, sin(t) * rr)
+            }
+            path.close()
+            fill.color = 0xFFFFC107.toInt()
+            c.drawPath(path, fill)
+            fill.color = 0xFFFFF9C4.toInt()
+            c.drawCircle(4f, 0f, 7f, fill)
+        }
+        c.restore()
+    }
+
     internal fun drawDriverBody(c: Canvas, d: Driver, x: Float, y: Float, f: Float, swing: Float) {
         // shadow
         fill.color = 0x40000000
@@ -1522,7 +1543,11 @@ class Renderer(internal val g: Game) {
         val stride = if (jumping) 0f else if (moving) 28f else 0f
         val phase = if (moving) d.walk else g.anim * 3f
         val hurt = d.hurtT > 0f && (g.anim * 20f).toInt() % 2 == 0
-        if (walkSprite(c, pic, x, y + 4f, 108f, f < 0f, phase, stride, if (hurt) 150 else 255, if (moving) 5f else 0f)) {
+        // landing squash: shorter for a moment
+        val squat = if (d.landT > 0f) 1f - 0.12f * (d.landT / 0.16f) else 1f
+        val kick = if (d.muzzleT > 0f) -4f * f else 0f
+        if (walkSprite(c, pic, x + kick, y + 4f, 108f * squat, f < 0f, phase, stride, if (hurt) 150 else 255, if (moving) 5f else 0f)) {
+            if (d.muzzleT > 0f) muzzle(c, x + cos(d.aim) * 62f, y - 58f + sin(d.aim) * 62f, d.aim)
             driverHp(c, d, x, y)
             return
         }

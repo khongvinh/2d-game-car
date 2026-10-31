@@ -256,7 +256,7 @@ Tài liệu bàn giao để tiếp tục làm việc ở phiên chat mới mà k
 - Chưa dùng: zombie_spitter (ảnh chỉ có cái đầu — nên tạo lại cả người), car_monster/car_muscle, survivor_dead, def_build_slot/gate/generator/sandbags, item_ammo/blueprint/chest/fuel/medkit/scrap, các part_* khác, ui_gift/lock/mission/star/trophy.
 - Việc tiếp: tạo lại zombie_spitter; dùng tiếp các ảnh chưa dùng (nút nhiệm vụ/thành tích, xăng/phế liệu trên HUD); cân bằng độ khó; trại theo vùng.
 
-### v7.5 — Chân bước thật, ảnh gốc không nén, sửa ảnh lỗi, script asset bản 2 (hiện tại)
+### v7.5 — Chân bước thật, ảnh gốc không nén, sửa ảnh lỗi, script asset bản 2
 - Phản hồi (ảnh chụp máy thật): nhân vật di chuyển lạ, trùm nhà kho vẫn vẽ code, chưa sinh động; muốn giống video; không cần nén, cần đẹp và nhất quán.
 - Nguyên nhân tìm ra: survivor_run do AI vẽ QUAY TRÁI (chạy giật lùi) và dính khói súng/cục rác (trông như bóng ma đi cạnh); zombie_walker, boss_brute, zombie_armored, zombie_bat, boss_tank_zombie cũng quay trái; ảnh bị nén 256 màu + thu 384px nên lem.
 - nhap_asset.py: KHÔNG nén nữa (sprite PNG RGBA gốc ≤1024px, nền PNG gốc; img ~35MB, APK ~38MB); hàm clean(): bỏ điểm mờ alpha < 90 (khói, bụi), xóa mảnh rời < 30% mảnh lớn nhất, cắt sát; FACING_LEFT = ảnh quay trái thì lật; CUT_LEFT = {"survivor_run": 0.4} cắt bỏ khói. LƯU Ý: khi nhập bộ v2, xem lại hướng từng ảnh và sửa FACING_LEFT cho đúng bộ mới.
@@ -265,6 +265,14 @@ Tài liệu bàn giao để tiếp tục làm việc ở phiên chat mới mà k
 - Nối sẵn tên ảnh mới (có file là tự dùng): cửa prop_door/prop_door_locked, kệ prop_shelf, xe gỉ prop_car_rusty, chồng thùng prop_crate_stack, pallet + thùng phuy prop_pallet/prop_barrel, sàn treo prop_catwalk (kéo giãn — spriteFill), nền phòng bg_warehouse/_2/_3 theo palette phòng.
 - Script asset bản 2: tools/assets/tao_asset_colab_v2.py — SDXL 1.0 + LCM-LoRA (8 bước, 1024px, guidance 1,5, negative prompt cấm khói/bóng/vật thừa/nhiều nhân vật), VAE fp16-fix, seed cố định theo tên (SEED_GOC), một phong cách chung cho mọi ảnh; nhân vật/zombie chế độ "nguoi" (toàn thân, nhìn ngang, hai chân dạng ra, khổ dọc 832x1216, quay phải); thêm survivor_jump/shoot/hurt, zombie_spitter vẽ lại toàn thân, nhóm do_dac (cửa, kệ, xe gỉ, thùng, pallet, sàn treo, bàn, item_crate, def_barricade_wood, def_sandbags vẽ lại), hieu_ung (fx_muzzle/explosion/fire/spark chế độ "sang" vẽ nền đen lấy độ sáng làm độ trong; fx_blood/dust), nền bg_warehouse_2/_3, bg_volcano_road/night_road/alien_road. Lưu Drive DuaXeSinhTon_assets_v2; TAO_AM_THANH = False (âm thanh giữ bộ 1). Cài: !pip install -q diffusers transformers accelerate peft rembg onnxruntime.
 - Việc tiếp: người dùng chạy script v2 trên Colab → trợ lý tải về (giữ nhóm thư mục), sửa FACING_LEFT theo ảnh mới, nhập, nối fx_* (lửa đầu nòng, nổ, máu, bụi) và nền đường theo vùng; cân bằng độ khó.
+
+### v7.6 — Hiệu ứng như video, hỗ trợ khung hình chạy thật, script tạo khung hình (hiện tại)
+- Người dùng gửi lại video mẫu (gameplay kiểu chạy-bắn qua phòng nhà kho, 70 giây). Điểm làm nó sinh động: nhân vật có khung hình chạy thật + tư thế nhảy/tiếp đất, bụi khi nhảy/tiếp đất, lửa đầu nòng, vệt đạn, nổ, phòng vẽ tay liền khối. Chỉ học cảm giác/thể loại — không chép hình, tên, giao diện của game đó.
+- Game: bụi khi nhảy, khi tiếp đất (rơi mạnh bụi nhiều hơn) và theo bước chân (Game.dustAt); nhún người khi tiếp đất (Driver.landT); lửa đầu nòng to + giật súng khi bắn (Driver.muzzleT, Renderer.muzzle — ảnh fx_muzzle nếu có, không thì ngôi sao lửa vẽ code; không áp dụng cho cung/phi tiêu/giáo).
+- Khung hình chạy: Sprites.frames(tên) đếm tên_0..tên_15; walkSprite phát theo pha bước khi có khung (đi/chạy), không có thì dùng Rig cắt chân.
+- tools/assets/tao_khung_hinh_colab.py (chạy SAU tao_asset_colab_v2.py): tự dựng bộ xương OpenPose 8 tư thế/vòng (kiểu "chay" / "di" / "lach"), SDXL + ControlNet OpenPose (thibaud/controlnet-openpose-sdxl-1.0) + IP-Adapter (h94/IP-Adapter sdxl, mẫu = ảnh gốc bản 2, DO_GIONG_MAU 0,65) + LCM-LoRA, cùng seed; xóa phông + lọc rác; cắt mọi khung theo MỘT khung bao chung (chân không giật). Ra Drive DuaXeSinhTon_assets_v2/khung_hinh/<tên>_0..7.png (+ _xuong/ ảnh bộ xương). Nhân vật: survivor_run, zombie_walker/runner/fat/spitter/armored, boss_brute.
+- nhap_asset.py: tham số --v2 (bộ 2 vẽ quay phải, bỏ lật/cắt của bộ 1); nhóm khung_hinh lọc rác nhưng không cắt riêng từng khung.
+- Việc tiếp: người dùng chạy 2 script Colab (v2 rồi khung hình) → trợ lý tải về, `python3 tools/assets/nhap_asset.py <thư mục> --v2`, xem hướng ảnh, nối fx_* (nổ, máu, lửa) và nền đường theo vùng.
 
 ## 3. Luật chơi cũ trước v7.0 (v6.1, để tham khảo)
 
@@ -447,7 +455,7 @@ cd tools/dev/preview && gradle walk      # tài xế đứng yên khi bão đi q
 
 | Phiên | Tiêu đề | Phạm vi |
 |---|---|---|
-| #3 | Đua Xe Sinh Tồn #3 — v7.3→v7.5: ảnh AI đầy đủ, chân bước thật, ảnh gốc không nén, script asset v2 | v7.4: đủ 101 ảnh, ánh xạ zombie/trùm/vũ khí xe/nút tròn/nền; v7.5: Rig cắt hông, sửa ảnh quay trái/dính khói, trùm nhà kho bằng ảnh, tao_asset_colab_v2.py |
+| #3 | Đua Xe Sinh Tồn #3 — v7.3→v7.6: ảnh AI đầy đủ, chân bước thật, ảnh gốc không nén, hiệu ứng bụi/lửa nòng, script asset v2 + khung hình chạy | v7.4: đủ 101 ảnh, ánh xạ zombie/trùm/vũ khí xe/nút tròn/nền; v7.5: Rig cắt hông, sửa ảnh quay trái/dính khói, trùm nhà kho bằng ảnh, tao_asset_colab_v2.py; v7.6: bụi/nhún/lửa nòng, khung hình tên_0..7, tao_khung_hinh_colab.py |
 | #2 | Đua Xe Sinh Tồn #2 — v5.0→v7.3: lá chắn đi bộ, âm lượng, nhà kho 30 phòng kiểu Earn to Die Rogue, menu bản đồ, nhiệm vụ, LÀM LẠI thành thủ trại (ngày lục soát/lên đường, đêm thủ thành), script tạo asset AI | v5.1→v7.3 + bài thử preview `inside`, `walk`, `rooms`, `camp`; script asset Colab miễn phí; nhập ảnh AI |
 | #1 | Đua Xe Sinh Tồn #1 — v1.0→v5.0: tạo game, kiểu Earn to Die, bão 3 bo, nhạc, trùm cuối, 20 bản đồ, gara 25 xe, 20 kiểu đường, giao diện thép, tiếng động cơ, ngọc đỏ, lô cốt, cốt truyện, cây kỹ năng, tài xế lục soát, xe nổ tài xế chạy tiếp, nhảy, đổi vị trí phím | Từ đầu đến v5.0 + tài liệu bàn giao, công cụ tools/dev, quy tắc CLAUDE.md |
 

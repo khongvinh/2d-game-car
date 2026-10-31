@@ -332,4 +332,8 @@ class Driver {
 
     /** Melee swing animation. */
     var atkT = 0f
+
+    /** Muzzle flash and landing squash timers (drawing only). */
+    var muzzleT = 0f
+    var landT = 0f
 }

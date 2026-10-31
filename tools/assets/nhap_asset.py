@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 """Copy assets made by tao_asset_colab.py into the app (app/src/main/assets).
 
-Usage: python3 tools/assets/nhap_asset.py <thư mục DuaXeSinhTon_assets đã giải nén>
+Usage: python3 tools/assets/nhap_asset.py <thư mục DuaXeSinhTon_assets đã giải nén> [--v2]
+  --v2: bộ ảnh bản 2 (đã vẽ quay phải) — không lật/cắt theo bảng sửa của bộ 1.
+  Thư mục khung_hinh/ (<tên>_0.png...): khung hình chạy, giữ nguyên khung bao chung.
 
 Pictures are kept at full quality (no palette, no JPEG): sprites as RGBA PNG,
 backgrounds as PNG. Sprites are cleaned first: faint haze (smoke, dust) is
@@ -23,7 +25,7 @@ FACING_LEFT = {"survivor_run", "zombie_walker", "boss_brute", "zombie_armored", 
 CUT_LEFT = {"survivor_run": 0.4}
 
 
-def clean(im):
+def clean(im, crop=True):
     """Erase haze and loose blobs around the subject, crop to what is left."""
     a = np.array(im)
     alpha = a[:, :, 3]
@@ -62,6 +64,8 @@ def clean(im):
         alpha[~pad] = 0
     a[:, :, 3] = alpha
     out = Image.fromarray(a)
+    if not crop:
+        return out
     box = out.getchannel("A").getbbox()
     if box:
         l, t, r, b = box
@@ -70,6 +74,9 @@ def clean(im):
 
 
 src = sys.argv[1]
+V2 = "--v2" in sys.argv[2:]
+if V2:
+    FACING_LEFT, CUT_LEFT = set(), {}
 root = os.path.join(os.path.dirname(__file__), "..", "..", "app", "src", "main", "assets")
 img_dir = os.path.join(root, "img")
 os.makedirs(img_dir, exist_ok=True)
@@ -88,6 +95,12 @@ for group in sorted(os.listdir(src)):
                 old = os.path.join(img_dir, name + ".jpg")
                 if os.path.exists(old):
                     os.remove(old)
+            elif group == "khung_hinh":
+                # animation frames share one bounding box: clean but never crop
+                im = clean(im.convert("RGBA"), crop=False)
+                if name.rsplit("_", 1)[0] in FACING_LEFT:
+                    im = im.transpose(Image.FLIP_LEFT_RIGHT)
+                im.save(os.path.join(img_dir, name + ".png"), "PNG")
             elif group == "hieu_ung" and name.startswith("fx_") and name not in ("fx_blood", "fx_dust"):
                 im.convert("RGBA").save(os.path.join(img_dir, name + ".png"), "PNG")  # glow: keep soft edges
             else:
