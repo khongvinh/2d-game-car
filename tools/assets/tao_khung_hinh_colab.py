@@ -1,6 +1,6 @@
 # ============================================================
-# TẠO KHUNG HÌNH CHẠY (HOẠT HÌNH THẬT) CHO "ĐUA XE SINH TỒN"
-# Chạy SAU tao_asset_colab_v2.py (cần ảnh gốc bản 2 của từng nhân vật).
+# TẠO KHUNG HÌNH CHẠY "ĐUA XE SINH TỒN" — SCRIPT 2/2 (chạy sau)
+# Chạy SAU tao_anh_colab.py (script 1/2; cần ảnh gốc của từng nhân vật).
 # Cách làm: script tự dựng bộ xương OpenPose cho 8 tư thế của một vòng chạy
 # (nhìn ngang, quay phải), rồi SDXL + ControlNet OpenPose vẽ nhân vật theo
 # từng tư thế; IP-Adapter lấy ảnh gốc làm mẫu để mọi khung giữ cùng mặt,
@@ -173,7 +173,7 @@ def chay():
         pipe.set_ip_adapter_scale(VE_LAI.get(ten, DO_GIONG_MAU))
         mau_path = f"{GOC}/{nhom}/{ten}.png"
         if not os.path.exists(mau_path):
-            print("⚠️  Thiếu ảnh gốc (chạy tao_asset_colab_v2.py trước):", mau_path); continue
+            print("⚠️  Thiếu ảnh gốc (chạy tao_anh_colab.py trước):", mau_path); continue
         mau = Image.open(mau_path).convert("RGBA")
         nen_trang = Image.new("RGB", mau.size, (255, 255, 255)); nen_trang.paste(mau, mask=mau.split()[3])
         khung = []

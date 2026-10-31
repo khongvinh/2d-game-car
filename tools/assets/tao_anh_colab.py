@@ -1,10 +1,16 @@
 # ============================================================
-# BỔ SUNG ASSET "ĐUA XE SINH TỒN" (chạy sau bản 2)
-# Vẽ những thứ game còn vẽ bằng code + vẽ lại các ảnh bản 2 bị hỏng.
-# Cùng mô hình/phong cách với tao_asset_colab_v2.py (SDXL 1.0 + LCM-LoRA),
-# lưu vào CÙNG thư mục DuaXeSinhTon_assets_v2. Ảnh có trong VE_LAI sẽ bị
-# xóa rồi vẽ lại; ảnh mới thì vẽ nếu chưa có (chạy lại không vẽ trùng).
-# Runtime: GPU T4. Cài ở ô riêng trước:
+# TẠO ẢNH GAME "ĐUA XE SINH TỒN" — SCRIPT 1/2 (chạy trước)
+#   Script 2/2: tao_khung_hinh_colab.py (khung hình chạy, cần ảnh của script này).
+# Chạy trên Google Colab (Runtime > Change runtime type > T4 GPU).
+#  - SDXL 1.0 + LCM-LoRA (8 bước, 1024px), seed cố định theo tên ảnh.
+#  - Prompt kiểu TỪ KHÓA, 45–60 token (CLIP chỉ đọc 77 token, vượt bị cắt);
+#    script tự đếm token và cảnh báo trước khi vẽ.
+#  - Xóa phông (rembg), lọc rác (khói, mảnh rời), cắt sát; hiệu ứng "sang"
+#    vẽ trên nền đen rồi lấy độ sáng làm độ trong.
+#  - Lưu Drive: MyDrive/Colab_Notebooks/DuaXeSinhTon_assets_v2/<nhóm>/<tên>.png.
+#    Ảnh đã có thì bỏ qua (chạy lại không vẽ trùng). Ảnh trong VE_LAI được xóa
+#    và vẽ lại một lần mỗi đợt (đổi DOT để vẽ lại đợt mới).
+# Cài thư viện ở ô riêng trước:
 #   !pip install -q diffusers transformers accelerate peft rembg onnxruntime
 # ============================================================
 import os, sys, time, zipfile, io
@@ -118,7 +124,144 @@ CAM_NEN = "text, watermark, logo, people, 3d, photo, blurry"
 NGANG_HAN = "side view, facing right"
 SUNG_XE = "roof turret, side view, barrel right"
 HINH = [
-    # --- Súng lắp trên xe (game xoay theo hướng ngắm; nòng phải chĩa sang phải) ---
+    # --- Nhân vật ---
+    ("nhan_vat", "survivor_idle", "male survivor, red cap, brown leather jacket, blue jeans, boots, pistol pointed down, standing", "nguoi", DOC),
+    ("nhan_vat", "survivor_run", "male survivor, red cap, brown leather jacket, blue jeans, boots, holding pistol, running", "nguoi", DOC),
+    ("nhan_vat", "survivor_jump", "male survivor, red cap, brown leather jacket, blue jeans, holding pistol, jumping", True, VUONG),
+    ("nhan_vat", "survivor_shoot", "male survivor, red cap, brown leather jacket, blue jeans, boots, aiming pistol forward", "nguoi", DOC),
+    ("nhan_vat", "survivor_hurt", "male survivor, red cap, leather jacket, blue jeans, flinching in pain", True, VUONG),
+    ("nhan_vat", "survivor_dead", "male survivor in red cap lying knocked out on the ground", True, VUONG),
+    ("nhan_vat", "merchant", "burly merchant, red bandana, beard, green vest, hook hand", True, VUONG),
+    # --- Zombie và trùm ---
+    ("zombie", "zombie_walker", "shambling green-skinned zombie in torn plaid shirt and jeans, arms reaching forward, walking", "nguoi", DOC),
+    ("zombie", "zombie_runner", "fast skinny grey zombie in rags sprinting, leaning forward", "nguoi", DOC),
+    ("zombie", "zombie_fat", "huge fat bloated green zombie in torn overalls, waddling", "nguoi", DOC),
+    ("zombie", "zombie_spitter", "hunched green zombie with swollen glowing acid throat and dripping mouth, walking", "nguoi", DOC),
+    ("zombie", "zombie_armored", "zombie wearing dented riot police armor and cracked helmet, walking", "nguoi", DOC),
+    ("zombie", "zombie_bat", "mutant zombie bat flying, wings spread", True, VUONG),
+    ("zombie", "zombie_crawler", "legless zombie crawling on its hands", True, VUONG),
+    ("zombie", "zombie_dog", "rabid rotten zombie dog running", True, VUONG),
+    ("zombie", "boss_brute", "giant muscular butcher zombie boss with bloody apron and huge cleaver, walking", "nguoi", DOC),
+    ("zombie", "boss_mutant_worm", "giant pink mutant worm boss rearing up, round mouth full of teeth", True, VUONG),
+    ("zombie", "boss_tank_zombie", "massive hulking zombie boss with rusty metal plates bolted onto its body, walking", "nguoi", DOC),
+    # --- Xe (nhìn ngang, đầu xe bên phải) ---
+    ("xe", "car_motorbike", "rusty dirt motorbike with rider seat", True, NGANG),
+    ("xe", "car_sedan", "rusty orange sedan, armor plates, bull bar, " + NGANG_HAN, True, NGANG),
+    ("xe", "car_muscle", "black orange muscle car, spikes, both wheels, " + NGANG_HAN, True, NGANG),
+    ("xe", "car_pickup", "armored orange pickup truck, both wheels, " + NGANG_HAN, True, NGANG),
+    ("xe", "car_bus", "armored orange school bus, metal plates, plow, " + NGANG_HAN, True, NGANG),
+    ("xe", "car_monster", "orange monster truck, huge wheels, " + NGANG_HAN, True, NGANG),
+    ("xe", "car_tank", "olive military tank, tracks, cannon, " + NGANG_HAN, True, NGANG),
+    ("xe", "car_wreck_burning", "burning wrecked pickup truck, side view", True, NGANG),
+    # --- Mảnh ghép (thu thập đủ để lắp) ---
+    ("manh_xe", "part_engine", "car engine block part", True, VUONG),
+    ("manh_xe", "part_wheel", "big off-road tire with spikes", True, VUONG),
+    ("manh_xe", "part_armor", "riveted steel armor plate", True, VUONG),
+    ("manh_xe", "part_chassis", "rusty car chassis frame", True, VUONG),
+    ("manh_xe", "part_fuel_tank", "jerry-can style fuel tank part", True, VUONG),
+    ("manh_xe", "part_gun_barrel", "machine gun barrel part", True, VUONG),
+    ("manh_xe", "part_scope", "rifle scope part", True, VUONG),
+    ("manh_xe", "part_gear", "big metal cog gear", True, VUONG),
+    ("manh_xe", "part_circuit", "salvaged electronic circuit board", True, VUONG),
+    ("manh_xe", "part_brick", "stack of bricks and cement bag for building", True, VUONG),
+    # --- Vũ khí ---
+    ("vu_khi", "wpn_pistol", "single handgun, horizontal, no hand, " + NGANG_HAN, True, NGANG),
+    ("vu_khi", "wpn_smg", "submachine gun", True, VUONG),
+    ("vu_khi", "wpn_shotgun", "pump shotgun", True, VUONG),
+    ("vu_khi", "wpn_rifle", "assault rifle", True, VUONG),
+    ("vu_khi", "wpn_minigun", "rotary minigun", True, VUONG),
+    ("vu_khi", "wpn_rocket", "rocket launcher", True, VUONG),
+    ("vu_khi", "wpn_flamethrower", "flamethrower with fuel tank", True, VUONG),
+    ("vu_khi", "wpn_laser", "sci-fi laser rifle", True, VUONG),
+    ("vu_khi", "wpn_bow", "wooden bow with arrow, no person, " + NGANG_HAN, True, VUONG),
+    ("vu_khi", "wpn_spear", "long spear, iron tip, horizontal, no person, " + NGANG_HAN, True, NGANG),
+    ("vu_khi", "wpn_axe", "fire axe, diagonal", True, VUONG),
+    ("vu_khi", "wpn_shuriken", "metal throwing star", True, VUONG),
+    ("vu_khi", "wpn_dynamite", "bundle of dynamite with lit fuse", True, VUONG),
+    # --- Pháo đài & bệ phòng thủ ---
+    ("phong_thu", "def_barricade_spikes", "spiked metal barricade, czech hedgehog", True, VUONG),
+    ("do_dac", "def_wall_metal", "tall wall of riveted scrap metal, narrow", True, DOC),
+    ("phong_thu", "def_gate", "fortress gate made of scrap metal and car doors", True, VUONG),
+    ("phong_thu", "def_watchtower", "wooden watchtower with sniper nest", True, VUONG),
+    ("phong_thu", "def_turret_mg", "machine gun turret on tripod base", True, VUONG),
+    ("phong_thu", "def_turret_cannon", "heavy cannon turret on armored base", True, VUONG),
+    ("phong_thu", "def_turret_flame", "flamethrower turret on base", True, VUONG),
+    ("phong_thu", "def_turret_tesla", "tesla coil electric turret", True, VUONG),
+    ("phong_thu", "def_turret_mortar", "mortar launcher turret", True, VUONG),
+    ("phong_thu", "def_landmine", "landmine half buried in sand", True, VUONG),
+    ("phong_thu", "def_generator", "diesel generator with cables", True, VUONG),
+    ("phong_thu", "def_build_slot", "empty concrete turret platform with yellow hazard stripes", True, VUONG),
+    # --- Vật phẩm rơi ---
+    ("vat_pham", "item_cash", "stack of green banknotes", True, VUONG),
+    ("vat_pham", "item_gem", "glowing red crystal gem", True, VUONG),
+    ("vat_pham", "item_medkit", "first aid kit", True, VUONG),
+    ("vat_pham", "item_fuel", "red jerry can of fuel", True, VUONG),
+    ("vat_pham", "item_ammo", "military ammo box", True, VUONG),
+    ("vat_pham", "item_scrap", "pile of scrap metal", True, VUONG),
+    ("vat_pham", "item_blueprint", "rolled blue blueprint paper", True, VUONG),
+    ("vat_pham", "item_chest", "metal treasure case with yellow hazard tape", True, VUONG),
+    # --- Biểu tượng sức mạnh (chọn khi lên cấp) ---
+    ("suc_manh", "pw_dual_magazine", "two taped rifle magazines", False, VUONG),
+    ("suc_manh", "pw_dynamite", "dynamite sticks with sparks", False, VUONG),
+    ("suc_manh", "pw_matchstick", "burning matchstick with big flame", False, VUONG),
+    ("suc_manh", "pw_nitrogen", "frosty liquid nitrogen flask", False, VUONG),
+    ("suc_manh", "pw_explode_corpse", "zombie skull exploding", False, VUONG),
+    ("suc_manh", "pw_shoes", "running sneakers with speed lines", False, VUONG),
+    ("suc_manh", "pw_orbit_junk", "spinning saw blades orbiting", False, VUONG),
+    ("suc_manh", "pw_adrenaline", "adrenaline syringe", False, VUONG),
+    ("suc_manh", "pw_battery", "car battery with lightning bolts", False, VUONG),
+    ("suc_manh", "pw_damage", "red card with crossed guns and plus sign", False, VUONG),
+    ("suc_manh", "pw_fire_rate", "bullets with speed arrows", False, VUONG),
+    ("suc_manh", "pw_health", "green card with heart and plus sign", False, VUONG),
+    ("suc_manh", "pw_magnet", "horseshoe magnet pulling coins", False, VUONG),
+    ("suc_manh", "pw_double_jump", "boots with springs", False, VUONG),
+    ("suc_manh", "pw_vampire", "blood drop with fangs", False, VUONG),
+    # --- Giao diện ---
+    ("giao_dien", "ui_skull", "zombie skull boss marker", True, VUONG),
+    ("giao_dien", "ui_lock", "heavy padlock", True, VUONG),
+    ("giao_dien", "ui_star", "gold star badge", True, VUONG),
+    ("giao_dien", "ui_home", "house icon on round metal button", True, VUONG),
+    ("giao_dien", "ui_garage", "car icon on round metal button", True, VUONG),
+    ("giao_dien", "ui_skills", "star over boxes icon on round metal button", True, VUONG),
+    ("giao_dien", "ui_mission", "clipboard with checklist", True, VUONG),
+    ("giao_dien", "ui_trophy", "gold trophy cup", True, VUONG),
+    ("giao_dien", "ui_gift", "gift crate on a parachute", True, VUONG),
+    # --- Đồ đạc nhà kho / trại (thay hình vẽ bằng code) ---
+    ("do_dac", "prop_door", "closed green metal warehouse door in a frame", True, DOC),
+    ("do_dac", "prop_door_locked", "green metal door, boarded planks, chain, padlock, solid", True, DOC),
+    ("do_dac", "prop_shelf", "tall rusty warehouse shelf, cardboard boxes, solid", True, DOC),
+    ("do_dac", "prop_car_rusty", "abandoned rusty brown car with flat tires, side view", True, NGANG),
+    ("do_dac", "prop_crate_stack", "stack of three wooden crates", True, VUONG),
+    ("do_dac", "prop_barrel", "rusty oil drum barrel", True, DOC),
+    ("do_dac", "prop_pallet", "wooden pallet with sacks", True, NGANG),
+    ("do_dac", "prop_catwalk", "long steel catwalk, yellow black hazard stripes, solid, " + NGANG_HAN, True, NGANG),
+    ("do_dac", "prop_bench", "old wooden workbench with tools", True, NGANG),
+    ("do_dac", "item_crate", "closed wooden loot crate with metal corners and a question mark sticker", True, VUONG),
+    ("do_dac", "def_barricade_wood", "barricade of crossed wooden planks nailed together, front view", True, NGANG),
+    ("do_dac", "def_sandbags", "low wall of stacked sandbags", True, NGANG),
+    # --- Hiệu ứng ---
+    ("hieu_ung", "fx_muzzle", "gun muzzle flash, yellow orange, star burst, pointing right", "sang", VUONG),
+    ("hieu_ung", "fx_explosion", "round fireball explosion, orange yellow", "sang", VUONG),
+    ("hieu_ung", "fx_fire", "single tall cartoon flame, orange yellow", "sang", DOC),
+    ("hieu_ung", "fx_spark", "electric blue spark burst", "sang", VUONG),
+    ("hieu_ung", "fx_blood", "dark red blood splash, droplets", True, VUONG),
+    ("hieu_ung", "fx_dust", "brown dust puff cloud", True, VUONG),
+    # --- Nền (không xóa phông) ---
+    ("nen", "bg_desert_far", "desert canyon with red mesas and sunset sky, far layer", False, NGANG),
+    ("nen", "bg_desert_road", "ruined desert highway with broken poles and wrecked cars", False, NGANG),
+    ("nen", "bg_warehouse", "inside a ruined brick warehouse with tall arched windows, shelves and crates", False, NGANG),
+    ("nen", "bg_garage", "inside a brick garage workshop with roller door and hanging lamp", False, NGANG),
+    ("nen", "bg_fortress", "makeshift survivor fortress camp of scrap walls in the desert", False, NGANG),
+    ("nen", "bg_menu_island", "floating desert rock island with a signpost, wrecked cars and a skull flag", False, NGANG),
+    ("nen", "bg_city_ruins", "ruined city street at dusk with burning buildings", False, NGANG),
+    ("nen", "bg_night_forest", "dark misty forest at night with a red moon", False, NGANG),
+    ("nen", "bg_warehouse_2", "inside a ruined factory hall with rusty machines and hanging chains", False, NGANG),
+    ("nen", "bg_warehouse_3", "inside an abandoned supermarket with empty shelves and broken lights", False, NGANG),
+    ("nen", "bg_volcano_road", "volcanic wasteland road with lava rivers and ash sky", False, NGANG),
+    ("nen", "bg_night_road", "dark forest road at night under a big moon", False, NGANG),
+    ("nen", "bg_alien_road", "alien planet landscape with purple sky, two moons and strange crystals", False, NGANG),
+
+    # --- Bổ sung: súng lắp trên xe, chướng ngại, trại, tường (trước đây vẽ code) ---
     ("sung_xe", "wpn_mount_pistol", "twin heavy pistols, " + SUNG_XE, True, NGANG),
     ("sung_xe", "wpn_mount_knife", "steel blades and spikes on a bumper ram, " + NGANG_HAN, True, NGANG),
     ("sung_xe", "wpn_mount_smg", "submachine gun, drum magazine, " + SUNG_XE, True, NGANG),
@@ -129,40 +272,13 @@ HINH = [
     ("sung_xe", "wpn_mount_rocket", "rocket launcher pod, " + SUNG_XE, True, NGANG),
     ("sung_xe", "wpn_mount_laser", "laser cannon, blue coils, " + SUNG_XE, True, NGANG),
     ("sung_xe", "wpn_mount_minigun", "six-barrel minigun, " + SUNG_XE, True, NGANG),
-
-    # --- Vũ khí tài xế cầm: vẽ lại cho nằm ngang, không có người ---
-    ("vu_khi", "wpn_pistol", "single handgun, horizontal, no hand, " + NGANG_HAN, True, NGANG),
-    ("vu_khi", "wpn_bow", "wooden bow with arrow, no person, " + NGANG_HAN, True, VUONG),
-    ("vu_khi", "wpn_spear", "long spear, iron tip, horizontal, no person, " + NGANG_HAN, True, NGANG),
-
-    # --- Xe: vẽ lại nhìn NGANG HẲN (bản 2 bị chéo 3/4) ---
-    ("xe", "car_sedan", "rusty orange sedan, armor plates, bull bar, " + NGANG_HAN, True, NGANG),
-    ("xe", "car_pickup", "armored orange pickup truck, both wheels, " + NGANG_HAN, True, NGANG),
-    ("xe", "car_bus", "armored orange school bus, metal plates, plow, " + NGANG_HAN, True, NGANG),
-    ("xe", "car_tank", "olive military tank, tracks, cannon, " + NGANG_HAN, True, NGANG),
-    ("xe", "car_muscle", "black orange muscle car, spikes, both wheels, " + NGANG_HAN, True, NGANG),
-    ("xe", "car_monster", "orange monster truck, huge wheels, " + NGANG_HAN, True, NGANG),
-
-    # --- Chướng ngại trên đường, trại, nhà kho (đang vẽ code) ---
     ("do_dac", "obs_crate", "wooden crate, cross braces", True, VUONG),
     ("do_dac", "obs_barrel_explosive", "red explosive barrel, yellow hazard sign", True, DOC),
     ("do_dac", "obs_bunker", "concrete pillbox bunker, gun slit, sandbags, " + NGANG_HAN, True, NGANG),
     ("do_dac", "def_wall_wood", "tall wall of sharpened logs, narrow", True, DOC),
-    ("do_dac", "def_wall_metal", "tall wall of riveted scrap metal, narrow", True, DOC),
     ("do_dac", "def_wall_concrete", "tall concrete wall, parapet, rebar, narrow", True, DOC),
     ("do_dac", "prop_tent", "patched canvas tent, " + NGANG_HAN, True, NGANG),
     ("do_dac", "prop_fire_barrel", "rusty campfire barrel, no fire", True, DOC),
-    ("do_dac", "prop_catwalk", "long steel catwalk, yellow black hazard stripes, solid, " + NGANG_HAN, True, NGANG),
-    ("do_dac", "prop_shelf", "tall rusty warehouse shelf, cardboard boxes, solid", True, DOC),
-    ("do_dac", "prop_door_locked", "green metal door, boarded planks, chain, padlock, solid", True, DOC),
-
-    # --- Hiệu ứng: vẽ trên nền ĐEN tuyền (chế độ "sang") ---
-    ("hieu_ung", "fx_muzzle", "gun muzzle flash, yellow orange, star burst, pointing right", "sang", VUONG),
-    ("hieu_ung", "fx_explosion", "round fireball explosion, orange yellow", "sang", VUONG),
-    ("hieu_ung", "fx_fire", "single tall cartoon flame, orange yellow", "sang", DOC),
-    ("hieu_ung", "fx_spark", "electric blue spark burst", "sang", VUONG),
-    ("hieu_ung", "fx_blood", "dark red blood splash, droplets", True, VUONG),
-    ("hieu_ung", "fx_dust", "brown dust puff cloud", True, VUONG),
 ]
 
 # Ảnh hỏng: xóa rồi vẽ lại MỘT lần cho mỗi ĐỢT (đổi DOT để vẽ lại đợt mới).

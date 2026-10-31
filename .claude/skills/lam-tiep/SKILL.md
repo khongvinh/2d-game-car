@@ -18,7 +18,7 @@ Người dùng gọi: `/lam-tiep <việc cần làm>` (có thể bỏ trống ph
 Sửa code → `cd tools/dev/compile && gradle compileKotlin` (hoặc `cd tools/dev/preview && gradle camp` để chạy thử + chụp ảnh trại/đêm/lục soát/xưởng) → tăng versionCode/versionName trong `app/build.gradle.kts` và `Game.VERSION` → `bash tools/dev/build_apk.sh <code> <name>` → commit, push → kiểm tra GitHub Actions "Build APK" xanh → gửi APK + ảnh chụp cho người dùng → cập nhật tài liệu + bản Word (`node tools/dev/md2docx.js docs/TIEN_TRINH_DU_AN.md docs/TIEN_TRINH_DU_AN.docx`).
 
 ## Asset AI (ảnh/âm thanh)
-- Người dùng tạo bằng Colab (`tools/assets/tao_asset_colab_gpu.py`), lưu Drive thư mục `14i1_kbJc9H1rZfqnH9T_pj3xFs0gynEw` → `DuaXeSinhTon_assets/`.
+- Người dùng tạo bằng Colab (`tools/assets/tao_anh_colab.py` (rồi `tao_khung_hinh_colab.py`)), lưu Drive thư mục `14i1_kbJc9H1rZfqnH9T_pj3xFs0gynEw` → `DuaXeSinhTon_assets_v2/` (id 1nPaaucPvla5PKYdqUsBh9t1s_Q3mZHSB). Nhập: `python3 tools/assets/nhap_asset.py <thư mục> --v2`.
 - Zip > 10MB không tải được bằng connector: tìm từng file (search_files theo mimeType + modifiedTime) rồi download_file_content từng id; giao việc tải hàng loạt cho subagent để đỡ tốn ngữ cảnh. KHÔNG mở bảng "Key API".
 - Nhập: `python3 tools/assets/nhap_asset.py <thư mục>` (chia nhóm nen/nhac/am_thanh/khac). Game nạp theo tên (Sprites.kt).
 
