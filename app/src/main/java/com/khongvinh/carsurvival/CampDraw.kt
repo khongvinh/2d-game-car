@@ -140,6 +140,7 @@ internal fun Renderer.drawCamp(c: Canvas) {
             fill.color = 0x66FFFFFF
             c.drawCircle(zz.x, zz.y - zz.type.h / 2, zz.type.w * 0.6f, fill)
         }
+        if (f.burnT > 0f) burning(c, zz.x, zz.y + 4f, big)
         if (f.slowT > 0f) {
             fill.color = 0x5580D8FF
             c.drawCircle(zz.x, zz.y - zz.type.h / 2, zz.type.w * 0.7f, fill)
@@ -177,6 +178,7 @@ internal fun Renderer.drawCamp(c: Canvas) {
             i += 2
         }
     }
+    drawFx(c)
     for (p in g.particles) {
         val ratio = (p.life / p.maxLife).coerceIn(0f, 1f)
         fill.color = p.color

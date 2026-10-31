@@ -119,3 +119,23 @@ internal fun Renderer.spriteFill(c: Canvas, name: String?, l: Float, t: Float, r
     c.drawBitmap(bm, null, r, bmpPaint)
     return true
 }
+
+/** Effect pictures centred on their spot, growing then fading out. */
+internal fun Renderer.drawFx(c: Canvas) {
+    for (f in g.fxs) {
+        val t = 1f - (f.life / f.maxLife).coerceIn(0f, 1f)
+        val s = f.size * (1f + f.grow * t)
+        val a = (255 * (if (t < 0.5f) 1f else (1f - t) * 2f)).toInt().coerceIn(0, 255)
+        c.save()
+        c.translate(f.x, f.y)
+        c.rotate(f.rot)
+        sprite(c, f.name, 0f, s / 2, s, alpha = a)
+        c.restore()
+    }
+}
+
+/** Flames licking a burning monster. */
+internal fun Renderer.burning(c: Canvas, x: Float, y: Float, h: Float): Boolean {
+    val k = 1f + 0.12f * kotlin.math.sin(g.anim * 18f + x)
+    return sprite(c, "fx_fire", x, y, h * 0.8f * k, alpha = 220, squash = k)
+}

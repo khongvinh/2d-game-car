@@ -174,6 +174,11 @@ class Particle(
     val grow: Float = 0f,
 )
 
+/** A one-shot AI effect picture (explosion, blood splat, sparks) that grows and fades. */
+class Fx(val name: String, val x: Float, val y: Float, val size: Float, val maxLife: Float, val grow: Float, val rot: Float) {
+    var life = maxLife
+}
+
 class FloatText(val text: String, var x: Float, var y: Float, val color: Int) {
     var life = 1.3f
     var size = 44f

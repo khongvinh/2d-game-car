@@ -63,6 +63,12 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
     val shots = ArrayList<Projectile>()
     val beams = ArrayList<Beam>()
     val particles = ArrayList<Particle>()
+    val fxs = ArrayList<Fx>()
+
+    /** Plays effect picture [name] once (only when the picture exists). */
+    internal fun fxAt(name: String, x: Float, y: Float, size: Float, life: Float = 0.45f, grow: Float = 0.5f) {
+        if (fxs.size < 40 && Sprites.has(name)) fxs.add(Fx(name, x, y, size, life, grow, rnd(-15f, 15f)))
+    }
     val texts = ArrayList<FloatText>()
 
     /** End boss of every 5th stage (null on normal stages). */
@@ -2785,6 +2791,8 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
             p.y += p.vy * dt
             if (p.life <= 0f) pi.remove()
         }
+        for (f in fxs) f.life -= dt
+        fxs.removeAll { it.life <= 0f }
         val ti = texts.iterator()
         while (ti.hasNext()) {
             val t = ti.next()
@@ -2806,12 +2814,14 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
     internal fun rnd(a: Float, b: Float) = a + Random.nextFloat() * (b - a)
 
     private fun bleed(x: Float, y: Float, n: Int) {
+        if (n >= 4) fxAt("fx_blood", x, y, 30f + n * 4f, 0.4f, 0.6f)
         repeat(n) {
             particles.add(Particle(x, y, rnd(-220f, 220f), rnd(-380f, 40f), 0.7f, 0.7f, rnd(4f, 8f), if (Random.nextBoolean()) 0xFF8E0000.toInt() else 0xFF5D7A1F.toInt(), G))
         }
     }
 
     private fun explode(x: Float, y: Float, color: Int, n: Int) {
+        if (n >= 20) fxAt("fx_explosion", x, y, minOf(380f, 70f + n * 3.5f), 0.5f, 0.8f)
         val colors = intArrayOf(color, 0xFFFFC107.toInt(), 0xFFFF5722.toInt(), 0xFF424242.toInt())
         repeat(n) {
             val a = Random.nextFloat() * 6.2832f
@@ -2822,6 +2832,7 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
     }
 
     private fun sparks(x: Float, y: Float) {
+        if (Random.nextFloat() < 0.3f) fxAt("fx_spark", x, y, 46f, 0.15f, 0.3f)
         repeat(4) {
             val a = Random.nextFloat() * 6.2832f
             particles.add(Particle(x, y, cos(a) * 200f, sin(a) * 200f, 0.25f, 0.25f, 4f, 0xFFFFF59D.toInt()))

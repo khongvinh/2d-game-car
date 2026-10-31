@@ -90,8 +90,14 @@ class Renderer(internal val g: Game) {
         val th = g.theme
         val W = g.W
         val H = g.H
-        // desert road: the AI picture replaces the painted sky
-        if (!(th.region == Region.DESERT && backdrop(c, "bg_desert_road"))) {
+        // road: the AI picture of the region replaces the painted sky
+        val roadPic = when (th.region) {
+            Region.DESERT -> "bg_desert_road"
+            Region.VOLCANO -> "bg_volcano_road"
+            Region.NIGHT -> "bg_night_road"
+            Region.ALIEN -> "bg_alien_road"
+        }
+        if (!backdrop(c, roadPic)) {
             fill.alpha = 255 // a paint's alpha also fades its shader
             fill.shader = skyShader
             c.drawRect(0f, 0f, W, H, fill)
@@ -294,6 +300,7 @@ class Renderer(internal val g: Game) {
         for (rk in g.bossRocks) drawBossRock(c, rk)
         drawPlayerCar(c)
         if (g.driver.out) drawDriver(c)
+        drawFx(c)
         for (p in g.particles) {
             val ratio = (p.life / p.maxLife).coerceIn(0f, 1f)
             fill.color = p.color
@@ -1180,9 +1187,12 @@ class Renderer(internal val g: Game) {
         // AI sprites face right; turn them towards the player
         val sway = sin(z.phase)
         val pic = Sprites.zombie(z.type)
-        if (Sprites.walks(z.type) && walkSprite(c, pic, z.x, z.y + 4f, z.type.h * 1.3f, dir < 0f, z.phase, Sprites.stride(z.type), lean = 4f)) return
-        if (sprite(c, pic, z.x, z.y + 4f - kotlin.math.abs(sway) * 4f, z.type.h * 1.3f, flip = dir < 0f,
-                rot = sway * (if (z.type.flying) 10f else 6f), squash = 1f + 0.04f * kotlin.math.abs(sin(z.phase * 2f)))) return
+        if ((Sprites.walks(z.type) && walkSprite(c, pic, z.x, z.y + 4f, z.type.h * 1.3f, dir < 0f, z.phase, Sprites.stride(z.type), lean = 4f)) ||
+            sprite(c, pic, z.x, z.y + 4f - kotlin.math.abs(sway) * 4f, z.type.h * 1.3f, flip = dir < 0f,
+                rot = sway * (if (z.type.flying) 10f else 6f), squash = 1f + 0.04f * kotlin.math.abs(sin(z.phase * 2f)))) {
+            if (z.burnT > 0f) burning(c, z.x, z.y + 4f - z.fly, z.type.h * 1.3f)
+            return
+        }
         c.save()
         c.translate(z.x, z.y)
         when (z.type) {
@@ -4802,6 +4812,7 @@ class Renderer(internal val g: Game) {
         }
         drawDriver(c)
         for (s in inn.shots) sideShot(c, s)
+        drawFx(c)
         for (p in g.particles) {
             val ratio = (p.life / p.maxLife).coerceIn(0f, 1f)
             fill.color = p.color
@@ -5239,6 +5250,7 @@ class Renderer(internal val g: Game) {
             val gy = rm.support(z.x, z.y)
             c.drawOval(z.x - z.type.w * 0.7f, gy - 5f, z.x + z.type.w * 0.7f, gy + 5f, fill)
             drawZombie(c, z)
+            if (f.burnT > 0f && z.burnT <= 0f) burning(c, z.x, z.y + 4f, z.type.h * 1.3f)
             if (f.slowT > 0f) {
                 fill.color = 0x5580D8FF
                 c.drawOval(z.x - z.type.w * 0.6f, z.y - z.type.h, z.x + z.type.w * 0.6f, z.y, fill)
@@ -5325,6 +5337,7 @@ class Renderer(internal val g: Game) {
             }
             stroke.alpha = 255
         }
+        drawFx(c)
         for (p in g.particles) {
             val ratio = (p.life / p.maxLife).coerceIn(0f, 1f)
             fill.color = p.color
