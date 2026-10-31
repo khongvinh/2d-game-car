@@ -5,6 +5,12 @@ on:
   pull_request:
   workflow_dispatch:
 
+# the same commit is pushed to two branches: build them one after the other so
+# the two runs do not race to upload the APK to the same release
+concurrency:
+  group: build-apk
+  cancel-in-progress: false
+
 jobs:
   build:
     runs-on: ubuntu-latest
