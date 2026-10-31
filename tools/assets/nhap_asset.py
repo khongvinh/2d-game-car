@@ -24,6 +24,7 @@ from PIL import Image
 # left are mirrored here; CUT_LEFT drops junk on the left (gun smoke).
 FACING_LEFT = {"survivor_run", "zombie_walker", "boss_brute", "zombie_armored", "zombie_bat", "boss_tank_zombie"}
 CUT_LEFT = {"survivor_run": 0.4}
+CUT_RIGHT = {}
 
 
 # pictures where the AI drew a second, smaller copy: keep only the big one
@@ -105,8 +106,10 @@ V2 = "--v2" in sys.argv[2:]
 if V2:
     # bộ 2 (vẽ lại lần 3, prompt dưới 77 token): những ảnh AI vẫn vẽ quay trái
     FACING_LEFT = {"survivor_idle", "survivor_run", "survivor_shoot", "zombie_walker", "zombie_crawler", "car_sedan", "car_motorbike", "car_tank",
-                   "wpn_mount_laser", "wpn_mount_shotgun", "wpn_mount_pistol", "wpn_mount_smg"}
+                   "wpn_mount_laser", "wpn_mount_shotgun", "wpn_mount_pistol", "wpn_mount_smg",
+                   "survivor_ride", "wpn_flamethrower"}
     CUT_LEFT = {}
+    CUT_RIGHT = {"survivor_ride": 0.7}   # a piece of vehicle the AI drew on the right
 root = os.path.join(os.path.dirname(__file__), "..", "..", "app", "src", "main", "assets")
 img_dir = os.path.join(root, "img")
 os.makedirs(img_dir, exist_ok=True)
@@ -138,6 +141,8 @@ for group in sorted(os.listdir(src)):
                 im = im.convert("RGBA")
                 if name in CUT_LEFT:
                     im = im.crop((int(im.width * CUT_LEFT[name]), 0, im.width, im.height))
+                if name in CUT_RIGHT:
+                    im = im.crop((0, 0, int(im.width * CUT_RIGHT[name]), im.height))
                 im = clean(im, keep=0.75 if name in ONLY_BIGGEST else 0.3)
                 if name in TOP_BAND:
                     im = top_band(im)

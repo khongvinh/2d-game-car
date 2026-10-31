@@ -91,16 +91,30 @@ internal fun Renderer.walkSprite(
     val hip = rig.hip.toFloat()
     // the body rises a little as a leg passes under it
     val bob = if (stride > 0f) -lift * rig.h * 0.025f else kotlin.math.sin(phase * 0.5f) * rig.h * 0.008f
-    fun leg(b: Bitmap, x0: Float, pivot: Float, a: Float, up: Float) {
+    // two-bone legs: the thigh swings from the hip, the shin hangs from the knee and folds back
+    // while the leg travels forward (that is what makes it read as a step, not a slide)
+    val run = stride >= 26f
+    val bend = if (stride <= 0f) 0f else if (run) 70f else 45f
+    fun leg(l: Rig.Leg, x0: Float, p: Float) {
+        val thighA = -stride * kotlin.math.sin(p)
+        val kneeA = bend * maxOf(0f, kotlin.math.cos(p))
         c.save()
-        c.translate(x0 + pivot, hip + bob * 0.4f - up)
-        c.rotate(a)
-        c.drawBitmap(b, -pivot, 0f, bmpPaint)
+        c.translate(x0 + l.hipX, hip + bob * 0.4f)
+        c.rotate(thighA)
+        c.drawBitmap(l.thigh, -l.hipX, 0f, bmpPaint)
+        c.translate(l.kneeX - l.hipX, l.knee)
+        c.rotate(kneeA)
+        c.drawBitmap(l.shin, -l.kneeX, 0f, bmpPaint)
         c.restore()
     }
-    // back leg first, the leg moving forward is lifted
-    leg(rig.legA, 0f, rig.aX.toFloat(), stride * sw, if (sw > 0f) sw * rig.h * 0.02f * (stride / 30f) else 0f)
-    leg(rig.legB, (rig.w - rig.legB.width).toFloat(), rig.bX.toFloat(), -stride * sw, if (sw < 0f) -sw * rig.h * 0.02f * (stride / 30f) else 0f)
+    // the leg behind first
+    if (kotlin.math.sin(phase) < 0f) {
+        leg(rig.a, 0f, phase)
+        leg(rig.b, (rig.w - rig.legB.width).toFloat(), phase + kotlin.math.PI.toFloat())
+    } else {
+        leg(rig.b, (rig.w - rig.legB.width).toFloat(), phase + kotlin.math.PI.toFloat())
+        leg(rig.a, 0f, phase)
+    }
     c.save()
     c.translate(rig.w / 2f, hip + bob)
     c.rotate(lean + (if (stride > 0f) sw * stride * 0.08f else 0f))

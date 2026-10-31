@@ -286,9 +286,9 @@ HINH = [
 ]
 
 # Ảnh hỏng: xóa rồi vẽ lại MỘT lần cho mỗi ĐỢT (đổi DOT để vẽ lại đợt mới).
-# Đợt 5: chỉ những ảnh còn đáng thử lại (bụi, sàn nhà, tường sắt/bê tông: thôi, game vẽ code).
-DOT = "dot5"
-VE_LAI = {"survivor_ride", "wpn_mount_flamer", "wpn_mount_knife", "wpn_flamethrower", "prop_tent"}
+# Không còn ảnh cần vẽ lại (những ảnh AI không vẽ được đã chuyển sang vẽ bằng code).
+DOT = "dot6"
+VE_LAI = set()
 
 
 # 6. HÀM XỬ LÝ ÂM THANH

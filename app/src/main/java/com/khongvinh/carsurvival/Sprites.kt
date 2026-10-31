@@ -164,6 +164,30 @@ object Sprites {
  * about the hip while the body bobs. Cut once per sprite and cached.
  */
 class Rig(val body: Bitmap, val legA: Bitmap, val legB: Bitmap, val hip: Int, val aX: Int, val bX: Int, val w: Int, val h: Int) {
+    /** Each leg cut again at the knee: thigh + shin, so the knee can bend (two-bone walk). */
+    class Leg(val thigh: Bitmap, val shin: Bitmap, val hipX: Float, val kneeX: Float, val knee: Float)
+
+    val a: Leg = knee(legA, aX.toFloat())
+    val b: Leg = knee(legB, bX.toFloat())
+
+    private fun knee(leg: Bitmap, hipX: Float): Leg {
+        val lw = leg.width
+        val lh = leg.height
+        val k = (lh * 0.48f).toInt().coerceIn(2, lh - 2)
+        // the knee sits at the middle of the leg's pixels around that row
+        val band = 4.coerceAtMost(minOf(k, lh - k - 1))
+        val px = IntArray(lw * (band * 2 + 1))
+        leg.getPixels(px, 0, lw, 0, k - band, lw, band * 2 + 1)
+        var sx = 0L
+        var n = 0L
+        for (y in 0..band * 2) for (x in 0 until lw) if ((px[y * lw + x] ushr 24) > 40) { sx += x; n++ }
+        val kx = if (n > 0) sx.toFloat() / n else hipX
+        val over = (lh * 0.06f).toInt()
+        val thigh = Bitmap.createBitmap(leg, 0, 0, lw, minOf(lh, k + over))
+        val shin = Bitmap.createBitmap(leg, 0, k, lw, lh - k)
+        return Leg(thigh, shin, hipX, kx, k.toFloat())
+    }
+
     companion object {
         private val cache = HashMap<String, Rig?>()
 

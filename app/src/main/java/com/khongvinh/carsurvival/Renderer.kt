@@ -1574,7 +1574,17 @@ class Renderer(internal val g: Game) {
     /** The car's weapon on a post on the roof of the AI picture: turns to aim, kicks back and flashes when it fires. */
     private fun roofGun(c: Canvas, v: Vehicle, roof: Float, atX: Float = Float.NaN, atY: Float = Float.NaN) {
         val w = g.weapon
-        if (w == WeaponType.KNIFE || g.driver.out) return
+        if (g.driver.out) return
+        if (w == WeaponType.KNIFE) {
+            // blades on the front bumper, swinging when they cut
+            val swing = if (g.car.slashT > 0f) sin((0.2f - g.car.slashT) / 0.2f * PI.toFloat()) * 25f else 0f
+            c.save()
+            c.translate(Car.WHEEL_X[1] + 46f, Car.WHEEL_Y - 6f)
+            c.rotate(10f - swing)
+            spriteBox(c, "wpn_mount_knife", -10f, -34f, 90f, 30f)
+            c.restore()
+            return
+        }
         val car = g.car
         val held = !atX.isNaN()
         val mx = if (held) atX else v.cls.mountX
@@ -1633,8 +1643,9 @@ class Renderer(internal val g: Game) {
         val pic = when {
             jumping && Sprites.has("survivor_jump") -> "survivor_jump"
             d.atkT > 0f && Sprites.has("survivor_shoot") -> "survivor_shoot"
-            // running: real frames if any, else the running picture with its legs cut free
-            moving && Sprites.has("survivor_run") -> "survivor_run"
+            // moving: real frames if any, else the standing picture (legs straight and side by side)
+            // walked with a two-bone leg rig (thigh + shin, the knee folds) — reads as a proper step
+            moving && Sprites.frames("survivor_run") > 0 -> "survivor_run"
             else -> "survivor_idle"
         }
         // legs really step (picture cut at the hip), body leans into the run
