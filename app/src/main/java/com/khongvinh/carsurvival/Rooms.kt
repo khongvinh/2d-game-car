@@ -32,6 +32,11 @@ enum class Power(val title: String, val desc: String, val icon: String, val max:
 
 /** A monster in a room: a [Zombie] for looks plus its own falling, slowing and spitting. */
 class Foe(val z: Zombie, val ranged: Boolean) {
+    init {
+        // ranged monsters wear the acid-spitter look, the others never do
+        z.spitter = ranged
+    }
+
     var vy = 0f
     var slowT = 0f
     var burnT = 0f

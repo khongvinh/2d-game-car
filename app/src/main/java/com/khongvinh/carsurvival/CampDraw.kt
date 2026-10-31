@@ -425,7 +425,11 @@ private fun Renderer.campHud(c: Canvas) {
     val line = if (g.state == State.SIEGE) {
         "🌙 ĐÊM ${s.nights + 1} • ĐỢT ${cp.wave}/${cp.waves} • 🧟 ${cp.foes.size}"
     } else {
-        "☀ NGÀY ${s.day} • ${cp.region.title} • ${s.distM}m / ${Campaign.GOAL_M}m${if (s.dayActed) " • đã dùng lượt hôm nay" else ""}"
+        "☀ NGÀY ${s.day} • ${cp.region.title} • ${s.distM}m / ${Campaign.GOAL_M}m${when {
+            s.nightDue -> " • trạm mới: dựng thủ rồi VÀO ĐÊM"
+            s.fuel < 3 -> " • lục soát tìm xăng để lên đường"
+            else -> " • đủ xăng: LÊN ĐƯỜNG tới trạm kế"
+        }}"
     }
     val lw = text.measureText(line)
     glassPanel(c, W / 2 - lw / 2 - 24f, 96f, W / 2 + lw / 2 + 24f, 138f, 14f)

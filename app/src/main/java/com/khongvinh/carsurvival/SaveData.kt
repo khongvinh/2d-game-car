@@ -66,6 +66,9 @@ class SaveData(context: Context) {
     /** The day's action (expedition or drive) is used up. */
     var dayActed = prefs.getBoolean("dayActed", false)
 
+    /** Reached a new station on the road: the night there must be held before driving on. */
+    var nightDue = prefs.getBoolean("nightDue", false)
+
     /** Lifetime counters per [Stat]. */
     val life = IntArray(Stat.entries.size) { prefs.getInt("life$it", 0) }
 
@@ -235,7 +238,7 @@ class SaveData(context: Context) {
         slotType.fill(-1); slotLevel.fill(0); slotHp.fill(0)
         slotType[0] = DefType.MG.ordinal; slotLevel[0] = 1
         slotType[2] = DefType.WOOD.ordinal; slotLevel[2] = 1
-        wallHpSaved = 0; dayActed = false
+        wallHpSaved = 0; dayActed = false; nightDue = false
         achClaimed = 0
         bestScore = 0
         records.clear()
@@ -294,6 +297,7 @@ class SaveData(context: Context) {
         }
         e.putInt("wallHp", wallHpSaved)
         e.putBoolean("dayActed", dayActed)
+        e.putBoolean("nightDue", nightDue)
         life.forEachIndexed { i, v -> e.putInt("life$i", v) }
         e.putInt("mDay", missionDay)
         for (i in 0 until 3) {

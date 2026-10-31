@@ -616,6 +616,7 @@ class Campaign(private val g: Game) {
         save.addStat(Stat.GEMS, gems)
         save.day++
         save.dayActed = false
+        save.nightDue = false
         // mines that were not stepped on stay; everything keeps its damage
         store()
         banner = "SỐNG SÓT ĐÊM $n!"
@@ -635,6 +636,7 @@ class Campaign(private val g: Game) {
         wallHp = wallMax * 0.5f
         save.day++
         save.dayActed = false
+        save.nightDue = false
         store()
         banner = "TRẠI THẤT THỦ!"
         bannerSub = "Mất rào chắn và $lost⚙ — dựng lại rồi chiến tiếp"
@@ -674,6 +676,7 @@ class Campaign(private val g: Game) {
         save.dayActed = true
         for (i in 0 until SLOTS) if (defs[i]?.type?.ground == true) defs[i] = null
         wallHp = wallMax
+        save.nightDue = metres > 0
         store()
         banner = "DỰNG TRẠI MỚI!"
         bannerSub = "Đi thêm ${metres}m • Tổng ${save.distM}m / ${GOAL_M}m • ${region.title}"

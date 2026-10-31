@@ -59,6 +59,10 @@ class Zombie(val type: ZombieType, var x: Float, var y: Float) {
     var fly = if (type.flying) 150f + (x % 60f) else 0f
     var alive = true
     var phase = (x * 0.37f) % 6.28f
+
+    /** Road spitters lob acid at the car / driver (about one zombie in five). */
+    var spitter = !type.flying && type != ZombieType.LIZARD && (x.toInt() / 13 and 0x7fffffff) % 5 == 0
+    var spitCd = 1.5f + (x % 2f + 2f) % 2f
     val shirt = SHIRTS[(x.toInt() / 7 and 0x7fffffff) % SHIRTS.size]
 
     companion object {

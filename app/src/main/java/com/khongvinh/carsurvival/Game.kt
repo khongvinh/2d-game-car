@@ -24,7 +24,7 @@ import kotlin.random.Random
 class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
     companion object {
         /** Shown on the menu so the installed build is easy to check. */
-        const val VERSION = "7.8"
+        const val VERSION = "7.9"
 
         const val VIRTUAL_HEIGHT = 720f
         const val METER = 30f
@@ -1787,6 +1787,21 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
             if (abs(dx) < 1300f) {
                 z.x += sign(chaseX - z.x) * z.type.speed * dt
             }
+            // spitters fire back: a lobbed blob of acid aimed where the target will be
+            if (z.spitter && dyingT <= 0f) {
+                z.spitCd -= dt
+                val tdx = chaseX - z.x
+                if (z.spitCd <= 0f && tdx < -160f && tdx > -950f) {
+                    z.spitCd = max(1.6f, 2.8f - stage * 0.05f)
+                    val t = 0.75f
+                    val tx = if (driver.out) driver.x else c.x + c.vx * t * 0.8f
+                    val ty = if (driver.out) driver.y - 50f else c.y - 20f
+                    val sx = z.x
+                    val sy = z.y - z.type.h * 0.75f
+                    bossRocks.add(BossRock(sx, sy, (tx - sx) / t, (ty - sy) / t - 0.5f * G * t, 4, 5f + stage * 0.6f).also { it.life = 2f })
+                    particles.add(Particle(sx, sy, 0f, 0f, 0.12f, 0.12f, 12f, 0xFF76FF03.toInt()))
+                }
+            }
             if (z.burnT > 0f) {
                 // set alight by the flamethrower
                 z.burnT -= dt
@@ -2316,6 +2331,24 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
             if (r.kind == 1 && Random.nextFloat() < 0.6f) {
                 particles.add(Particle(r.x, r.y, rnd(-40f, 40f), rnd(-60f, 0f), 0.35f, 0.35f, rnd(6f, 12f), if (Random.nextBoolean()) 0xFFFF6D00.toInt() else 0xFFFFC400.toInt(), 0f, 1f))
             }
+            if (r.kind == 4) {
+                // zombie acid: arcs down, splashes on the car, the driver or the ground
+                r.vy += G * dt
+                val hit = if (driver.out) abs(r.x - driver.x) < 30f && r.y > driver.y - 100f && r.y < driver.y + 10f else hypot(r.x - c.x, r.y - c.y) < 75f
+                if (hit) {
+                    r.alive = false
+                    if (driver.out) hurtDriver(r.dmg) else {
+                        if (c.shieldT <= 0f) bunkerDamage += r.dmg * (1f - armor)
+                        damageCar(r.dmg * (1f - armor))
+                    }
+                    sfx.play(Sfx.S.HIT, 0.4f)
+                } else if (r.y > terrain.heightAt(r.x) || r.life <= 0f) r.alive = false
+                if (!r.alive) repeat(8) {
+                    val a = rnd(3.3f, 6.1f)
+                    particles.add(Particle(r.x, r.y, cos(a) * 170f, sin(a) * 200f, 0.5f, 0.5f, 6f, 0xFF76FF03.toInt(), G * 0.6f))
+                }
+                continue
+            }
             if (r.kind == 3) {
                 // bunker bullet
                 if (driver.out && abs(r.x - driver.x) < 20f && r.y > driver.y - 80f && r.y < driver.y) {
@@ -2520,6 +2553,12 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
         if (best == Float.MAX_VALUE || c.ammo < weapon.ammoUse || c.fireCd > 0f) return
         c.fireCd = st.interval
         c.ammo -= weapon.ammoUse
+        // brass flies off the roof gun
+        if (weapon == WeaponType.PISTOL || weapon == WeaponType.SMG || weapon == WeaponType.MINIGUN || weapon == WeaponType.SHOTGUN) {
+            val back = if (cos(c.aim) >= 0f) -1f else 1f
+            particles.add(Particle(ox, oy - 4f, c.vx + back * rnd(80f, 170f), c.vy - rnd(220f, 360f), 0.8f, 0.8f,
+                if (weapon == WeaponType.SHOTGUN) 5f else 3.5f, if (weapon == WeaponType.SHOTGUN) 0xFFD32F2F.toInt() else 0xFFFFC107.toInt(), G))
+        }
         val dx = tx - ox
         val dy = ty - oy
         val d = max(1f, hypot(dx, dy))
@@ -3163,10 +3202,10 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
         if (state == State.SIEGE) return l
         l.add(Button("menu", "◀ MENU", 24f, 20f, 210f, 90f, grey))
         l.add(Button("workshop", "🔧 XƯỞNG", 224f, 20f, 440f, 90f, 0xFF5D4037.toInt()))
-        val acted = save.dayActed
-        l.add(Button("expedition", "🔍 LỤC SOÁT", W - 660f, H - 104f, W - 450f, H - 20f, 0xFF1E88E5.toInt(), !acted))
-        l.add(Button("drive", "🚗 LÊN ĐƯỜNG", W - 440f, H - 104f, W - 230f, H - 20f, 0xFFF9A825.toInt(), !acted && save.fuel >= 3))
-        l.add(Button("night", "🌙 VÀO ĐÊM", W - 220f, H - 104f, W - 20f, H - 20f, 0xFF4527A0.toInt()))
+        // search any time; drive on with fuel; the night comes once a new station is reached
+        l.add(Button("expedition", "🔍 LỤC SOÁT", W - 660f, H - 104f, W - 450f, H - 20f, 0xFF1E88E5.toInt()))
+        l.add(Button("drive", "🚗 LÊN ĐƯỜNG", W - 440f, H - 104f, W - 230f, H - 20f, 0xFFF9A825.toInt(), !save.nightDue && save.fuel >= 3))
+        l.add(Button("night", "🌙 VÀO ĐÊM", W - 220f, H - 104f, W - 20f, H - 20f, 0xFF4527A0.toInt(), save.nightDue))
         return l
     }
 

@@ -76,6 +76,7 @@ object Sprites {
             Region.ALIEN -> "boss_mutant_worm"
             else -> "boss_brute"
         }
+        f.ranged && has("zombie_spitter") -> "zombie_spitter"
         else -> zombie(f.z.type)
     }
 

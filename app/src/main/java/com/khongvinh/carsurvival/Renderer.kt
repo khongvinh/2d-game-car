@@ -1167,6 +1167,7 @@ class Renderer(internal val g: Game) {
             val len = (Car.WHEEL_X[1] - Car.WHEEL_X[0]) / 0.56f
             val ph = if (v.cls == VehicleClass.MOTO) 118f else (len * bm.height / bm.width).coerceIn(70f, 150f)
             sprite(c, carPic, (Car.WHEEL_X[0] + Car.WHEEL_X[1]) / 2, Car.WHEEL_Y + Car.WHEEL_R + 2f + bounce, ph)
+            roofGun(c, v, Car.WHEEL_Y + Car.WHEEL_R + 2f + bounce - ph)
             c.restore()
         } else if (!hurt) art.draw(c, v, car.x, car.y, car.angle, car.wheelRot, car.aim, car.boosting, w, false, car.compress, g.wrecked, car.squat, car.slashT)
         art.noRider = false
@@ -1193,7 +1194,7 @@ class Renderer(internal val g: Game) {
         val dir = sign(px - z.x).let { if (it == 0f) -1f else it }
         // AI sprites face right; turn them towards the player
         val sway = sin(z.phase)
-        val pic = Sprites.zombie(z.type)
+        val pic = if (z.spitter && Sprites.has("zombie_spitter")) "zombie_spitter" else Sprites.zombie(z.type)
         if ((Sprites.walks(z.type) && walkSprite(c, pic, z.x, z.y + 4f, z.type.h * 1.3f, dir < 0f, z.phase, Sprites.stride(z.type), lean = 4f)) ||
             sprite(c, pic, z.x, z.y + 4f - kotlin.math.abs(sway) * 4f, z.type.h * 1.3f, flip = dir < 0f,
                 rot = sway * (if (z.type.flying) 10f else 6f), squash = 1f + 0.04f * kotlin.math.abs(sin(z.phase * 2f)))) {
@@ -1534,6 +1535,32 @@ class Renderer(internal val g: Game) {
         c.restore()
     }
 
+    /** The car's weapon on a post on the roof of the AI picture: turns to aim, kicks back and flashes when it fires. */
+    private fun roofGun(c: Canvas, v: Vehicle, roof: Float) {
+        val w = g.weapon
+        if (w == WeaponType.KNIFE || g.driver.out) return
+        val car = g.car
+        val mx = v.cls.mountX
+        val my = maxOf(v.cls.mountY, roof + 14f) - 8f
+        // post and mount plate
+        fill.color = 0xFF263238.toInt()
+        c.drawRect(mx - 4f, my, mx + 4f, maxOf(my + 6f, roof + 22f), fill)
+        c.drawRoundRect(mx - 16f, my - 2f, mx + 16f, my + 9f, 3f, 3f, fill)
+        val since = g.wstats.interval - car.fireCd
+        val firing = since in 0f..0.07f
+        c.save()
+        c.translate(mx, my)
+        c.rotate((car.aim - car.angle - car.squat) * 180f / PI.toFloat())
+        if (firing) c.translate(-6f, 0f)
+        c.scale(1.5f, 1.5f)
+        art.weaponArt(c, w)
+        c.restore()
+        if (firing && w != WeaponType.CATAPULT && w != WeaponType.CROSSBOW && w != WeaponType.LASER) {
+            val a = car.aim - car.angle - car.squat
+            muzzle(c, mx + cos(a) * 66f, my + sin(a) * 66f, a)
+        }
+    }
+
     /** Muzzle flash: the AI effect picture if there is one, else a hot star. */
     internal fun muzzle(c: Canvas, x: Float, y: Float, a: Float) {
         c.save()
@@ -1846,6 +1873,16 @@ class Renderer(internal val g: Game) {
 
     private fun drawBossRock(c: Canvas, rk: BossRock) {
         when (rk.kind) {
+            4 -> { // acid blob with a dripping trail
+                for (k in 1..3) {
+                    fill.color = Color.argb(150 - k * 40, 118, 255, 3)
+                    c.drawCircle(rk.x - rk.vx * 0.02f * k, rk.y - rk.vy * 0.02f * k, 9f - k * 2f, fill)
+                }
+                fill.color = 0xFF64DD17.toInt()
+                c.drawCircle(rk.x, rk.y, 11f, fill)
+                fill.color = 0xFFCCFF90.toInt()
+                c.drawCircle(rk.x - 3f, rk.y - 3f, 4f, fill)
+            }
             3 -> {
                 val l = hypot(rk.vx, rk.vy).coerceAtLeast(1f)
                 stroke.color = 0x66FF3D00

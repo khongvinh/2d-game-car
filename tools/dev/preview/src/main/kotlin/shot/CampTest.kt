@@ -26,7 +26,7 @@ fun main() {
     println("after build scrap=${save.scrap} defs=${g.campaign.defs.map { it?.type?.name }}")
     // nights: survive a few, log how it goes
     for (n in 1..3) {
-        tap(g, "night"); tick(g, 0.5f)
+        g.save.nightDue = true; tap(g, "night"); tick(g, 0.5f)
         var t = 0f
         var shots = 0
         while (g.state == State.SIEGE && t < 400f) {
@@ -74,7 +74,7 @@ fun main() {
     tick(g, 0.5f)
     shot(g, "v7_back")
     // next day: drive
-    tap(g, "night"); tick(g, 0.5f)
+    g.save.nightDue = true; tap(g, "night"); tick(g, 0.5f)
     while (g.state == State.SIEGE) tick(g, 0.5f)
     println("night 4: nights=${save.nights} wall=${g.campaign.wallHp.toInt()} ${g.campaign.banner}")
     tick(g, 4.5f)
