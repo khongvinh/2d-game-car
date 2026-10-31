@@ -22,5 +22,7 @@ Sửa code → `cd tools/dev/compile && gradle compileKotlin` (hoặc `cd tools/
 - Zip > 10MB không tải được bằng connector: tìm từng file (search_files theo mimeType + modifiedTime) rồi download_file_content từng id; giao việc tải hàng loạt cho subagent để đỡ tốn ngữ cảnh. KHÔNG mở bảng "Key API".
 - Nhập: `python3 tools/assets/nhap_asset.py <thư mục>` (chia nhóm nen/nhac/am_thanh/khac). Game nạp theo tên (Sprites.kt).
 
+- Tự đề xuất vẽ AI cho mọi thứ còn vẽ code / ảnh AI lỗi (xem CLAUDE.md) — không đợi người dùng nhắc.
+
 ## Trả lời
 Luôn bằng tiếng Việt. Theo dõi ngữ cảnh: ≥ 90% thì lưu tiến trình và nhắc mở chat mới (xem CLAUDE.md).

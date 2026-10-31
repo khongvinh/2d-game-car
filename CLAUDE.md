@@ -34,3 +34,8 @@ Sửa code → `cd tools/dev/compile && gradle compileKotlin` → (đổi hình/
 `cd tools/dev/preview && gradle shots` và xem ảnh) → tăng versionCode/versionName trong
 `app/build.gradle.kts` → `bash tools/dev/build_apk.sh <code> <name>` → commit, push → kiểm tra
 GitHub Actions "Build APK" xanh → gửi APK cho người dùng.
+
+## Đồ họa: tự đề xuất ảnh AI (người dùng dặn, không cần nhắc lại)
+- Mọi thứ trong game còn vẽ bằng code, hoặc ảnh AI bị lỗi (sai hướng, dính rác, sai nội dung, không đồng đều),
+  trợ lý TỰ đề xuất và viết/bổ sung script Colab (tools/assets/) để vẽ bằng AI, nối sẵn tên ảnh trong code
+  (có ảnh thì tự dùng, chưa có thì vẽ code tạm), rồi báo người dùng danh sách cần chạy.
