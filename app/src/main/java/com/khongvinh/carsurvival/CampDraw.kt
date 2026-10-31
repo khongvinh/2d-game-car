@@ -38,8 +38,8 @@ internal fun Renderer.drawCamp(c: Canvas) {
         c.drawOval(x, 30f + (k % 5) * 40f, x + 60f, 44f + (k % 5) * 40f, fill)
     }
     // the camp behind the wall: tents, the car, a fire barrel
-    tent(c, 40f, 0xFF8D6E63.toInt())
-    tent(c, 260f, 0xFF6D4C41.toInt())
+    if (!sprite(c, "prop_tent", 70f, 6f, 150f)) tent(c, 40f, 0xFF8D6E63.toInt())
+    if (!sprite(c, "prop_tent", 300f, 6f, 130f, flip = true)) tent(c, 260f, 0xFF6D4C41.toInt())
     val v = Vehicles.of(VehicleClass.entries[s.carTier.coerceIn(0, 4)], 0)
     if (!sprite(c, Sprites.CARS[s.carTier.coerceIn(0, 4)], 150f, 4f + sin(g.anim * 9f) * 0.8f, 130f)) {
         c.save()
@@ -49,9 +49,11 @@ internal fun Renderer.drawCamp(c: Canvas) {
         c.restore()
     }
     // fire barrel
-    fill.color = 0xFF5D4037.toInt()
-    c.drawRect(560f, -70f, 610f, 0f, fill)
-    for (k in 0..3) {
+    if (!sprite(c, "prop_fire_barrel", 585f, 4f, 110f)) {
+        fill.color = 0xFF5D4037.toInt()
+        c.drawRect(560f, -70f, 610f, 0f, fill)
+    }
+    if (!burning(c, 585f, -66f, 90f)) for (k in 0..3) {
         fill.color = if (k % 2 == 0) 0xFFFF6D00.toInt() else 0xFFFFD740.toInt()
         val fy = -70f - 20f - 18f * sin(g.anim * 9f + k)
         c.drawCircle(575f + k * 8f, fy, 10f - k, fill)
@@ -235,7 +237,8 @@ private fun Renderer.tent(c: Canvas, x: Float, col: Int) {
 private fun Renderer.drawWall(c: Canvas, level: Int, hpF: Float) {
     val x = Campaign.WALL_X
     val h = Campaign.WALL_H[level.coerceIn(0, 2)]
-    when (level) {
+    val pic = arrayOf("def_wall_wood", "def_wall_metal", "def_wall_concrete")[level.coerceIn(0, 2)]
+    if (!(Sprites.has("def_wall_wood") && spriteFill(c, pic, x - 14f, -h - 10f, x + 74f, 4f))) when (level) {
         0 -> { // planks and logs
             for (k in 0 until 6) {
                 fill.color = if (k % 2 == 0) 0xFF8D6E63.toInt() else 0xFF795548.toInt()

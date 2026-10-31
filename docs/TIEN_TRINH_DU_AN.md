@@ -294,11 +294,19 @@ Tài liệu bàn giao để tiếp tục làm việc ở phiên chat mới mà k
 - LỤC SOÁT VÔ TẬN: RoomRun(total = Int.MAX_VALUE, bossEvery = 6) — trùm mỗi 6 phòng (xen kẽ pháo/đồ tể), phòng nghỉ mỗi 7 phòng, lái buôn sau phòng 5/15/25; số quái min(26, 4 + phòng + vùng/3), đợt 2 thêm 2 + phòng/3, máu x(1 + 0,1 x (phòng - 1)), cắn 8 + 0,7 x vùng + 0,6 x phòng. Chết (hoặc thoát ở menu tạm dừng) → về trại MANG ĐỦ đồ đã lục (phế liệu, xăng, mảnh, tiền); banner "VỀ TRẠI — ĐÃ QUA n PHÒNG". HUD "Phòng n" (không còn /6).
 - Preview camp: bot giữ máu 3 phòng rồi cho gục; ảnh v7_room3.
 
-### v7.9 — Luật trại mới, súng trên xe, quái đường bắn trả (hiện tại)
+### v7.9 — Luật trại mới, súng trên xe, quái đường bắn trả
 - LUẬT TRẠI: 🔍 LỤC SOÁT luôn mở (không giới hạn lượt/ngày — gom càng nhiều càng tốt); 🚗 LÊN ĐƯỜNG mở khi có ≥ 3L xăng VÀ không còn đêm phải qua; 🌙 VÀO ĐÊM chỉ mở sau khi lên đường tới trạm mới (save.nightDue, prefs "nightDue": driveDone đặt = quãng đi > 0; thắng đêm hoặc trại thất thủ xóa). Không còn "dayActed" chặn hành động. Dòng trên cùng gợi ý việc tiếp ("trạm mới: dựng thủ rồi VÀO ĐÊM" / "lục soát tìm xăng để lên đường" / "đủ xăng: LÊN ĐƯỜNG tới trạm kế").
 - Súng trên xe (Renderer.roofGun): khi xe dùng ảnh AI, súng vẽ code (weaponArt x1,5) đặt trên trụ ở nóc ảnh xe, xoay theo hướng ngắm, giật lùi + lửa đầu nòng khi bắn (theo car.fireCd); vỏ đạn văng ra khi bắn súng lục/tiểu liên/nòng xoay (đồng), hoa cải (đỏ). Ảnh vũ khí AI không dùng cho súng trên xe (lộn xộn hướng).
 - Quái đường bắn trả: Zombie.spitter (~1/5 zombie đi bộ, không bay, không thằn lằn) dùng ảnh zombie_spitter, đứng trước xe 160–950 thì phun axit vòng cầu đón đầu xe (BossRock kind 4, chu kỳ max(1,6; 2,8 - 0,05 x ải) giây, sát thương 5 + 0,6 x ải, trừ giáp xe; trúng tài xế khi đi bộ). Trong nhà kho/đêm, Foe.ranged đặt z.spitter = ranged; quái phun axit ban đêm cũng dùng ảnh zombie_spitter.
 - Preview camp: đặt save.nightDue = true trước mỗi đêm thử.
+
+### v8.0 — Súng trên xe bằng ảnh AI, chuẩn bị bộ ảnh bổ sung (hiện tại)
+- Người dùng: súng lắp trên xe phải dùng ảnh AI; thiếu thì viết script Colab vẽ thêm. QUY TẮC MỚI (người dùng dặn): trợ lý TỰ ĐỀ XUẤT vẽ ảnh AI cho mọi thứ còn vẽ bằng code hoặc ảnh AI bị hỏng — không đợi nhắc.
+- Súng trên xe (Sprites.mount): ưu tiên wpn_mount_<loại> (pistol, knife, smg, crossbow, shotgun, catapult, flamer, rocket, laser, minigun); tạm thời: súng lục → wpn_smg, súng máy → wpn_rifle, hoa cải → wpn_shotgun, phun lửa → wpn_flamethrower; còn lại vẽ code. Thẻ gara dùng cùng ảnh.
+- Nối sẵn (có ảnh là tự dùng): thùng gỗ trên đường obs_crate (tạm dùng item_crate), thùng nổ obs_barrel_explosive, lô cốt obs_bunker (súng vẫn vẽ code bên dưới), tường trại def_wall_wood/metal/concrete theo cấp (chỉ dùng khi có def_wall_wood), lều prop_tent, thùng lửa prop_fire_barrel + lửa fx_fire, ghế nghỉ prop_bench (đã có, nay dùng).
+- tools/assets/tao_asset_bo_sung_colab.py (chạy sau v2, cùng thư mục v2): vẽ 10 wpn_mount_*, vẽ lại wpn_pistol/bow/spear nằm ngang không người, vẽ lại 6 xe NHÌN NGANG HẲN (bản 2 bị chéo 3/4), obs_crate, obs_barrel_explosive, obs_bunker, 3 tường, lều, thùng lửa, vẽ lại prop_catwalk/shelf/door_locked (đặc, không mờ) và 6 hiệu ứng (nền đen tuyền, cấm cảnh vật). VE_LAI xóa-vẽ-lại một lần (ghi _da_ve_lai.txt).
+- tao_khung_hinh_colab.py: VE_LAI = survivor_run, boss_brute với IP-Adapter 0,85 + mô tả màu áo quần cố định + cấm "different clothes, changing colors".
+- Khi nhập lần tới: xe vẽ lại phải quay phải → BỎ car_* khỏi FACING_LEFT của --v2 nếu đúng; xem lại khung hình survivor_run/boss_brute rồi bỏ chúng khỏi danh sách loại trừ.
 
 ## 3. Luật chơi cũ trước v7.0 (v6.1, để tham khảo)
 
@@ -481,7 +489,7 @@ cd tools/dev/preview && gradle walk      # tài xế đứng yên khi bão đi q
 
 | Phiên | Tiêu đề | Phạm vi |
 |---|---|---|
-| #3 | Đua Xe Sinh Tồn #3 — v7.3→v7.9: ảnh AI đầy đủ, chân bước thật, ảnh gốc không nén, hiệu ứng bụi/lửa nòng, script asset v2 + khung hình chạy | v7.4: đủ 101 ảnh, ánh xạ zombie/trùm/vũ khí xe/nút tròn/nền; v7.5: Rig cắt hông, sửa ảnh quay trái/dính khói, trùm nhà kho bằng ảnh, tao_asset_colab_v2.py; v7.6: bụi/nhún/lửa nòng, khung hình tên_0..7, tao_khung_hinh_colab.py; v7.7: nhập bộ v2 + khung hình zombie, hiệu ứng ảnh nổ/lửa/tia điện, nền đường theo vùng; v7.8: sửa đi bộ, axit trúng rào, đạn súng máy thật + vỏ đạn, xe đúng hướng, menu, nút nhảy tròn, lục soát vô tận; v7.9: luật trại (lục soát luôn mở, đêm sau khi tới trạm), súng trên nóc xe, quái đường phun axit |
+| #3 | Đua Xe Sinh Tồn #3 — v7.3→v8.0: ảnh AI đầy đủ, chân bước thật, ảnh gốc không nén, hiệu ứng bụi/lửa nòng, script asset v2 + khung hình chạy | v7.4: đủ 101 ảnh, ánh xạ zombie/trùm/vũ khí xe/nút tròn/nền; v7.5: Rig cắt hông, sửa ảnh quay trái/dính khói, trùm nhà kho bằng ảnh, tao_asset_colab_v2.py; v7.6: bụi/nhún/lửa nòng, khung hình tên_0..7, tao_khung_hinh_colab.py; v7.7: nhập bộ v2 + khung hình zombie, hiệu ứng ảnh nổ/lửa/tia điện, nền đường theo vùng; v7.8: sửa đi bộ, axit trúng rào, đạn súng máy thật + vỏ đạn, xe đúng hướng, menu, nút nhảy tròn, lục soát vô tận; v7.9: luật trại (lục soát luôn mở, đêm sau khi tới trạm), súng trên nóc xe, quái đường phun axit; v8.0: súng trên xe bằng ảnh AI, script bổ sung |
 | #2 | Đua Xe Sinh Tồn #2 — v5.0→v7.3: lá chắn đi bộ, âm lượng, nhà kho 30 phòng kiểu Earn to Die Rogue, menu bản đồ, nhiệm vụ, LÀM LẠI thành thủ trại (ngày lục soát/lên đường, đêm thủ thành), script tạo asset AI | v5.1→v7.3 + bài thử preview `inside`, `walk`, `rooms`, `camp`; script asset Colab miễn phí; nhập ảnh AI |
 | #1 | Đua Xe Sinh Tồn #1 — v1.0→v5.0: tạo game, kiểu Earn to Die, bão 3 bo, nhạc, trùm cuối, 20 bản đồ, gara 25 xe, 20 kiểu đường, giao diện thép, tiếng động cơ, ngọc đỏ, lô cốt, cốt truyện, cây kỹ năng, tài xế lục soát, xe nổ tài xế chạy tiếp, nhảy, đổi vị trí phím | Từ đầu đến v5.0 + tài liệu bàn giao, công cụ tools/dev, quy tắc CLAUDE.md |
 

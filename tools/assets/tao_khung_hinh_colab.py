@@ -33,16 +33,20 @@ SO_BUOC = 8
 DO_BAM_SAT = 1.5
 SEED = 777
 DO_GIONG_MAU = 0.65   # IP-Adapter: cao = giống ảnh gốc hơn nhưng ít theo tư thế hơn (0.5-0.8)
+# Vẽ lại các nhân vật mà khung hình lần trước không đồng đều (giữ màu áo quần chặt hơn)
+VE_LAI = {"survivor_run": 0.85, "boss_brute": 0.85}   # tên -> DO_GIONG_MAU riêng
 
 # (tên ảnh gốc trong bộ v2, thư mục, mô tả, kiểu đi: "chay" | "di" | "lach")
 NHAN_VAT = [
-    ("survivor_run", "nhan_vat", "male survivor, red cap, brown leather jacket, blue jeans, brown boots, holding a pistol", "chay"),
+    ("survivor_run", "nhan_vat", "male survivor, orange-red baseball cap, open brown leather jacket over a light blue t-shirt, "
+     "light blue denim jeans on both legs, brown boots, short dark beard, holding a pistol, same outfit in every frame", "chay"),
     ("zombie_walker", "zombie", "shambling green-skinned zombie in torn plaid shirt and jeans, arms reaching forward", "di"),
     ("zombie_runner", "zombie", "fast skinny grey zombie in rags", "chay"),
     ("zombie_fat", "zombie", "huge fat bloated green zombie in torn overalls", "lach"),
     ("zombie_spitter", "zombie", "hunched green zombie with swollen glowing acid throat", "di"),
     ("zombie_armored", "zombie", "zombie wearing dented riot police armor and cracked helmet", "di"),
-    ("boss_brute", "zombie", "giant muscular butcher zombie boss with bloody apron and huge cleaver", "lach"),
+    ("boss_brute", "zombie", "giant hulking muscular green zombie butcher boss, very broad shoulders and thick arms, "
+     "orange apron with blood stains, dark trousers, holding a huge meat cleaver, same outfit in every frame", "lach"),
 ]
 
 PHONG_CACH = (
@@ -51,7 +55,7 @@ PHONG_CACH = (
     "game sprite, full body from head to feet, strict side view profile facing right, "
     "one single character only, isolated on plain flat pure white background"
 )
-CAM = ("text, watermark, logo, frame, multiple views, character sheet, duplicate, extra limbs, "
+CAM = ("different clothes, changing colors, text, watermark, logo, frame, multiple views, character sheet, duplicate, extra limbs, "
        "extra characters, smoke, dust, muzzle flash, motion lines, shadow, ground, scenery, "
        "cropped, cut off, blurry, photo, 3d render, realistic, facing left, front view")
 
@@ -167,8 +171,12 @@ def loc_rac(anh):
 
 def chay():
     for ten, nhom, mo_ta, kieu in NHAN_VAT:
-        if os.path.exists(f"{RA}/{ten}_{SO_KHUNG - 1}.png"):
+        da_lam = f"{RA}/_da_ve_lai.txt"
+        xong_roi = set(open(da_lam).read().split()) if os.path.exists(da_lam) else set()
+        lam_lai = ten in VE_LAI and ten not in xong_roi
+        if os.path.exists(f"{RA}/{ten}_{SO_KHUNG - 1}.png") and not lam_lai:
             print("⏭  Đã có:", ten); continue
+        pipe.set_ip_adapter_scale(VE_LAI.get(ten, DO_GIONG_MAU))
         mau_path = f"{GOC}/{nhom}/{ten}.png"
         if not os.path.exists(mau_path):
             print("⚠️  Thiếu ảnh gốc (chạy tao_asset_colab_v2.py trước):", mau_path); continue
@@ -194,6 +202,9 @@ def chay():
                 hop = b if hop is None else (min(hop[0], b[0]), min(hop[1], b[1]), max(hop[2], b[2]), max(hop[3], b[3]))
         for i, k in enumerate(khung):
             (k.crop(hop) if hop else k).save(f"{RA}/{ten}_{i}.png", "PNG")
+        if lam_lai:
+            with open(da_lam, "a") as f:
+                f.write(ten + "\n")
         print("✅ Xong:", ten)
     print("🎉 HOÀN THÀNH. Thư mục:", RA, "(xem _xuong/ để thấy bộ xương từng khung)")
 

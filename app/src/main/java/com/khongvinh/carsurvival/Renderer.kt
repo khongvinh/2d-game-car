@@ -1343,7 +1343,7 @@ class Renderer(internal val g: Game) {
         val l = o.x - w / 2
         val t = o.y - h
         when (o.type) {
-            ObstacleType.CRATE -> {
+            ObstacleType.CRATE -> if (!spriteFill(c, if (Sprites.has("obs_crate")) "obs_crate" else "item_crate", l - 4f, t - 4f, l + w + 4f, t + h + 2f)) {
                 fill.color = 0xFFA1887F.toInt()
                 c.drawRect(l, t, l + w, t + h, fill)
                 stroke.color = 0xFF5D4037.toInt()
@@ -1352,7 +1352,7 @@ class Renderer(internal val g: Game) {
                 c.drawLine(l + 6f, t + 6f, l + w - 6f, t + h - 6f, stroke)
                 c.drawLine(l + w - 6f, t + 6f, l + 6f, t + h - 6f, stroke)
             }
-            ObstacleType.BARREL -> {
+            ObstacleType.BARREL -> if (!spriteFill(c, "obs_barrel_explosive", l - 4f, t - 2f, l + w + 4f, t + h + 2f)) {
                 fill.color = 0xFFC62828.toInt()
                 c.drawRoundRect(l, t, l + w, t + h, 10f, 10f, fill)
                 fill.color = 0xFF8E0000.toInt()
@@ -1552,8 +1552,11 @@ class Renderer(internal val g: Game) {
         c.translate(mx, my)
         c.rotate((car.aim - car.angle - car.squat) * 180f / PI.toFloat())
         if (firing) c.translate(-6f, 0f)
-        c.scale(1.5f, 1.5f)
-        art.weaponArt(c, w)
+        val pic = Sprites.mount(w)
+        if (pic == null || !spriteBox(c, pic, -16f, -26f, 74f, 18f)) {
+            c.scale(1.5f, 1.5f)
+            art.weaponArt(c, w)
+        }
         c.restore()
         if (firing && w != WeaponType.CATAPULT && w != WeaponType.CROSSBOW && w != WeaponType.LASER) {
             val a = car.aim - car.angle - car.squat
@@ -1693,6 +1696,8 @@ class Renderer(internal val g: Game) {
             c.drawPath(path, fill)
         }
         c.restore()
+        // concrete pillbox from the AI picture over the code gun
+        if (spriteFill(c, "obs_bunker", l - 12f, t - 22f, l + w + 12f, t + h + 4f)) return
         // dome
         val hit = o.flash > 0f
         path.reset()
@@ -2814,6 +2819,7 @@ class Renderer(internal val g: Game) {
 
     /** Workbench in a rest room: a table with tools under a lamp. */
     private fun drawBench(c: Canvas, x: Float, used: Boolean) {
+        if (sprite(c, "prop_bench", x, 4f, 110f, alpha = if (used) 150 else 255)) return
         fill.color = 0xFF5D4037.toInt()
         c.drawRect(x - 130f, -90f, x + 130f, -76f, fill)
         c.drawRect(x - 120f, -76f, x - 106f, 0f, fill)

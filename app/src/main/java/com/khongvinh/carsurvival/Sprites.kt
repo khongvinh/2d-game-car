@@ -80,8 +80,21 @@ object Sprites {
         else -> zombie(f.z.type)
     }
 
-    /** Car-mounted weapons. */
-    fun weapon(w: WeaponType) = when (w) {
+    /** Car-mounted weapon: the AI turret picture (wpn_mount_*) if made, else a fitting hand-gun picture. */
+    fun mount(w: WeaponType): String? {
+        val own = "wpn_mount_" + w.name.lowercase()
+        if (has(own)) return own
+        return when (w) {
+            WeaponType.PISTOL -> "wpn_smg"
+            WeaponType.SMG -> "wpn_rifle"
+            WeaponType.SHOTGUN -> "wpn_shotgun"
+            WeaponType.FLAMER -> "wpn_flamethrower"
+            else -> null
+        }?.takeIf { has(it) }
+    }
+
+    /** Car-mounted weapons (garage cards). */
+    fun weapon(w: WeaponType) = mount(w) ?: when (w) {
         WeaponType.PISTOL -> "wpn_pistol"
         WeaponType.KNIFE -> "wpn_axe"
         WeaponType.SMG -> "wpn_rifle"
