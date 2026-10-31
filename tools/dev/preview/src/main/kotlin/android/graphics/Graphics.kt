@@ -60,6 +60,17 @@ class Paint(@Suppress("UNUSED_PARAMETER") flags: Int = 0) {
 class Bitmap(val img: java.awt.image.BufferedImage) {
     val width get() = img.width
     val height get() = img.height
+    fun getPixels(px: IntArray, off: Int, stride: Int, x: Int, y: Int, w: Int, h: Int) {
+        img.getRGB(x, y, w, h, px, off, stride)
+    }
+
+    companion object {
+        fun createBitmap(b: Bitmap, x: Int, y: Int, w: Int, h: Int): Bitmap {
+            val o = java.awt.image.BufferedImage(w, h, java.awt.image.BufferedImage.TYPE_INT_ARGB)
+            o.createGraphics().apply { drawImage(b.img.getSubimage(x, y, w, h), 0, 0, null); dispose() }
+            return Bitmap(o)
+        }
+    }
 }
 
 object BitmapFactory {
@@ -132,6 +143,12 @@ class Canvas(private val g: Graphics2D) {
     fun drawRect(l: Float, t: Float, r: Float, b: Float, p: Paint) = draw(Rectangle2D.Float(minOf(l, r), minOf(t, b), Math.abs(r - l), Math.abs(b - t)), p)
     fun drawRoundRect(l: Float, t: Float, r: Float, b: Float, rx: Float, ry: Float, p: Paint) = draw(RoundRectangle2D.Float(l, t, r - l, b - t, rx * 2, ry * 2), p)
     fun drawRoundRect(rc: RectF, rx: Float, ry: Float, p: Paint) = drawRoundRect(rc.left, rc.top, rc.right, rc.bottom, rx, ry, p)
+    fun drawBitmap(b: Bitmap, x: Float, y: Float, p: Paint?) {
+        val d = RectF()
+        d.set(x, y, x + b.width, y + b.height)
+        drawBitmap(b, null, d, p)
+    }
+
     fun drawBitmap(b: Bitmap, @Suppress("UNUSED_PARAMETER") src: Rect?, dst: RectF, p: Paint?) {
         val old = g.composite
         val a = ((p?.alpha ?: 255) / 255f) * layerAlpha

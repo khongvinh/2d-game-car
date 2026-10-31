@@ -1179,7 +1179,9 @@ class Renderer(internal val g: Game) {
         val dir = sign(px - z.x).let { if (it == 0f) -1f else it }
         // AI sprites face right; turn them towards the player
         val sway = sin(z.phase)
-        if (sprite(c, Sprites.zombie(z.type), z.x, z.y + 4f - kotlin.math.abs(sway) * 4f, z.type.h * 1.3f, flip = dir < 0f,
+        val pic = Sprites.zombie(z.type)
+        if (Sprites.walks(z.type) && walkSprite(c, pic, z.x, z.y + 4f, z.type.h * 1.3f, dir < 0f, z.phase, Sprites.stride(z.type), lean = 4f)) return
+        if (sprite(c, pic, z.x, z.y + 4f - kotlin.math.abs(sway) * 4f, z.type.h * 1.3f, flip = dir < 0f,
                 rot = sway * (if (z.type.flying) 10f else 6f), squash = 1f + 0.04f * kotlin.math.abs(sin(z.phase * 2f)))) return
         c.save()
         c.translate(z.x, z.y)
@@ -1509,11 +1511,18 @@ class Renderer(internal val g: Game) {
         fill.color = 0x40000000
         c.drawOval(x - 20f, y - 4f, x + 20f, y + 4f, fill)
         val moving = d.dir != 0f && g.state == State.PLAYING
-        val pic = if (moving && Sprites.has("survivor_run")) "survivor_run" else "survivor_idle"
-        val bob = if (moving) kotlin.math.abs(sin(d.walk)) * 6f else 0f
-        val lean = if (moving) 6f * f + sin(d.walk) * 3f else 0f
-        val breathe = if (moving) 1f else 1f + 0.02f * sin(g.anim * 3f)
-        if (sprite(c, pic, x, y + 4f - bob, 108f, flip = f < 0f, rot = lean, squash = breathe)) {
+        val jumping = d.air > 0.05f
+        val pic = when {
+            jumping && Sprites.has("survivor_jump") -> "survivor_jump"
+            d.atkT > 0f && Sprites.has("survivor_shoot") -> "survivor_shoot"
+            moving && Sprites.has("survivor_run") -> "survivor_run"
+            else -> "survivor_idle"
+        }
+        // legs really step (picture cut at the hip), body leans into the run
+        val stride = if (jumping) 0f else if (moving) 28f else 0f
+        val phase = if (moving) d.walk else g.anim * 3f
+        val hurt = d.hurtT > 0f && (g.anim * 20f).toInt() % 2 == 0
+        if (walkSprite(c, pic, x, y + 4f, 108f, f < 0f, phase, stride, if (hurt) 150 else 255, if (moving) 5f else 0f)) {
             driverHp(c, d, x, y)
             return
         }
@@ -4142,7 +4151,16 @@ class Renderer(internal val g: Game) {
     }
 
 
+    /** Region boss from its AI picture: big walkers step, others heave. */
+    private fun bossSprite(c: Canvas, name: String, x: Float, y: Float, b: Boss, alpha: Int): Boolean {
+        val face = g.driver.x > x || (!g.driver.out && g.car.x > x)
+        val ph = g.anim * 4f + x * 0.01f
+        return if (name == "boss_brute") walkSprite(c, name, x, y, b.h * 1.1f, !face, ph, 16f, alpha, 3f)
+        else sprite(c, name, x, y + 6f, b.h * 1.1f, flip = !face, alpha = alpha, rot = sin(ph) * 3f, squash = 1f + 0.04f * sin(ph * 2f))
+    }
+
     internal fun drawBossAny(c: Canvas, b: Boss) {
+        Sprites.boss(b.tier)?.let { if (bossSprite(c, it, b.x, b.y, b, if (b.flash > 0f) 160 else 255)) return }
         when (b.tier) {
             2 -> drawDragon(c, b)
             3 -> drawBatBoss(c, b)
@@ -4971,9 +4989,10 @@ class Renderer(internal val g: Game) {
             Region.NIGHT -> intArrayOf(0xFF2B3A66.toInt(), 0xFF141C33.toInt())
             Region.ALIEN -> intArrayOf(0xFF7A4AA8.toInt(), 0xFF2E1A4A.toInt())
         }
-        val hall = Sprites.has("bg_warehouse")
+        val hallPic = arrayOf("bg_warehouse", "bg_warehouse_2", "bg_warehouse_3")[rm.palette.coerceIn(0, 2)].let { if (Sprites.has(it)) it else "bg_warehouse" }
+        val hall = Sprites.has(hallPic)
         if (hall) {
-            backdrop(c, "bg_warehouse")
+            backdrop(c, hallPic)
             fill.color = 0x44000000
             c.drawRect(0f, 0f, W, H, fill)
         } else {
@@ -5070,7 +5089,13 @@ class Renderer(internal val g: Game) {
         for (dc in rm.decor) {
             val dx = dc[0]
             if (dx < x0 - 200f || dx > x1 + 200f) continue
-            when (dc[1].toInt()) {
+            val prop = when (dc[1].toInt()) {
+                0 -> sprite(c, "prop_shelf", dx, 4f, 240f)
+                1 -> sprite(c, "prop_car_rusty", dx, 6f, 120f)
+                2 -> sprite(c, "prop_crate_stack", dx, 4f, 120f)
+                else -> sprite(c, "prop_pallet", dx, 4f, 60f).also { sprite(c, "prop_barrel", dx + 105f, 4f, 95f) }
+            }
+            if (!prop) when (dc[1].toInt()) {
                 0 -> {
                     fill.color = 0xFF5D4A3A.toInt()
                     c.drawRect(dx - 90f, -220f, dx - 82f, 0f, fill)
@@ -5125,6 +5150,7 @@ class Renderer(internal val g: Game) {
         for (p in rm.platforms) {
             if (p.r < x0 || p.l > x1) continue
             val t = -p.top
+            if (spriteFill(c, "prop_catwalk", p.l - 6f, t - 6f, p.r + 6f, t + 40f)) continue
             fill.color = 0xFF3A3530.toInt()
             c.drawRect(p.l + 14f, t + 16f, p.l + 22f, t + 40f, fill)
             c.drawRect(p.r - 22f, t + 16f, p.r - 14f, t + 40f, fill)
@@ -5304,6 +5330,21 @@ class Renderer(internal val g: Game) {
     }
 
     private fun door(c: Canvas, x: Float, exit: Boolean, open: Boolean) {
+        val pic = if (exit && !open && Sprites.has("prop_door_locked")) "prop_door_locked" else "prop_door"
+        if (spriteFill(c, pic, x - 62f, -250f, x + 62f, 0f)) {
+            if (!exit) return
+            fill.color = if (open) 0xFF1B5E20.toInt() else 0xFF7F1D1D.toInt()
+            c.drawRoundRect(x - 50f, -300f, x + 50f, -262f, 6f, 6f, fill)
+            text.textAlign = Paint.Align.CENTER
+            text.textSize = 24f
+            text.color = if (open) 0xFFB9F6CA.toInt() else 0xFFFFCDD2.toInt()
+            c.drawText(if (open) "EXIT ➜" else "KHÓA", x, -272f, text)
+            if (open) {
+                fill.color = Color.argb((60 + 50 * sin(g.anim * 5f)).toInt(), 105, 240, 174)
+                c.drawRect(x - 62f, -250f, x + 62f, 0f, fill)
+            }
+            return
+        }
         fill.color = 0xFF3E3A36.toInt()
         c.drawRect(x - 62f, -250f, x + 62f, 0f, fill)
         fill.color = if (exit) 0xFF4DB6AC.toInt() else 0xFF5B7F6E.toInt()
@@ -5336,7 +5377,16 @@ class Renderer(internal val g: Game) {
 
     private fun drawRoomBoss(c: Canvas, b: RoomBoss) {
         val x = b.x
-        when (b.kind) {
+        val hit = if (b.flash > 0f) 160 else 255
+        val face = b.dir > 0f
+        val drawn = when (b.kind) {
+            0 -> sprite(c, "item_crate", x, 0f, 80f) &&
+                sprite(c, "def_turret_cannon", x, -70f + (if (b.fireCd < 0.15f) 4f else 0f), 120f, flip = g.driver.x < x, alpha = hit)
+            1 -> walkSprite(c, "boss_brute", x, 0f, b.h * 1.25f, !face, b.anim * (if (b.chargeT > 0f) 14f else 5f),
+                if (b.chargeT > 0f) 30f else 18f, hit, if (b.chargeT > 0f) 10f else 3f)
+            else -> Sprites.boss(b.look.tier)?.let { bossSprite(c, it, x, 0f, b.look, hit) } ?: false
+        }
+        if (!drawn) when (b.kind) {
             0 -> { // cannon turret on a crate base
                 fill.color = 0xFF5D4037.toInt()
                 c.drawRect(x - 70f, -70f, x + 70f, 0f, fill)

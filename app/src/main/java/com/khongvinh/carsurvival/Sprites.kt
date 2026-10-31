@@ -41,6 +41,22 @@ object Sprites {
         ZombieType.BLOB -> "zombie_crawler"
     }
 
+    /** Upright monsters whose legs can step (see [Rig]). */
+    fun walks(t: ZombieType) = t == ZombieType.WALKER || t == ZombieType.RUNNER || t == ZombieType.FAT
+
+    fun stride(t: ZombieType) = when (t) {
+        ZombieType.RUNNER -> 34f
+        ZombieType.FAT -> 14f
+        else -> 22f
+    }
+
+    /** Road/room region boss by tier (1 brute, 2 dragon, 3 bat, 4 alien); null = drawn in code. */
+    fun boss(tier: Int) = when (tier) {
+        1 -> "boss_brute"
+        4 -> if (has("boss_mutant_worm")) "boss_mutant_worm" else null
+        else -> null
+    }
+
     /** Siege monster picture: night bosses have their own (by region). */
     fun foe(f: Foe, boss: Boolean, r: Region) = when {
         boss -> when (r) {
@@ -114,5 +130,59 @@ object Sprites {
         Region.VOLCANO -> "bg_city_ruins"
         Region.NIGHT -> "bg_night_forest"
         Region.ALIEN -> "bg_fortress"
+    }
+}
+
+/**
+ * A still picture cut into body + two legs so it can walk: the legs swing
+ * about the hip while the body bobs. Cut once per sprite and cached.
+ */
+class Rig(val body: Bitmap, val legA: Bitmap, val legB: Bitmap, val hip: Int, val aX: Int, val bX: Int, val w: Int, val h: Int) {
+    companion object {
+        private val cache = HashMap<String, Rig?>()
+
+        /** Where the hip is, as a share of the picture height. */
+        private fun hipOf(name: String) = when {
+            name.startsWith("boss") -> 0.62f
+            name == "zombie_fat" -> 0.7f
+            name.startsWith("survivor") -> 0.56f
+            else -> 0.58f
+        }
+
+        fun of(name: String): Rig? = synchronized(cache) {
+            cache.getOrPut(name) { Sprites.get(name)?.let { cut(it, hipOf(name)) } }
+        }
+
+        private fun cut(b: Bitmap, hipF: Float): Rig? {
+            val w = b.width
+            val h = b.height
+            val hip = (h * hipF).toInt()
+            if (hip <= 4 || h - hip < 8 || w < 16) return null
+            // split the legs at the emptiest column in the middle of the leg area
+            val px = IntArray(w * (h - hip))
+            b.getPixels(px, 0, w, 0, hip, w, h - hip)
+            val col = IntArray(w)
+            for (y in 0 until h - hip) for (x in 0 until w) if ((px[y * w + x] ushr 24) > 40) col[x]++
+            var l = 0
+            while (l < w && col[l] == 0) l++
+            var r = w - 1
+            while (r > l && col[r] == 0) r--
+            if (r - l < 8) return null
+            var split = (l + r) / 2
+            var best = Int.MAX_VALUE
+            for (x in l + (r - l) * 3 / 10..l + (r - l) * 7 / 10) if (col[x] < best) { best = col[x]; split = x }
+            // centre of each leg = where it hangs from
+            fun centre(a: Int, z: Int): Int {
+                var s = 0L
+                var n = 0L
+                for (x in a until z) { s += x.toLong() * col[x]; n += col[x] }
+                return if (n > 0) (s / n).toInt() else (a + z) / 2
+            }
+            val overlap = (h * 0.05f).toInt()
+            val body = Bitmap.createBitmap(b, 0, 0, w, minOf(h, hip + overlap))
+            val legA = Bitmap.createBitmap(b, 0, hip, split, h - hip)
+            val legB = Bitmap.createBitmap(b, split, hip, w - split, h - hip)
+            return Rig(body, legA, legB, hip, centre(0, split), centre(split, w) - split, w, h)
+        }
     }
 }
