@@ -278,7 +278,7 @@ class Campaign(private val g: Game) {
 
     private fun spawnBoss(n: Int) {
         val z = Zombie(ZombieType.FAT, SPAWN_X + 100f, 0f)
-        z.hp = 300f * (1f + 0.25f * n)
+        z.hp = 520f * (1f + 0.3f * n)
         z.fly = 1f // marks the boss (drawn big)
         foes.add(Foe(z, false))
         g.sfx.play(Sfx.S.ROAR)
@@ -401,7 +401,7 @@ class Campaign(private val g: Game) {
                     shots.add(RoomShot(sx, sy, (tx - sx) / t, (ty - sy) / t - Game.G * 0.5f * t, 0, 6f + n * 0.5f))
                 }
             } else {
-                val dmg = bite * (if (boss) 4f else if (z.type == ZombieType.FAT || z.type == ZombieType.BLOB) 1.8f else 1f) * dt
+                val dmg = bite * (if (boss) 6f else if (z.type == ZombieType.FAT || z.type == ZombieType.BLOB) 1.8f else 1f) * dt
                 if (bd != null) {
                     bd.hp -= dmg
                     bd.flash = 0.08f

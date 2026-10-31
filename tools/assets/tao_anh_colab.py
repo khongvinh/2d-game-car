@@ -132,6 +132,7 @@ HINH = [
     ("nhan_vat", "survivor_jump", "male survivor, red cap, brown leather jacket, blue jeans, holding pistol, jumping", True, VUONG),
     ("nhan_vat", "survivor_shoot", "male survivor, red cap, brown leather jacket, blue jeans, boots, aiming pistol forward", "nguoi", DOC),
     ("nhan_vat", "survivor_hurt", "male survivor, red cap, leather jacket, blue jeans, flinching in pain", True, VUONG),
+    ("nhan_vat", "survivor_ride", "male survivor, red cap, red leather jacket, blue jeans, sitting, riding motorbike pose, no motorbike", "nguoi", DOC),
     ("nhan_vat", "survivor_dead", "male survivor in red cap lying knocked out on the ground", True, VUONG),
     ("nhan_vat", "merchant", "burly merchant, red bandana, beard, green vest, hook hand", True, VUONG),
     # --- Zombie và trùm ---
@@ -168,12 +169,12 @@ HINH = [
     ("manh_xe", "part_brick", "stack of bricks and cement bag for building", True, VUONG),
     # --- Vũ khí ---
     ("vu_khi", "wpn_pistol", "single handgun, horizontal, no hand, " + NGANG_HAN, True, NGANG),
-    ("vu_khi", "wpn_smg", "single submachine gun, horizontal, barrel right", True, VUONG),
+    ("vu_khi", "wpn_smg", "single submachine gun, horizontal, side view, barrel right", True, VUONG),
     ("vu_khi", "wpn_shotgun", "pump shotgun", True, VUONG),
     ("vu_khi", "wpn_rifle", "assault rifle", True, VUONG),
     ("vu_khi", "wpn_minigun", "rotary minigun", True, VUONG),
     ("vu_khi", "wpn_rocket", "rocket launcher", True, VUONG),
-    ("vu_khi", "wpn_flamethrower", "single handheld flamethrower, fuel tank, no car, no fire, horizontal", True, VUONG),
+    ("vu_khi", "wpn_flamethrower", "single handheld flamethrower, horizontal, no fire, no vehicle", True, VUONG),
     ("vu_khi", "wpn_laser", "sci-fi laser rifle", True, VUONG),
     ("vu_khi", "wpn_bow", "wooden bow with arrow, no person, " + NGANG_HAN, True, VUONG),
     ("vu_khi", "wpn_spear", "long spear, iron tip, horizontal, no person, " + NGANG_HAN, True, NGANG),
@@ -182,7 +183,7 @@ HINH = [
     ("vu_khi", "wpn_dynamite", "bundle of dynamite with lit fuse", True, VUONG),
     # --- Pháo đài & bệ phòng thủ ---
     ("phong_thu", "def_barricade_spikes", "wooden barricade with sharp metal spikes, front view", True, VUONG),
-    ("do_dac", "def_wall_metal", "tall narrow wall panel, riveted rusty steel plates, solid, front view", True, DOC),
+    ("do_dac", "def_wall_metal", "tall narrow rusty sheet metal wall panel, bolts, thick, filled, solid, front view", True, DOC),
     ("phong_thu", "def_gate", "fortress gate made of scrap metal and car doors", True, VUONG),
     ("phong_thu", "def_watchtower", "wooden watchtower with sniper nest", True, VUONG),
     ("phong_thu", "def_turret_mg", "machine gun turret on tripod base", True, VUONG),
@@ -236,7 +237,8 @@ HINH = [
     ("do_dac", "prop_crate_stack", "stack of three wooden crates", True, VUONG),
     ("do_dac", "prop_barrel", "rusty oil drum barrel", True, DOC),
     ("do_dac", "prop_pallet", "wooden pallet with sacks", True, NGANG),
-    ("do_dac", "prop_catwalk", "thick steel catwalk platform, yellow black hazard stripes, solid, " + NGANG_HAN, True, NGANG),
+    ("do_dac", "floor_warehouse", "worn concrete warehouse floor strip, cracks, stains, seamless texture, " + NGANG_HAN, False, NGANG),
+    ("do_dac", "prop_catwalk", "horizontal steel walkway beam, yellow black hazard stripes, no legs, " + NGANG_HAN, True, NGANG),
     ("do_dac", "prop_bench", "old wooden workbench with tools", True, NGANG),
     ("do_dac", "item_crate", "closed wooden loot crate with metal corners and a question mark sticker", True, VUONG),
     ("do_dac", "def_barricade_wood", "barricade of crossed wooden planks nailed together, front view", True, NGANG),
@@ -247,7 +249,7 @@ HINH = [
     ("hieu_ung", "fx_fire", "single tall cartoon flame, orange yellow", "sang", DOC),
     ("hieu_ung", "fx_spark", "electric blue spark burst", "sang", VUONG),
     ("hieu_ung", "fx_blood", "dark red blood splash, droplets", True, VUONG),
-    ("hieu_ung", "fx_dust", "small round puff of brown dust", True, VUONG),
+    ("hieu_ung", "fx_dust", "small round brown dust cloud puff, soft", True, VUONG),
     # --- Nền (không xóa phông) ---
     ("nen", "bg_desert_far", "desert canyon with red mesas and sunset sky, far layer", False, NGANG),
     ("nen", "bg_desert_road", "ruined desert highway with broken poles and wrecked cars", False, NGANG),
@@ -265,12 +267,12 @@ HINH = [
 
     # --- Bổ sung: súng lắp trên xe, chướng ngại, trại, tường (trước đây vẽ code) ---
     ("sung_xe", "wpn_mount_pistol", "twin heavy pistols, " + SUNG_XE, True, NGANG),
-    ("sung_xe", "wpn_mount_knife", "two steel blades on a bumper bracket, no car, " + NGANG_HAN, True, NGANG),
+    ("sung_xe", "wpn_mount_knife", "two curved steel blades on a bracket, no vehicle, " + NGANG_HAN, True, NGANG),
     ("sung_xe", "wpn_mount_smg", "submachine gun, drum magazine, " + SUNG_XE, True, NGANG),
     ("sung_xe", "wpn_mount_crossbow", "heavy crossbow ballista, " + SUNG_XE, True, NGANG),
     ("sung_xe", "wpn_mount_shotgun", "double barrel shotgun, " + SUNG_XE, True, NGANG),
     ("sung_xe", "wpn_mount_catapult", "small catapult arm with rock, " + SUNG_XE, True, NGANG),
-    ("sung_xe", "wpn_mount_flamer", "single flamethrower, fuel tank, " + SUNG_XE, True, NGANG),
+    ("sung_xe", "wpn_mount_flamer", "single flamethrower turret, " + SUNG_XE, True, NGANG),
     ("sung_xe", "wpn_mount_rocket", "single rocket launcher tube, " + SUNG_XE, True, NGANG),
     ("sung_xe", "wpn_mount_laser", "laser cannon, blue coils, " + SUNG_XE, True, NGANG),
     ("sung_xe", "wpn_mount_minigun", "six-barrel minigun, " + SUNG_XE, True, NGANG),
@@ -278,18 +280,17 @@ HINH = [
     ("do_dac", "obs_barrel_explosive", "red explosive barrel, yellow hazard sign", True, DOC),
     ("do_dac", "obs_bunker", "concrete pillbox bunker, gun slit, sandbags, " + NGANG_HAN, True, NGANG),
     ("do_dac", "def_wall_wood", "tall narrow wall panel, sharpened wooden logs, solid, front view", True, DOC),
-    ("do_dac", "def_wall_concrete", "tall narrow concrete wall block, cracks, solid, front view", True, DOC),
-    ("do_dac", "prop_tent", "patched canvas camping tent, solid colors, " + NGANG_HAN, True, NGANG),
+    ("do_dac", "def_wall_concrete", "tall narrow grey concrete wall block, thick, filled, solid, front view", True, DOC),
+    ("do_dac", "prop_tent", "orange canvas camping tent, filled solid colors, " + NGANG_HAN, True, NGANG),
     ("do_dac", "prop_fire_barrel", "rusty campfire barrel, no fire", True, DOC),
 ]
 
 # Ảnh hỏng: xóa rồi vẽ lại MỘT lần cho mỗi ĐỢT (đổi DOT để vẽ lại đợt mới).
-# Đợt 3: ảnh đợt 2 vẫn lỗi (nền trắng ở hiệu ứng, nhiều vật trong 1 ảnh, mờ, sai nội dung).
-DOT = "dot3"
+# Đợt 4: ảnh vẫn lỗi sau đợt 3 (mô tả mới, gọn hơn) + 2 ảnh mới (survivor_ride, floor_warehouse vẽ nếu chưa có).
+DOT = "dot4"
 VE_LAI = {
-    "fx_muzzle", "fx_fire", "fx_spark", "fx_dust",
-    "def_wall_concrete", "def_wall_wood", "def_wall_metal", "prop_catwalk", "prop_tent", "def_barricade_spikes",
-    "wpn_mount_flamer", "wpn_mount_knife", "wpn_mount_rocket", "wpn_flamethrower", "wpn_smg",
+    "def_wall_metal", "def_wall_concrete", "prop_tent", "prop_catwalk", "fx_dust",
+    "wpn_mount_knife", "wpn_mount_flamer", "wpn_flamethrower", "wpn_smg",
 }
 
 

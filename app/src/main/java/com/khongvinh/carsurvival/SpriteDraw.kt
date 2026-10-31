@@ -139,3 +139,9 @@ internal fun Renderer.burning(c: Canvas, x: Float, y: Float, h: Float): Boolean 
     val k = 1f + 0.12f * kotlin.math.sin(g.anim * 18f + x)
     return sprite(c, "fx_fire", x, y, h * 0.8f * k, alpha = 220, squash = k)
 }
+
+/** Walk-cycle phase from the distance walked, so feet plant instead of sliding (one cycle = two steps). */
+internal fun stepPhase(x: Float, h: Float, facingLeft: Boolean): Float {
+    val cycle = h * 0.95f
+    return (if (facingLeft) -x else x) / cycle * 2f * kotlin.math.PI.toFloat()
+}

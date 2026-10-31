@@ -27,7 +27,7 @@ CUT_LEFT = {"survivor_run": 0.4}
 
 
 # pictures where the AI drew a second, smaller copy: keep only the big one
-ONLY_BIGGEST = {"car_sedan", "car_tank", "wpn_shotgun", "wpn_laser", "wpn_minigun", "part_chassis",
+ONLY_BIGGEST = {"car_sedan", "car_tank", "wpn_mount_rocket", "wpn_shotgun", "wpn_laser", "wpn_minigun", "part_chassis",
                 "part_gun_barrel", "survivor_dead"}
 
 
@@ -83,8 +83,8 @@ src = sys.argv[1]
 V2 = "--v2" in sys.argv[2:]
 if V2:
     # bộ 2 (vẽ lại lần 3, prompt dưới 77 token): những ảnh AI vẫn vẽ quay trái
-    FACING_LEFT = {"survivor_shoot", "zombie_walker", "zombie_crawler", "car_sedan", "car_motorbike", "car_tank",
-                   "wpn_mount_laser", "wpn_mount_shotgun"}
+    FACING_LEFT = {"survivor_idle", "survivor_run", "survivor_shoot", "zombie_walker", "zombie_crawler", "car_sedan", "car_motorbike", "car_tank",
+                   "wpn_mount_laser", "wpn_mount_shotgun", "wpn_mount_pistol", "wpn_mount_smg"}
     CUT_LEFT = {}
 root = os.path.join(os.path.dirname(__file__), "..", "..", "app", "src", "main", "assets")
 img_dir = os.path.join(root, "img")

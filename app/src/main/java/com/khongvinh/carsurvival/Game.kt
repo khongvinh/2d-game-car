@@ -24,7 +24,7 @@ import kotlin.random.Random
 class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
     companion object {
         /** Shown on the menu so the installed build is easy to check. */
-        const val VERSION = "8.2"
+        const val VERSION = "8.3"
 
         const val VIRTUAL_HEIGHT = 720f
         const val METER = 30f
@@ -185,7 +185,7 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
 
     // garage browsing
     /** 0 vehicles, 1 weapons, 2 skill tree, 3 hand weapons. */
-    var garageTab = 0
+    var garageTab = 1
 
     /** Vehicle on show in the garage (index into [Vehicles.all]). */
     var showVeh = 0
@@ -944,6 +944,8 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
         kills = 0; runMoney = 0; runGems = 0
         // endless: room after room, each harder; a boss every 6th room; ends only when the driver falls
         val run = RoomRun(campaign.zone, campaign.region, save.day * 977 + save.nights * 31, total = Int.MAX_VALUE, bossEvery = 6)
+        // guns start with a limited magazine; only levelling up refills it
+        run.ammo = if (save.sideWeapon.melee) -1 else 60
         rooms = run
         setState(State.PLAYING)
         val d = driver
@@ -1234,7 +1236,7 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
         if (levelUp > 0) achievements.add("⭐ Lên cấp $levelUp (+$levelGems♦)")
         if (runParts > 0) achievements.add("🔧 Tìm được $runParts mảnh xe")
         if (newBestScore) achievements.add("⭐ Điểm cao nhất mới")
-        if (kills >= 50) achievements.add("🧟 Đồ tể zombie") else if (kills >= 20) achievements.add("🧟 Sát thủ zombie")
+        if (kills >= 50) achievements.add("💀 Đồ tể zombie") else if (kills >= 20) achievements.add("💀 Sát thủ zombie")
         if (smashed >= 15) achievements.add("💥 Xe ủi")
         if (maxAir >= 2f) achievements.add("🦅 Phi công") else if (maxAir >= 1f) achievements.add("🛫 Bay cao")
         if (maxKmh >= 150f) achievements.add("⚡ Tốc độ bàn thờ")
@@ -3300,6 +3302,8 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
         val next = Skills.nodes.firstOrNull { Skills.available(save.skills, it) && it.stat != null }
         skillSel = next?.id ?: 0
         skillPage = next?.page ?: 0
+        // the old vehicle showroom (tab 0) is gone: cars are built in the WORKSHOP
+        if (garageTab == 0) garageTab = 1
         setState(State.GARAGE)
     }
 
@@ -3455,7 +3459,7 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
             for (i in 0..3) if (inRect(navRect(i), x, y)) {
                 sfx.play(Sfx.S.CLICK)
                 // the weapons button keeps whichever list (car / hand) was open
-                if (i == 0) goMenu() else if (i == 2 && garageTab == 3) Unit else garageTab = i - 1
+                if (i == 0) goMenu() else if (i == 1) setState(State.WORKSHOP) else if (i == 2 && garageTab == 3) Unit else garageTab = i - 1
                 return
             }
             when (garageTab) {

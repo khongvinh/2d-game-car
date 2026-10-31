@@ -50,7 +50,7 @@ class Foe(val z: Zombie, val ranged: Boolean) {
 
 /** Boss of rooms 10 / 20 / 30. [kind] 0 cannon turret, 1 brute, 2 the region's big boss. */
 class RoomBoss(val kind: Int, var x: Float, val tier: Int, hpMul: Float) {
-    val maxHp = (if (kind == 0) 60f else if (kind == 1) 80f else 120f) * hpMul
+    val maxHp = (if (kind == 0) 260f else if (kind == 1) 340f else 480f) * hpMul
     var hp = maxHp
     var fireCd = 2f
     var chargeT = 0f
@@ -198,6 +198,10 @@ class RoomRun(val stage: Int, val region: Region, private val seed: Int, val tot
     private fun make(i: Int) = Room(i, stage, region, seed + i * 101, boss = (i == total && bossLast) || i % bossEvery == 0, rest = i % 7 == 0 && i < total, bossKind = if (i % (bossEvery * 2) == 0) 1 else if (i % bossEvery == 0) 0 else Random(seed + i).nextInt(2))
     var level = 1
     var xp = 0
+
+    /** Gun ammo for the search (-1 = melee weapon, no ammo); refilled only on level-up. */
+    var ammo = -1
+    val ammoPerLevel = 30
     val xpNeed get() = 4 + level * 3
     val powers = IntArray(Power.entries.size)
     fun lv(p: Power) = powers[p.ordinal]
@@ -330,7 +334,7 @@ class RoomRules(private val g: Game) {
     private fun updateFoes(run: RoomRun, dt: Float) {
         val d = g.driver
         val rm = run.room
-        val bite = 8f + run.stage * 0.7f + run.index * 0.6f
+        val bite = 11f + run.stage * 1f + run.index * 0.8f
         for (f in rm.foes) {
             val z = f.z
             if (!z.alive) continue
@@ -406,7 +410,7 @@ class RoomRules(private val g: Game) {
                     b.fireCd = 2.2f
                     for (k in -1..1) {
                         val a = atan2(d.y - 60f - (-b.h + 30f), dx) + k * 0.18f
-                        run.room.shots.add(RoomShot(b.x, -b.h + 30f, cos(a) * 620f, sin(a) * 620f, 1, 10f + run.stage))
+                        run.room.shots.add(RoomShot(b.x, -b.h + 30f, cos(a) * 650f, sin(a) * 650f, 1, 18f + run.stage * 1.5f))
                     }
                     g.sfx.play(Sfx.S.CATAPULT, 0.6f)
                 }
@@ -429,13 +433,13 @@ class RoomRules(private val g: Game) {
                 if (b.fireCd <= 0f) {
                     b.fireCd = 1.8f
                     val a = atan2(d.y - 60f - (-b.h * 0.6f), dx)
-                    run.room.shots.add(RoomShot(b.x, -b.h * 0.6f, cos(a) * 540f, sin(a) * 540f, 1, 12f + run.stage))
+                    run.room.shots.add(RoomShot(b.x, -b.h * 0.6f, cos(a) * 560f, sin(a) * 560f, 1, 20f + run.stage * 1.5f))
                 }
             }
         }
         b.x = b.x.coerceIn(150f, run.room.width - 150f)
         b.look.x = b.x
-        if (abs(dx) < b.w / 2 + 20f && d.y > -b.h) g.hurtDriver((if (b.chargeT > 0f) 40f else 18f) * dt)
+        if (abs(dx) < b.w / 2 + 20f && d.y > -b.h) g.hurtDriver((if (b.chargeT > 0f) 75f else 32f) * dt)
     }
 
     private fun stats(run: RoomRun): Triple<Float, Float, Int> {
@@ -473,6 +477,19 @@ class RoomRules(private val g: Game) {
         if (d.dir == 0f) d.face = if (tx >= d.x) 1f else -1f
         if (d.fireCd > 0f) return
         d.fireCd = interval
+        if (!w.melee && run.ammo == 0) {
+            // out of ammo: a weak punch at arm's length until the next level-up
+            d.fireCd = 0.45f
+            if (best < 90f) {
+                d.atkT = 0.2f
+                for (fo in rm.foes) if (abs(fo.z.x - d.x) < 90f && abs(fo.z.y - d.y) < 140f) hurt(run, fo, dmg * 0.2f, (if (fo.z.x > d.x) 1f else -1f) * 120f)
+                g.sfx.play(Sfx.S.HIT, 0.35f)
+            } else if (Random.nextFloat() < 0.25f) {
+                g.texts.add(FloatText("HẾT ĐẠN!", d.x, d.y - 160f, 0xFFFF5252.toInt()).also { it.size = 34f; it.life = 0.8f })
+            }
+            return
+        }
+        if (!w.melee && run.ammo > 0) run.ammo--
         if (w.melee) {
             d.atkT = 0.25f
             val f = if (tx >= d.x) 1f else -1f
@@ -732,6 +749,10 @@ class RoomRules(private val g: Game) {
             run.xp -= run.xpNeed
             run.level++
             run.levelUps++
+            if (run.ammo >= 0) {
+                run.ammo += run.ammoPerLevel
+                g.texts.add(FloatText("+${run.ammoPerLevel} ĐẠN", g.driver.x, g.driver.y - 170f, 0xFFFFD740.toInt()).also { it.size = 40f })
+            }
         }
     }
 }

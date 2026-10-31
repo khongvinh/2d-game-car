@@ -34,8 +34,8 @@ DO_BAM_SAT = 1.5
 SEED = 777
 DO_GIONG_MAU = 0.65   # IP-Adapter: cao = giống ảnh gốc hơn nhưng ít theo tư thế hơn (0.5-0.8)
 # Vẽ lại các nhân vật mà khung hình lần trước không đồng đều (giữ màu áo quần chặt hơn)
-DOT = "dot3"   # đổi để vẽ lại thêm một đợt
-VE_LAI = {"survivor_run": 0.9, "boss_brute": 0.9}   # tên -> DO_GIONG_MAU riêng
+DOT = "dot4"   # đổi để vẽ lại thêm một đợt
+VE_LAI = {}   # tài xế/trùm thử 3 lần không đồng đều → game dùng kiểu cắt chân   # tên -> DO_GIONG_MAU riêng
 
 # (tên ảnh gốc trong bộ v2, thư mục, mô tả, kiểu đi: "chay" | "di" | "lach")
 # Prompt kiểu TỪ KHÓA (CLIP chỉ đọc 77 token): mô tả + phong cách ≈ 45–60 token.

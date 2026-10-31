@@ -16,9 +16,9 @@ private fun price(base: Int) = ((base * PRICE_MUL) / 10f).roundToInt() * 10
 enum class VehicleClass(val title: String, val icon: String, val unlockStage: Int, val mountX: Float, val mountY: Float) {
     MOTO("Xe máy", "🏍", 0, -46f, -40f),
     CAR("Xe hơi", "🚗", 5, -8f, -46f),
-    PICKUP("Bán tải", "🛻", 10, -46f, -40f),
+    PICKUP("Bán tải", "🚚", 10, -46f, -40f),
     ARMORED("Bọc thép", "🚙", 15, -6f, -64f),
-    TANK("Xe tăng", "🪖", 20, -14f, -80f),
+    TANK("Xe tăng", "🛡", 20, -14f, -80f),
 }
 
 /** One buyable vehicle. Multipliers apply on top of the upgrade levels. */

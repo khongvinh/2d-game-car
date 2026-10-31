@@ -1165,9 +1165,14 @@ class Renderer(internal val g: Game) {
             // (AI cars have their wheels at about 22% and 78% of their length)
             val bm = Sprites.get(carPic)!!
             val len = (Car.WHEEL_X[1] - Car.WHEEL_X[0]) / 0.56f
-            val ph = if (v.cls == VehicleClass.MOTO) 118f else (len * bm.height / bm.width).coerceIn(70f, 150f)
-            sprite(c, carPic, (Car.WHEEL_X[0] + Car.WHEEL_X[1]) / 2, Car.WHEEL_Y + Car.WHEEL_R + 2f + bounce, ph)
-            roofGun(c, v, Car.WHEEL_Y + Car.WHEEL_R + 2f + bounce - ph)
+            val ph = (len * bm.height / bm.width).coerceIn(70f, 150f)
+            val base = Car.WHEEL_Y + Car.WHEEL_R + 2f + bounce
+            val moto = v.cls == VehicleClass.MOTO
+            sprite(c, carPic, (Car.WHEEL_X[0] + Car.WHEEL_X[1]) / 2, base, ph)
+            spinWheels(c, car.wheelRot)
+            // the rider sits on the bike's seat (upper body of the driver picture), the gun in front of him
+            if (moto && !g.driver.out) rider(c, -18f, base - ph * 0.5f, 150f)
+            if (moto) roofGun(c, v, 0f, 14f, base - ph * 0.5f - 44f) else roofGun(c, v, base - ph)
             c.restore()
         } else if (!hurt) art.draw(c, v, car.x, car.y, car.angle, car.wheelRot, car.aim, car.boosting, w, false, car.compress, g.wrecked, car.squat, car.slashT)
         art.noRider = false
@@ -1195,7 +1200,7 @@ class Renderer(internal val g: Game) {
         // AI sprites face right; turn them towards the player
         val sway = sin(z.phase)
         val pic = if (z.spitter && Sprites.has("zombie_spitter")) "zombie_spitter" else Sprites.zombie(z.type)
-        if ((Sprites.walks(z.type) && walkSprite(c, pic, z.x, z.y + 4f, z.type.h * 1.3f, dir < 0f, z.phase, Sprites.stride(z.type), lean = 4f)) ||
+        if ((Sprites.walks(z.type) && walkSprite(c, pic, z.x, z.y + 4f, z.type.h * 1.3f, dir < 0f, stepPhase(z.x, z.type.h * 1.3f, dir < 0f), Sprites.stride(z.type), lean = 4f)) ||
             sprite(c, pic, z.x, z.y + 4f - kotlin.math.abs(sway) * 4f, z.type.h * 1.3f, flip = dir < 0f,
                 rot = sway * (if (z.type.flying) 10f else 6f), squash = 1f + 0.04f * kotlin.math.abs(sin(z.phase * 2f)))) {
             if (z.burnT > 0f) burning(c, z.x, z.y + 4f - z.fly, z.type.h * 1.3f)
@@ -1535,17 +1540,51 @@ class Renderer(internal val g: Game) {
         c.restore()
     }
 
+    /** Spokes turning over the picture's wheels so they visibly roll. */
+    private fun spinWheels(c: Canvas, rot: Float) {
+        stroke.strokeWidth = 4f
+        for (wx in Car.WHEEL_X) {
+            val cx = wx
+            val cy = Car.WHEEL_Y
+            val rr = Car.WHEEL_R * 0.72f
+            for (k in 0 until 3) {
+                val a = rot + k * PI.toFloat() / 3f
+                stroke.color = 0xCC1A1A1A.toInt()
+                c.drawLine(cx - cos(a) * rr, cy - sin(a) * rr, cx + cos(a) * rr, cy + sin(a) * rr, stroke)
+            }
+            fill.color = 0xAA9E9E9E.toInt()
+            c.drawCircle(cx, cy, 4f, fill)
+        }
+    }
+
+    /** The driver's upper body sitting at [seatY] (hip height), facing right. */
+    private fun rider(c: Canvas, x: Float, seatY: Float, h: Float) {
+        // AI picture of the driver sitting on a bike, if made; else the standing picture's upper body
+        if (sprite(c, "survivor_ride", x, seatY + h * 0.32f, h * 0.85f, rot = -3f + sin(g.anim * 8f) * 1.5f)) return
+        val rig = Rig.of("survivor_idle") ?: return
+        val s = h / rig.h
+        c.save()
+        c.translate(x, seatY)
+        c.rotate(-6f + sin(g.anim * 8f) * 1.5f)
+        c.scale(s, s)
+        c.drawBitmap(rig.body, -rig.w / 2f, -rig.hip.toFloat(), null)
+        c.restore()
+    }
+
     /** The car's weapon on a post on the roof of the AI picture: turns to aim, kicks back and flashes when it fires. */
-    private fun roofGun(c: Canvas, v: Vehicle, roof: Float) {
+    private fun roofGun(c: Canvas, v: Vehicle, roof: Float, atX: Float = Float.NaN, atY: Float = Float.NaN) {
         val w = g.weapon
         if (w == WeaponType.KNIFE || g.driver.out) return
         val car = g.car
-        val mx = v.cls.mountX
-        val my = maxOf(v.cls.mountY, roof + 14f) - 8f
-        // post and mount plate
-        fill.color = 0xFF263238.toInt()
-        c.drawRect(mx - 4f, my, mx + 4f, maxOf(my + 6f, roof + 22f), fill)
-        c.drawRoundRect(mx - 16f, my - 2f, mx + 16f, my + 9f, 3f, 3f, fill)
+        val held = !atX.isNaN()
+        val mx = if (held) atX else v.cls.mountX
+        val my = if (held) atY else maxOf(v.cls.mountY, roof + 14f) - 8f
+        // post and mount plate (a bike rider just holds the gun in front of him)
+        if (!held) {
+            fill.color = 0xFF263238.toInt()
+            c.drawRect(mx - 4f, my, mx + 4f, maxOf(my + 6f, roof + 22f), fill)
+            c.drawRoundRect(mx - 16f, my - 2f, mx + 16f, my + 9f, 3f, 3f, fill)
+        }
         val since = g.wstats.interval - car.fireCd
         val firing = since in 0f..0.07f
         c.save()
@@ -1594,9 +1633,8 @@ class Renderer(internal val g: Game) {
         val pic = when {
             jumping && Sprites.has("survivor_jump") -> "survivor_jump"
             d.atkT > 0f && Sprites.has("survivor_shoot") -> "survivor_shoot"
-            // running: real frames if any, else the standing picture with its legs cut free
-            // (the AI running pose has its legs crossed, so it cannot step)
-            moving && Sprites.frames("survivor_run") > 0 -> "survivor_run"
+            // running: real frames if any, else the running picture with its legs cut free
+            moving && Sprites.has("survivor_run") -> "survivor_run"
             else -> "survivor_idle"
         }
         // legs really step (picture cut at the hip), body leans into the run
@@ -2246,7 +2284,7 @@ class Renderer(internal val g: Game) {
         c.drawText("🏁", pr + 30f, py + 10f, text)
         text.color = Color.WHITE
         val inn = g.interior
-        if (inn != null) fitText(c, "🏠 ${Building.NAMES[inn.b.kind]} — ${inn.roomName(d.x)}  •  RƯƠNG ${inn.chests.count { it.opened }}/${inn.chests.size}  •  🧟 ${inn.zombiesLeft}", W / 2 + 17f, py + 44f, 24f, pr - pl + 70f)
+        if (inn != null) fitText(c, "🏠 ${Building.NAMES[inn.b.kind]} — ${inn.roomName(d.x)}  •  RƯƠNG ${inn.chests.count { it.opened }}/${inn.chests.size}  •  💀 ${inn.zombiesLeft}", W / 2 + 17f, py + 44f, 24f, pr - pl + 70f)
         else fitText(c, "+${g.distanceM.toInt()}m  •  tổng ${g.save.distM + g.distanceM.toInt()}m / ${Campaign.GOAL_M}m  •  NGÀY ${g.save.day}", W / 2 + 17f, py + 44f, 24f, pr - pl + 70f)
 
         val closed = g.phase >= Game.PHASE_TIME.size
@@ -3275,8 +3313,7 @@ class Renderer(internal val g: Game) {
     private fun drawGarage(c: Canvas) {
         garageRoom(c)
         when (g.garageTab) {
-            0 -> garageVehicles(c)
-            1 -> garageWeapons(c)
+            0, 1 -> garageWeapons(c)
             3 -> garageSide(c)
             else -> garageSkills(c)
         }
@@ -3706,7 +3743,7 @@ class Renderer(internal val g: Game) {
         val H = g.H
         val tiles = listOf(
             Triple("📏", "${g.maxDist.toInt()}m", "quãng đường"),
-            Triple("🧟", "${g.kills}", "zombie"),
+            Triple("💀", "${g.kills}", "zombie"),
             Triple("💥", "${g.smashed}", "vật cản"),
             Triple("💰", "+${g.distMoney + g.runMoney + g.stageBonus}$", "tiền"),
             Triple("♦", "+${g.runGems}", "ngọc đỏ"),
@@ -5238,7 +5275,7 @@ class Renderer(internal val g: Game) {
             if (dx < x0 - 200f || dx > x1 + 200f) continue
             val prop = when (dc[1].toInt()) {
                 0 -> sprite(c, "prop_shelf", dx, 4f, 240f)
-                1 -> sprite(c, "prop_car_rusty", dx, 6f, 120f)
+                1 -> sprite(c, "prop_crate_stack", dx, 4f, 130f).also { sprite(c, "prop_barrel", dx + 95f, 4f, 90f) }
                 2 -> sprite(c, "prop_crate_stack", dx, 4f, 120f)
                 else -> sprite(c, "prop_pallet", dx, 4f, 60f).also { sprite(c, "prop_barrel", dx + 105f, 4f, 95f) }
             }
@@ -5281,11 +5318,37 @@ class Renderer(internal val g: Game) {
                 }
             }
         }
-        // floor
-        fill.color = 0xFF4E4842.toInt()
+        // floor: worn concrete slabs, a dark skirting shadow where it meets the wall
+        fill.color = 0xFF5B524A.toInt()
         c.drawRect(x0, 0f, x1, 400f, fill)
+        fill.color = 0xFF6E645A.toInt()
+        c.drawRect(x0, 0f, x1, 36f, fill)
+        stroke.color = 0xFF3F3832.toInt()
+        stroke.strokeWidth = 2.5f
+        c.drawLine(x0, 36f, x1, 36f, stroke)
+        c.drawLine(x0, 110f, x1, 110f, stroke)
+        var fx = floor(x0 / 240f) * 240f
+        while (fx < x1) {
+            c.drawLine(fx, 0f, fx - 30f, 36f, stroke)
+            c.drawLine(fx + 120f - 30f, 36f, fx + 120f - 80f, 110f, stroke)
+            // stains and cracks
+            fill.color = 0x22000000
+            c.drawOval(fx + 40f + hash(fx.toInt()) % 60, 50f, fx + 150f + hash(fx.toInt()) % 60, 80f, fill)
+            fx += 240f
+        }
+        Sprites.get("floor_warehouse")?.let { bm ->
+            // AI floor texture tiled along the room
+            val tw = 120f * bm.width / bm.height
+            var tx = floor(x0 / tw) * tw
+            while (tx < x1) {
+                spriteFill(c, "floor_warehouse", tx, 0f, tx + tw + 1f, 120f)
+                tx += tw
+            }
+        }
+        fill.color = 0x55000000
+        c.drawRect(x0, -14f, x1, 0f, fill)
         fill.color = 0xFF8A827A.toInt()
-        c.drawRect(x0, 0f, x1, 10f, fill)
+        c.drawRect(x0, 0f, x1, 5f, fill)
         fill.color = 0xFF2A2420.toInt()
         c.drawRect(-400f, ceil - 120f, 0f, 400f, fill)
         c.drawRect(rm.width, ceil - 120f, rm.width + 400f, 400f, fill)
@@ -5297,6 +5360,15 @@ class Renderer(internal val g: Game) {
         for (p in rm.platforms) {
             if (p.r < x0 || p.l > x1) continue
             val t = -p.top
+            // steel posts down to the floor so the ledge stands on something
+            for (px in floatArrayOf(p.l + 22f, p.r - 22f)) {
+                fill.color = 0xFF2E2B28.toInt()
+                c.drawRect(px - 7f, t + 10f, px + 7f, 0f, fill)
+                fill.color = 0x33FFFFFF
+                c.drawRect(px - 7f, t + 10f, px - 3f, 0f, fill)
+                fill.color = 0xFF3A3632.toInt()
+                c.drawRect(px - 14f, -8f, px + 14f, 0f, fill)
+            }
             if (spriteFill(c, "prop_catwalk", p.l - 6f, t - 6f, p.r + 6f, t + 40f)) continue
             fill.color = 0xFF3A3530.toInt()
             c.drawRect(p.l + 14f, t + 16f, p.l + 22f, t + 40f, fill)
@@ -5531,7 +5603,7 @@ class Renderer(internal val g: Game) {
         val drawn = when (b.kind) {
             0 -> sprite(c, "item_crate", x, 0f, 80f) &&
                 sprite(c, "def_turret_cannon", x, -70f + (if (b.fireCd < 0.15f) 4f else 0f), 120f, flip = g.driver.x < x, alpha = hit)
-            1 -> walkSprite(c, "boss_brute", x, 0f, b.h * 1.25f, !face, b.anim * (if (b.chargeT > 0f) 14f else 5f),
+            1 -> walkSprite(c, "boss_brute", x, 0f, b.h * 1.25f, !face, stepPhase(x, b.h * 1.25f, !face),
                 if (b.chargeT > 0f) 30f else 18f, hit, if (b.chargeT > 0f) 10f else 3f)
             else -> Sprites.boss(b.look.tier)?.let { bossSprite(c, it, x, 0f, b.look, hit) } ?: false
         }
@@ -5605,6 +5677,18 @@ class Renderer(internal val g: Game) {
         glassPanel(c, W / 2 - tw / 2 - 24f, 56f, W / 2 + tw / 2 + 24f, 100f, 16f)
         text.color = if (bossRoom) 0xFFFF8A80.toInt() else Color.WHITE
         c.drawText(label, W / 2, 88f, text)
+        // ammo for the gun (refilled on level-up)
+        if (run.ammo >= 0) {
+            glassPanel(c, 240f, 56f, 400f, 100f, 14f)
+            if (!spriteBox(c, "item_ammo", 248f, 60f, 286f, 96f)) {
+                fill.color = 0xFFFFC107.toInt()
+                c.drawRoundRect(256f, 66f, 272f, 92f, 4f, 4f, fill)
+            }
+            text.textAlign = Paint.Align.LEFT
+            text.textSize = 28f
+            text.color = if (run.ammo == 0) 0xFFFF5252.toInt() else if (run.ammo < 10) 0xFFFFD740.toInt() else Color.WHITE
+            c.drawText(if (run.ammo == 0) "HẾT ĐẠN" else "${run.ammo}", 292f, 89f, text)
+        }
         // health and money
         glassPanel(c, 12f, 12f, 230f, 100f)
         val hf = (d.hp / d.maxHp).coerceIn(0f, 1f)
