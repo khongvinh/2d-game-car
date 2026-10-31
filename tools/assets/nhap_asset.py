@@ -27,7 +27,8 @@ CUT_LEFT = {"survivor_run": 0.4}
 
 
 # pictures where the AI drew a second, smaller copy: keep only the big one
-ONLY_BIGGEST = {"car_sedan", "car_tank"}
+ONLY_BIGGEST = {"car_sedan", "car_tank", "wpn_shotgun", "wpn_laser", "wpn_minigun", "part_chassis",
+                "part_gun_barrel", "survivor_dead"}
 
 
 def clean(im, crop=True, keep=0.3):
@@ -81,9 +82,9 @@ def clean(im, crop=True, keep=0.3):
 src = sys.argv[1]
 V2 = "--v2" in sys.argv[2:]
 if V2:
-    # bộ 2 phần lớn đã quay phải; mấy ảnh dưới đây AI vẫn vẽ quay trái
-    FACING_LEFT = {"survivor_shoot", "zombie_runner", "zombie_spitter", "zombie_crawler",
-                   "car_sedan", "car_muscle", "car_monster", "wpn_mount_laser", "wpn_mount_shotgun"}
+    # bộ 2 (vẽ lại lần 3, prompt dưới 77 token): những ảnh AI vẫn vẽ quay trái
+    FACING_LEFT = {"survivor_shoot", "zombie_walker", "zombie_crawler", "car_sedan", "car_motorbike", "car_tank",
+                   "wpn_mount_laser", "wpn_mount_shotgun"}
     CUT_LEFT = {}
 root = os.path.join(os.path.dirname(__file__), "..", "..", "app", "src", "main", "assets")
 img_dir = os.path.join(root, "img")
@@ -107,8 +108,6 @@ for group in sorted(os.listdir(src)):
                 # animation frames share one bounding box: clean but never crop
                 im = clean(im.convert("RGBA"), crop=False)
                 im.thumbnail((400, 400))  # drawn ~120-220 px tall
-                if name.rsplit("_", 1)[0] in FACING_LEFT:
-                    im = im.transpose(Image.FLIP_LEFT_RIGHT)
                 im.save(os.path.join(img_dir, name + ".png"), "PNG")
             elif group == "hieu_ung" and name.startswith("fx_") and name not in ("fx_blood", "fx_dust"):
                 im = im.convert("RGBA")

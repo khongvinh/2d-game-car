@@ -34,8 +34,8 @@ DO_BAM_SAT = 1.5
 SEED = 777
 DO_GIONG_MAU = 0.65   # IP-Adapter: cao = giống ảnh gốc hơn nhưng ít theo tư thế hơn (0.5-0.8)
 # Vẽ lại các nhân vật mà khung hình lần trước không đồng đều (giữ màu áo quần chặt hơn)
-DOT = "dot2"   # đổi để vẽ lại thêm một đợt
-VE_LAI = {"survivor_run": 0.85, "boss_brute": 0.85}   # tên -> DO_GIONG_MAU riêng
+DOT = "dot3"   # đổi để vẽ lại thêm một đợt
+VE_LAI = {"survivor_run": 0.9, "boss_brute": 0.9}   # tên -> DO_GIONG_MAU riêng
 
 # (tên ảnh gốc trong bộ v2, thư mục, mô tả, kiểu đi: "chay" | "di" | "lach")
 # Prompt kiểu TỪ KHÓA (CLIP chỉ đọc 77 token): mô tả + phong cách ≈ 45–60 token.
@@ -46,7 +46,7 @@ NHAN_VAT = [
     ("zombie_fat", "zombie", "huge fat green zombie, torn overalls", "lach"),
     ("zombie_spitter", "zombie", "hunched green zombie, glowing acid throat", "di"),
     ("zombie_armored", "zombie", "zombie in riot police armor, cracked helmet", "di"),
-    ("boss_brute", "zombie", "giant muscular green zombie butcher, orange bloody apron, dark trousers, huge cleaver", "lach"),
+    ("boss_brute", "zombie", "huge hulking fat muscular green zombie butcher, very wide body, orange bloody apron, huge cleaver", "lach"),
 ]
 
 PHONG_CACH = ("comic game art, Earn to Die style, thick black outlines, cel shading, game sprite, "
