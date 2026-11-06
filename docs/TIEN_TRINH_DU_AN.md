@@ -353,6 +353,7 @@ Tài liệu bàn giao để tiếp tục làm việc ở phiên chat mới mà k
 - Âm thanh: bỏ sfx_build (tiếng khoan búa) cho WOOD và sfx_coin; COIN = 2 nốt sine nhẹ; WOOD = tiếng gỗ trầm; mới S.LOOT (mở thùng: gõ gỗ + chuông 3 nốt nhẹ). Sfx.VERSION 5 (tạo lại bộ nhớ đệm).
 - Dáng đi zombie (tham khảo kỹ thuật procedural walk; không có repo GitHub nào làm đúng kiểu 2D zombie để dùng lại): walkSprite thêm shamble 0..1 — bước khựng (pha bị bẻ), 1 chân lết ngắn và thẳng gối, thân chồm tới mỗi bước + lắc ngang, nhún sâu hơn; tốc độ di chuyển dao động theo bước (lurchSpeed 0,45–1,55: lao tới khi đẩy, gần đứng khi kéo chân) → chân không trượt. Mỗi con lệch pha riêng (Zombie.gaitOff). Mức: đi bộ/phun axit/giáp 1, béo 0,8, chạy 0,35, trùm 0,6 (0,2 khi lao). Áp dụng đường, nhà kho, trại (kể cả quái có khung hình AI).
 - Preview camp: lục soát bằng Rìu phóng, chụp v8_throw0..5.
+- Script: thêm ảnh wpn_knife_throw (dao ném nằm ngang, mũi phải; 59 token). Code đã nối sẵn: dao bay (thrownWeapon), tư thế ném, thẻ gara (Sprites.side DART); chưa có ảnh thì vẽ code. Chạy tao_anh_colab.py — chỉ vẽ ảnh này (các ảnh khác đã có).
 
 ## 3. Luật chơi cũ trước v7.0 (v6.1, để tham khảo)
 

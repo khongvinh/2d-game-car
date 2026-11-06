@@ -180,6 +180,7 @@ HINH = [
     ("vu_khi", "wpn_spear", "long spear, iron tip, horizontal, no person, " + NGANG_HAN, True, NGANG),
     ("vu_khi", "wpn_axe", "fire axe, diagonal", True, VUONG),
     ("vu_khi", "wpn_shuriken", "metal throwing star", True, VUONG),
+    ("vu_khi", "wpn_knife_throw", "one steel throwing knife, wrapped handle, horizontal, blade pointing right, one object", True, NGANG),
     ("vu_khi", "wpn_dynamite", "bundle of dynamite with lit fuse", True, VUONG),
     # --- Pháo đài & bệ phòng thủ ---
     ("phong_thu", "def_barricade_spikes", "wooden barricade with sharp metal spikes, front view", True, VUONG),

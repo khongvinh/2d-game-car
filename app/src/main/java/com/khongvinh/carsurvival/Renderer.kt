@@ -4736,8 +4736,12 @@ class Renderer(internal val g: Game) {
                 c.rotate((if (left) -1f else 1f) * age * 900f)
                 if (!spriteBox(c, "wpn_axe", -26f, -34f, 26f, 34f)) { c.scale(0.9f, 0.9f); handWeapon(c, w, 1f) }
             }
-            else -> { // throwing knife
+            else -> { // throwing knife: the AI picture if made, else drawn here
                 c.rotate((if (left) -1f else 1f) * age * 1300f)
+                if (spriteBox(c, "wpn_knife_throw", -20f, -9f, 26f, 9f)) {
+                    c.restore()
+                    return
+                }
                 fill.color = 0xFF4E342E.toInt()
                 c.drawRoundRect(-16f, -3.5f, -2f, 3.5f, 2f, 2f, fill)
                 fill.color = 0xFFCFD8DC.toInt()

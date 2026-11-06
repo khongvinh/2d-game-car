@@ -148,7 +148,7 @@ object Sprites {
 
     fun side(w: SideWeapon) = when (w) {
         SideWeapon.PISTOL -> "wpn_pistol"
-        SideWeapon.DART -> "wpn_knife_throw" // none yet: drawn in code
+        SideWeapon.DART -> "wpn_knife_throw" // drawn in code until the AI picture is made
         SideWeapon.SPEAR -> "wpn_spear"
         SideWeapon.BOW -> "wpn_bow"
         SideWeapon.AXE -> "wpn_axe"
