@@ -71,6 +71,7 @@ internal fun Renderer.walkSprite(
     alpha: Int = 255,
     lean: Float = 0f,
     shamble: Float = 0f,
+    held: ((Canvas, Float, Float) -> Unit)? = null,
 ): Boolean {
     if (name == null) return false
     // zombie gait (shamble 0..1): a limp — the step hesitates (phase warp), one leg drags short and
@@ -126,9 +127,12 @@ internal fun Renderer.walkSprite(
     }
     c.save()
     c.translate(rig.w / 2f, hip + bob)
-    c.rotate(lean + lurch + roll + (if (stride > 0f) sw * stride * 0.08f else 0f))
+    val bodyRot = lean + lurch + roll + (if (stride > 0f) sw * stride * 0.08f else 0f)
+    c.rotate(bodyRot)
     c.translate(-rig.w / 2f, -hip)
     c.drawBitmap(rig.body, 0f, 0f, bmpPaint)
+    // something held in the hand moves with the body (picture pixels, body tilt in degrees, px per world unit)
+    held?.invoke(c, bodyRot, s)
     c.restore()
     c.restore()
     return true
@@ -141,6 +145,39 @@ internal fun Renderer.spriteFill(c: Canvas, name: String?, l: Float, t: Float, r
     bmpPaint.alpha = 255
     c.drawBitmap(bm, null, r, bmpPaint)
     return true
+}
+
+/**
+ * Draws a monster from its AI picture with a body-specific way of moving:
+ * upright walkers step on the two-bone leg rig (limp, lurch, lean per type), the dog gallops
+ * (hops, pitches, stretches), the crawler hauls itself along in pulses, the bat beats its wings.
+ * [x] is the feet, [h] the drawn height. False when there is no picture.
+ */
+internal fun Renderer.monster(c: Canvas, pic: String?, t: ZombieType, x: Float, footY: Float, h: Float, faceLeft: Boolean, off: Float, alpha: Int = 255, boss: Boolean = false): Boolean {
+    if (pic == null || !Sprites.has(pic)) return false
+    val p = stepPhase(x, h, faceLeft) + off
+    val s = kotlin.math.sin(p)
+    if (boss || Sprites.walks(t)) {
+        return walkSprite(c, pic, x, footY, h, faceLeft, p, if (boss) 16f else Sprites.stride(t), alpha,
+            if (boss) 4f else Sprites.lean(t), if (boss) 0.6f else Sprites.shamble(t))
+    }
+    return when (t) {
+        ZombieType.LIZARD -> { // gallop: bound up, nose down on landing, stretch in the air
+            val hop = maxOf(0f, s) * h * 0.2f
+            sprite(c, pic, x, footY - hop, h, flip = faceLeft, alpha = alpha,
+                rot = kotlin.math.cos(p) * 12f * (if (faceLeft) -1f else 1f), squash = 1f - 0.1f * kotlin.math.sin(2f * p))
+        }
+        ZombieType.BLOB -> { // crawler: flattens as it drags itself, bunches up as it reaches
+            sprite(c, pic, x, footY, h, flip = faceLeft, alpha = alpha,
+                rot = s * 5f * (if (faceLeft) -1f else 1f), squash = 1f - 0.12f * kotlin.math.abs(s))
+        }
+        ZombieType.BAT -> { // wing beats: squash and stretch fast, bob slow
+            val beat = kotlin.math.sin(g.anim * 15f + off)
+            sprite(c, pic, x, footY + kotlin.math.sin(g.anim * 4f + off) * 14f, h, flip = faceLeft, alpha = alpha,
+                rot = kotlin.math.sin(g.anim * 3f + off) * 8f, squash = 1f + 0.22f * beat)
+        }
+        else -> sprite(c, pic, x, footY, h, flip = faceLeft, alpha = alpha, rot = s * 5f)
+    }
 }
 
 /** Effect pictures centred on their spot, growing then fading out. */

@@ -27,6 +27,11 @@ CUT_LEFT = {"survivor_run": 0.4}
 CUT_RIGHT = {}
 
 
+# derived pictures: copy of a picture with parts erased (fractions of its size, after flips)
+# survivor_body = the driver with the two guns he was drawn holding removed (the game puts the
+# player's own weapon in his hand)
+DERIVED = {"survivor_body": ("survivor_idle", [(0.74, 0.50, 0.98, 0.75), (0.77, 0.42, 0.82, 0.50), (0.26, 0.50, 0.34, 0.62)])}
+
 # weapons the AI drew standing upright with the tip up
 TIP_UP = {"wpn_knife_throw"}
 
@@ -163,4 +168,18 @@ for group in sorted(os.listdir(src)):
             os.makedirs(os.path.join(root, sub), exist_ok=True)
             shutil.copy(p, os.path.join(root, sub, f))
             n += 1
+from PIL import ImageDraw  # noqa: E402
+
+for new, (base, boxes) in DERIVED.items():
+    bp = os.path.join(img_dir, base + ".png")
+    if not os.path.exists(bp):
+        continue
+    im = Image.open(bp).convert("RGBA")
+    a = im.getchannel("A")
+    dr = ImageDraw.Draw(a)
+    for x0, y0, x1, y1 in boxes:
+        dr.rectangle([x0 * im.width, y0 * im.height, x1 * im.width, y1 * im.height], fill=0)
+    im.putalpha(a)
+    im.save(os.path.join(img_dir, new + ".png"), "PNG")
+    n += 1
 print(f"Đã nhập {n} file vào {os.path.normpath(root)}")

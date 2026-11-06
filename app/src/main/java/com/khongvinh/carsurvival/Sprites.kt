@@ -32,9 +32,13 @@ object Sprites {
     fun has(name: String) = get(name) != null
 
     private val frameCount = HashMap<String, Int>()
+    private val FRAMES_OK = emptySet<String>()
 
     /** Number of animation frames name_0, name_1, ... shipped for [name] (0 = none). */
     fun frames(name: String): Int = synchronized(frameCount) {
+        // the AI walk frames changed clothes / build from frame to frame: every walker now uses
+        // its one good picture on the two-bone leg rig instead
+        if (name !in FRAMES_OK) return 0
         frameCount.getOrPut(name) {
             var n = 0
             while (n < 16 && has("${name}_$n")) n++
@@ -53,13 +57,22 @@ object Sprites {
     }
 
     /** Upright monsters whose legs can step (see [Rig]). */
-    fun walks(t: ZombieType) = t == ZombieType.WALKER || t == ZombieType.RUNNER || t == ZombieType.FAT
+    fun walks(t: ZombieType) = t == ZombieType.WALKER || t == ZombieType.RUNNER || t == ZombieType.FAT || t == ZombieType.ALIEN
 
     /** How much a monster limps and lurches (0 = clean run, 1 = full shamble). */
     fun shamble(t: ZombieType) = when (t) {
         ZombieType.RUNNER -> 0.35f
         ZombieType.FAT -> 0.8f
+        ZombieType.ALIEN -> 0.6f
         else -> 1f
+    }
+
+    /** Forward lean of each walker: runners pitch hard into the run, the fat one stays upright. */
+    fun lean(t: ZombieType) = when (t) {
+        ZombieType.RUNNER -> 14f
+        ZombieType.FAT -> 2f
+        ZombieType.ALIEN -> 3f
+        else -> 6f
     }
 
     fun stride(t: ZombieType) = when (t) {

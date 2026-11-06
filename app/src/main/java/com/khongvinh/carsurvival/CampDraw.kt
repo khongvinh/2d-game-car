@@ -116,9 +116,9 @@ internal fun Renderer.drawCamp(c: Canvas) {
         val pic = Sprites.foe(f, cp.isBoss(f), cp.region)
         val sway = sin(zz.phase)
         val big = if (cp.isBoss(f)) 270f else zz.type.h * 1.6f
-        val steps = (cp.isBoss(f) && pic == "boss_brute") || (!cp.isBoss(f) && Sprites.walks(zz.type))
-        if (steps && walkSprite(c, pic, zz.x, zz.y + 4f, big, true, stepPhase(zz.x, big, true) + zz.gaitOff, if (cp.isBoss(f)) 16f else Sprites.stride(zz.type), lean = 4f, shamble = if (cp.isBoss(f)) 0.6f else Sprites.shamble(zz.type))) {
-            // legs stepping, cut from the AI picture
+        val bossWalks = cp.isBoss(f) && pic != "boss_mutant_worm"
+        if (monster(c, pic, zz.type, zz.x, zz.y + 4f, big, true, zz.gaitOff, boss = bossWalks)) {
+            // moved with its own body-type gait
         } else if (sprite(c, pic, zz.x, zz.y + 4f - kotlin.math.abs(sway) * 5f, big, flip = true,
                 rot = sway * 6f, squash = 1f + 0.05f * kotlin.math.abs(sin(zz.phase * 2f)))) {
             // drawn from the AI picture, facing the camp

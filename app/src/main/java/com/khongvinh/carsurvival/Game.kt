@@ -24,7 +24,7 @@ import kotlin.random.Random
 class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
     companion object {
         /** Shown on the menu so the installed build is easy to check. */
-        const val VERSION = "8.8"
+        const val VERSION = "8.9"
 
         const val VIRTUAL_HEIGHT = 720f
         const val METER = 30f
@@ -67,6 +67,7 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
     val shots = ArrayList<Projectile>()
     val beams = ArrayList<Beam>()
     val particles = ArrayList<Particle>()
+    val weather = Weather(this)
     val fxs = ArrayList<Fx>()
 
     /** Plays effect picture [name] once (only when the picture exists). */
@@ -299,6 +300,7 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
         boss = null
         buildings.clear()
         stormX = -1e9f
+        weather.reset()
         car.fuel = min(car.maxFuel, save.fuel.toFloat())
         driveFuel0 = car.fuel
         texts.clear()
@@ -417,7 +419,6 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
         placeBunkers()
         placeBuildings()
 
-        stormX = -1500f
         phase = 0
         phaseLeft = PHASE_TIME[0]
         lastBeep = 0
@@ -952,7 +953,7 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
         // endless: room after room, each harder; a boss every 6th room; ends only when the driver falls
         val run = RoomRun(campaign.zone, campaign.region, save.day * 977 + save.nights * 31, total = Int.MAX_VALUE, bossEvery = 6)
         // guns start with a limited magazine; only levelling up refills it
-        run.ammo = if (save.sideWeapon.melee) -1 else 60
+        run.arm(save.sideWeapon)
         rooms = run
         setState(State.PLAYING)
         val d = driver
@@ -1420,6 +1421,7 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
             }
         }
         updateStorm(dt)
+        if (rooms == null && inside == null) weather.update(dt)
 
         // physics in fixed substeps
         var left = dt
@@ -1654,6 +1656,9 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
     }
 
     /** Applies damage to the car and shows the lost HP floating above it. */
+    internal fun hurtCar(amount: Float) = damageCar(amount)
+    internal fun flingZombie(z: Zombie, vx: Float, vy: Float) = smashZombie(z, vx, vy)
+
     private fun damageCar(amount: Float, instant: Boolean = true, ignoreShield: Boolean = false) {
         val c = car
         if (amount <= 0f || dyingT > 0f || (c.shieldT > 0f && !ignoreShield)) return
@@ -1717,7 +1722,9 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
     }
 
     private fun updateStorm(dt: Float) {
-        if (stormX < -1e8f) return
+        // the purple closing storm is gone for good (replaced by random weather)
+        stormX = -1e9f
+        return
         if (phase < PHASE_TIME.size) {
             phaseLeft -= dt
             if (phase == 2) {

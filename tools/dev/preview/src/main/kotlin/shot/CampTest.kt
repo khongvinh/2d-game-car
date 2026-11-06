@@ -86,7 +86,15 @@ fun main() {
     val gas = g.controls().first { it.id == "gas" }
     g.touchDown(1, gas.cx, gas.cy)
     t = 0f
-    while (g.state == State.PLAYING && t < 120f) { tick(g, 0.2f); t += 0.2f; if (t > 6f && t < 6.21f) shot(g, "v7_drive") }
+    // weather check: force a thunderstorm, then a tornado
+    g.weather.start(com.khongvinh.carsurvival.Weather.Kind.STORM); g.weather.power = 1f
+    while (g.state == State.PLAYING && t < 120f) {
+        tick(g, 0.2f); t += 0.2f
+        if (t > 6f && t < 6.21f) shot(g, "v7_drive")
+        if (t > 4f && t < 4.21f) shot(g, "v8_storm")
+        if (t > 8f && t < 8.21f) { g.weather.start(com.khongvinh.carsurvival.Weather.Kind.TORNADO); g.weather.power = 1f }
+        if (t > 11f && t < 11.21f) shot(g, "v8_tornado")
+    }
     g.touchUp(1)
     println("after drive t=${t.toInt()} state=${g.state} distM=${save.distM} fuel=${save.fuel} banner=${g.campaign.banner} ${g.campaign.bannerSub}")
     tick(g, 0.5f)

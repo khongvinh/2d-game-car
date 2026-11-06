@@ -329,8 +329,10 @@ class Renderer(internal val g: Game) {
             c.drawText(t.text, t.x, t.y, text)
         }
         text.alpha = 255
-        if (g.state != State.MENU && g.state != State.MAPS && g.state != State.GARAGE && g.state != State.STORY && g.state != State.LAYOUT) drawStorm(c)
+        val onRoad = g.state == State.PLAYING || g.state == State.PAUSED
+        if (onRoad) drawWeatherWorld(c)
         c.restore()
+        if (onRoad) drawWeatherScreen(c)
     }
 
     private fun drawTerrain(c: Canvas) {
@@ -1198,12 +1200,11 @@ class Renderer(internal val g: Game) {
         val px = if (g.driver.out) g.driver.x else g.car.x
         val dir = sign(px - z.x).let { if (it == 0f) -1f else it }
         // AI sprites face right; turn them towards the player
-        val sway = sin(z.phase)
-        val pic = if (z.spitter && Sprites.has("zombie_spitter")) "zombie_spitter" else Sprites.zombie(z.type)
-        if ((Sprites.walks(z.type) && walkSprite(c, pic, z.x, z.y + 4f, z.type.h * 1.3f, dir < 0f, stepPhase(z.x, z.type.h * 1.3f, dir < 0f) + z.gaitOff, Sprites.stride(z.type), lean = 4f, shamble = Sprites.shamble(z.type))) ||
-            sprite(c, pic, z.x, z.y + 4f - kotlin.math.abs(sway) * 4f, z.type.h * 1.3f, flip = dir < 0f,
-                rot = sway * (if (z.type.flying) 10f else 6f), squash = 1f + 0.04f * kotlin.math.abs(sin(z.phase * 2f)))) {
-            if (z.burnT > 0f) burning(c, z.x, z.y + 4f - z.fly, z.type.h * 1.3f)
+        val spit = z.spitter && Sprites.has("zombie_spitter")
+        val pic = if (spit) "zombie_spitter" else Sprites.zombie(z.type)
+        // z.y already includes a flyer's height
+        if (monster(c, pic, if (spit) ZombieType.WALKER else z.type, z.x, z.y + 4f, z.type.h * 1.3f, dir < 0f, z.gaitOff)) {
+            if (z.burnT > 0f) burning(c, z.x, z.y + 4f, z.type.h * 1.3f)
             return
         }
         c.save()
@@ -1682,11 +1683,13 @@ class Renderer(internal val g: Game) {
             // moving: real frames if any, else the standing picture (legs straight and side by side)
             // walked with a two-bone leg rig (thigh + shin, the knee folds) — reads as a proper step
             moving && Sprites.frames("survivor_run") > 0 -> "survivor_run"
+            Sprites.has("survivor_body") -> "survivor_body"
             else -> "survivor_idle"
         }
         // legs really step (picture cut at the hip), body leans into the run
         val stride = if (jumping) 0f else if (moving) 28f else 0f
-        val phase = if (moving) d.walk else g.anim * 3f
+        // steps follow the ground covered, so the feet never slide
+        val phase = if (moving) stepPhase(x, 108f, f < 0f) else g.anim * 3f
         val hurt = d.hurtT > 0f && (g.anim * 20f).toInt() % 2 == 0
         // landing squash: shorter for a moment
         val squat = if (d.landT > 0f) 1f - 0.12f * (d.landT / 0.16f) else 1f
@@ -1700,8 +1703,12 @@ class Renderer(internal val g: Game) {
         }
         val throwStep = if (tw >= 0.4f) f * 8f * kotlin.math.sin((tw - 0.4f) / 0.6f * PI.toFloat()) else 0f
         if (tw >= 0f && tw < 0.4f) throwPose(c, d, x + kick + throwStep, y, f)
+        val holding = pic == "survivor_body" && !(g.save.sideWeapon.thrown && tw >= 0f)
+        val hold: ((Canvas, Float, Float) -> Unit)? = if (!holding) null else { cv, rot, sc ->
+            heldWeapon(cv, g.save.sideWeapon, d, f, rot, sc)
+        }
         if (walkSprite(c, pic, x + kick + throwStep, y + 4f, 108f * squat, f < 0f, phase, stride, if (hurt) 150 else 255,
-                (if (moving) 5f else 0f) + throwLean * f)) {
+                (if (moving) 5f else 0f) + throwLean * f, held = hold)) {
             if (tw >= 0.4f) throwPose(c, d, x + kick + throwStep, y, f)
             if (d.muzzleT > 0f) muzzle(c, x + cos(d.aim) * 62f, y - 58f + sin(d.aim) * 62f, d.aim)
             driverHp(c, d, x, y)
@@ -4753,6 +4760,36 @@ class Renderer(internal val g: Game) {
         c.restore()
     }
 
+    /**
+     * The player's hand weapon in the driver's front hand (picture coordinates of survivor_body,
+     * already flipped and tilted with the body). Guns point at the target, and droop when idle.
+     */
+    private fun heldWeapon(c: Canvas, w: SideWeapon, d: Driver, f: Float, bodyRot: Float, sc: Float) {
+        val rig = Rig.of("survivor_body") ?: return
+        val hx = rig.w * 0.73f
+        val hy = rig.h * 0.47f
+        // world aim -> this flipped, tilted frame
+        val aimLocal = (if (f > 0f) d.aim else PI.toFloat() - d.aim) * 180f / PI.toFloat() - bodyRot
+        val idle = d.atkT <= 0f && (d.aim == 0f || d.aim == PI.toFloat())
+        val ang = if (idle) (if (w == SideWeapon.SPEAR) -10f else 35f) else aimLocal.coerceIn(-80f, 80f)
+        val u = 1.35f / sc
+        val kick = if (d.muzzleT > 0f) -6f * u else 0f
+        c.save()
+        c.translate(hx, hy)
+        c.rotate(ang)
+        c.translate(kick, 0f)
+        when (w) {
+            SideWeapon.PISTOL -> spriteBox(c, "wpn_pistol", -6f * u, -14f * u, 34f * u, 12f * u)
+            SideWeapon.SMG -> spriteBox(c, "wpn_smg", -22f * u, -14f * u, 52f * u, 14f * u)
+            SideWeapon.SHOTGUN -> spriteBox(c, "wpn_shotgun", -36f * u, -12f * u, 60f * u, 12f * u)
+            SideWeapon.BOW -> { c.rotate(-ang * 0.3f); spriteBox(c, "wpn_bow", -14f * u, -46f * u, 18f * u, 46f * u) }
+            SideWeapon.SPEAR -> spriteBox(c, "wpn_spear", -70f * u, -10f * u, 80f * u, 10f * u)
+            SideWeapon.AXE -> { c.rotate(-90f); spriteBox(c, "wpn_axe", -16f * u, -52f * u, 16f * u, 6f * u) }
+            SideWeapon.DART -> if (!spriteBox(c, "wpn_knife_throw", -6f * u, -6f * u, 34f * u, 6f * u)) { c.scale(u, u); handWeapon(c, w, 1f) }
+        }
+        c.restore()
+    }
+
     /** Throw pose overlay: the weapon held back over the shoulder, then a swoosh as the arm comes over. */
     private fun throwPose(c: Canvas, d: Driver, x: Float, y: Float, f: Float) {
         val w = g.save.sideWeapon
@@ -5798,17 +5835,42 @@ class Renderer(internal val g: Game) {
         glassPanel(c, W / 2 - tw / 2 - 24f, 56f, W / 2 + tw / 2 + 24f, 100f, 16f)
         text.color = if (bossRoom) 0xFFFF8A80.toInt() else Color.WHITE
         c.drawText(label, W / 2, 88f, text)
-        // ammo for the gun (refilled on level-up)
-        if (run.ammo >= 0) {
-            glassPanel(c, 240f, 56f, 400f, 100f, 14f)
-            if (!spriteBox(c, "item_ammo", 248f, 60f, 286f, 96f)) {
-                fill.color = 0xFFFFC107.toInt()
-                c.drawRoundRect(256f, 66f, 272f, 92f, 4f, 4f, fill)
+        // magazine (with a reload bar) or the throwing arm's strength
+        val sw = g.save.sideWeapon
+        if (sw.magazine > 0 || sw.thrown) {
+            glassPanel(c, 240f, 56f, 430f, 100f, 14f)
+            if (sw.thrown) {
+                text.textAlign = Paint.Align.LEFT
+                text.textSize = 20f
+                text.color = Color.WHITE
+                c.drawText("LỰC", 252f, 85f, text)
+                for (k in 0 until THROW_CHARGES) {
+                    fill.color = if (k < run.charges) 0xFFFFAB40.toInt() else 0xFF4E4A46.toInt()
+                    c.drawRoundRect(300f + k * 40f, 68f, 334f + k * 40f, 88f, 6f, 6f, fill)
+                }
+                if (run.restT > 0f) {
+                    fill.color = 0xFFFFD740.toInt()
+                    c.drawRect(300f, 92f, 300f + 114f * (1f - run.restT / 0.5f), 95f, fill)
+                }
+            } else {
+                if (!spriteBox(c, "item_ammo", 248f, 60f, 286f, 96f)) {
+                    fill.color = 0xFFFFC107.toInt()
+                    c.drawRoundRect(256f, 66f, 272f, 92f, 4f, 4f, fill)
+                }
+                text.textAlign = Paint.Align.LEFT
+                text.textSize = 26f
+                if (run.reloadT > 0f) {
+                    text.color = 0xFFFFD740.toInt()
+                    c.drawText("NẠP", 292f, 86f, text)
+                    fill.color = 0xFF4E4A46.toInt()
+                    c.drawRect(350f, 74f, 420f, 84f, fill)
+                    fill.color = 0xFFFFD740.toInt()
+                    c.drawRect(350f, 74f, 350f + 70f * (1f - run.reloadT / sw.reload), 84f, fill)
+                } else {
+                    text.color = if (run.mag <= sw.magazine / 4) 0xFFFF8A65.toInt() else Color.WHITE
+                    c.drawText("${run.mag} / ${sw.magazine}", 292f, 88f, text)
+                }
             }
-            text.textAlign = Paint.Align.LEFT
-            text.textSize = 28f
-            text.color = if (run.ammo == 0) 0xFFFF5252.toInt() else if (run.ammo < 10) 0xFFFFD740.toInt() else Color.WHITE
-            c.drawText(if (run.ammo == 0) "HẾT ĐẠN" else "${run.ammo}", 292f, 89f, text)
         }
         // health and money
         glassPanel(c, 12f, 12f, 230f, 100f)

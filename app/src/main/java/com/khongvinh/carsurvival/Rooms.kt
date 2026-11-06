@@ -201,9 +201,22 @@ class RoomRun(val stage: Int, val region: Region, private val seed: Int, val tot
     var level = 1
     var xp = 0
 
-    /** Gun ammo for the search (-1 = melee weapon, no ammo); refilled only on level-up. */
-    var ammo = -1
-    val ammoPerLevel = 30
+    /**
+     * Ammo is endless, but a gun holds [SideWeapon.magazine] rounds and then reloads; thrown
+     * weapons have [THROW_CHARGES] throws of strength that refill after a short rest.
+     */
+    var mag = 0
+    var reloadT = 0f
+    var charges = THROW_CHARGES
+    var restT = 0f
+    var regenT = 0f
+
+    fun arm(w: SideWeapon) {
+        mag = w.magazine
+        reloadT = 0f
+        charges = THROW_CHARGES
+        restT = 0f
+    }
 
     /** A throw waiting for the arm to come forward: angle, damage, pellets; released when throwT runs out. */
     var throwT = 0f
@@ -468,6 +481,23 @@ class RoomRules(private val g: Game) {
         val w = g.save.sideWeapon
         val (dmg, interval, pellets) = stats(run)
         d.fireCd -= dt
+        // reload the magazine / get the arm's strength back
+        if (run.reloadT > 0f) {
+            run.reloadT -= dt
+            if (run.reloadT <= 0f) {
+                run.mag = w.magazine
+                g.sfx.play(Sfx.S.CLICK, 0.8f)
+            }
+        }
+        if (w.thrown) {
+            if (run.restT > 0f) {
+                run.restT -= dt
+                if (run.restT <= 0f) run.charges = THROW_CHARGES
+            } else if (run.charges < THROW_CHARGES) {
+                run.regenT -= dt
+                if (run.regenT <= 0f) { run.charges++; run.regenT = 0.6f }
+            }
+        }
         if (run.throwT > 0f) {
             run.throwT -= dt
             if (run.throwT <= 0f) releaseThrow(run)
@@ -494,19 +524,23 @@ class RoomRules(private val g: Game) {
         if (d.dir == 0f) d.face = if (tx >= d.x) 1f else -1f
         if (d.fireCd > 0f) return
         d.fireCd = interval
-        if (!w.melee && run.ammo == 0) {
-            // out of ammo: a weak punch at arm's length until the next level-up
-            d.fireCd = 0.45f
-            if (best < 90f) {
-                d.atkT = 0.2f
-                for (fo in rm.foes) if (abs(fo.z.x - d.x) < 90f && abs(fo.z.y - d.y) < 140f) hurt(run, fo, dmg * 0.2f, (if (fo.z.x > d.x) 1f else -1f) * 120f)
-                g.sfx.play(Sfx.S.HIT, 0.35f)
-            } else if (Random.nextFloat() < 0.25f) {
-                g.texts.add(FloatText("HẾT ĐẠN!", d.x, d.y - 160f, 0xFFFF5252.toInt()).also { it.size = 34f; it.life = 0.8f })
+        if (w.thrown) {
+            if (run.charges <= 0) { d.fireCd = 0f; return }
+            run.charges--
+            run.regenT = 0.6f
+            if (run.charges == 0) {
+                run.restT = 0.5f
+                g.texts.add(FloatText("HẾT LỰC!", d.x, d.y - 160f, 0xFFFFAB40.toInt()).also { it.size = 30f; it.life = 0.6f })
             }
-            return
+        } else if (w.magazine > 0) {
+            if (run.reloadT > 0f) { d.fireCd = 0f; return }
+            run.mag--
+            if (run.mag <= 0) {
+                run.reloadT = w.reload
+                g.sfx.play(Sfx.S.CLICK, 0.6f)
+                g.texts.add(FloatText("NẠP ĐẠN...", d.x, d.y - 160f, 0xFFFFD740.toInt()).also { it.size = 30f; it.life = 0.8f })
+            }
         }
-        if (!w.melee && run.ammo > 0) run.ammo--
         if (w.melee) {
             d.atkT = 0.25f
             val f = if (tx >= d.x) 1f else -1f
@@ -795,10 +829,7 @@ class RoomRules(private val g: Game) {
             run.xp -= run.xpNeed
             run.level++
             run.levelUps++
-            if (run.ammo >= 0) {
-                run.ammo += run.ammoPerLevel
-                g.texts.add(FloatText("+${run.ammoPerLevel} ĐẠN", g.driver.x, g.driver.y - 170f, 0xFFFFD740.toInt()).also { it.size = 40f })
-            }
+
         }
     }
 }

@@ -5,6 +5,9 @@ package com.khongvinh.carsurvival
  * buildings). Bought in the garage's "VŨ KHÍ PHỤ" tab; they never use ammo.
  * [melee] weapons hit everything within [range] in front instead of firing.
  */
+/** Throws before the arm is spent (then a short rest refills them). */
+const val THROW_CHARGES = 3
+
 enum class SideWeapon(
     val title: String,
     val desc: String,
@@ -31,6 +34,23 @@ enum class SideWeapon(
 
     /** Damage per second, for the garage bars. */
     val dps get() = damage * pellets / interval
+
+    /** Rounds in one magazine (guns) before a reload; thrown weapons use [THROW_CHARGES] instead. */
+    val magazine get() = when (this) {
+        PISTOL -> 12
+        SHOTGUN -> 6
+        SMG -> 30
+        BOW -> 8
+        else -> 0
+    }
+
+    /** Seconds to reload a full magazine. */
+    val reload get() = when (this) {
+        SHOTGUN -> 1.6f
+        SMG -> 1.5f
+        BOW -> 1.1f
+        else -> 1.0f
+    }
 
     /** Thrown by hand (wind-up and throw pose) rather than fired. */
     val thrown get() = this == DART || this == SPEAR || this == AXE
