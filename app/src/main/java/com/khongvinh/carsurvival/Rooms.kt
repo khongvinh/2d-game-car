@@ -184,6 +184,8 @@ class Room(val index: Int, stage: Int, region: Region, seed: Int, val boss: Bool
 }
 
 /** A whole run of rooms after the drive, with its level, power-ups and timers. */
+internal const val THROW_T = 0.34f
+
 class RoomRun(val stage: Int, val region: Region, private val seed: Int, val total: Int = 6, private val bossLast: Boolean = false, val bossEvery: Int = 10) {
     /** Endless search: rooms never run out, the run ends when the driver falls. */
     val endless get() = total == Int.MAX_VALUE
@@ -202,6 +204,12 @@ class RoomRun(val stage: Int, val region: Region, private val seed: Int, val tot
     /** Gun ammo for the search (-1 = melee weapon, no ammo); refilled only on level-up. */
     var ammo = -1
     val ammoPerLevel = 30
+
+    /** A throw waiting for the arm to come forward: angle, damage, pellets; released when throwT runs out. */
+    var throwT = 0f
+    var throwA = 0f
+    var throwDmg = 0f
+    var throwN = 1
     val xpNeed get() = 4 + level * 3
     val powers = IntArray(Power.entries.size)
     fun lv(p: Power) = powers[p.ordinal]
@@ -354,11 +362,11 @@ class RoomRules(private val g: Game) {
             if (z.type.flying) {
                 // bats hover above and swoop at the player
                 val ty = if (abs(dx) < 260f) d.y - 50f else d.y - 220f + sin(z.phase * 0.3f) * 30f
-                z.x += sign(dx) * sp * dt
+                z.x += sign(dx) * sp * dt * (if (Sprites.walks(z.type)) lurchSpeed(z.x, z.type.h * 1.3f, z.gaitOff) else 1f)
                 z.y += (ty - z.y) * min(1f, dt * 2.5f)
             } else {
                 val wantRange = if (f.ranged) 420f else z.type.w / 2 + 16f
-                if (abs(dx) > wantRange) z.x += sign(dx) * sp * dt
+                if (abs(dx) > wantRange) z.x += sign(dx) * sp * dt * (if (Sprites.walks(z.type)) lurchSpeed(z.x, z.type.h * 1.3f, z.gaitOff) else 1f)
                 else if (f.ranged && abs(dx) < 260f) z.x -= sign(dx) * sp * 0.5f * dt
                 // walk off ledges, fall to whatever is below
                 var feet = z.y + f.vy * dt
@@ -455,6 +463,10 @@ class RoomRules(private val g: Game) {
         val w = g.save.sideWeapon
         val (dmg, interval, pellets) = stats(run)
         d.fireCd -= dt
+        if (run.throwT > 0f) {
+            run.throwT -= dt
+            if (run.throwT <= 0f) releaseThrow(run)
+        }
         val gx = d.x
         val gy = d.y - 58f
         val reach = if (w.melee) w.range + 30f else w.range + 150f
@@ -505,6 +517,15 @@ class RoomRules(private val g: Game) {
         }
         val dist = hypot(tx - gx, ty - gy)
         val lob = if (w.gravity > 0f) w.gravity * dist / (w.speed * w.speed) * 0.5f else 0f
+        if (w.thrown) {
+            // wind up first; the weapon leaves the hand when the arm comes over (see releaseThrow)
+            d.atkT = THROW_T
+            run.throwT = THROW_T * 0.4f
+            run.throwA = d.aim - lob * (if (cos(d.aim) >= 0f) 1f else -1f)
+            run.throwDmg = dmg
+            run.throwN = pellets
+            return
+        }
         for (k in 0 until pellets) {
             val spread = if (w.pellets > 1) w.spread else 0.09f
             val off = if (pellets > 1) spread * (k - (pellets - 1) / 2f) / max(1f, (pellets - 1) / 2f) else 0f
@@ -519,6 +540,23 @@ class RoomRules(private val g: Game) {
         g.particles.add(Particle(gx + cos(d.aim) * 26f, gy + sin(d.aim) * 26f, 0f, 0f, 0.06f, 0.06f, 9f, 0xFFFFE082.toInt()))
         if (w != SideWeapon.BOW && w != SideWeapon.DART && w != SideWeapon.SPEAR) d.muzzleT = 0.07f
         g.sfx.play(if (w == SideWeapon.BOW || w == SideWeapon.DART) Sfx.S.BOW else Sfx.S.SHOOT, 0.35f)
+    }
+
+    /** The thrown weapon leaves the hand (called when the wind-up is over). */
+    private fun releaseThrow(run: RoomRun) {
+        val d = g.driver
+        val w = g.save.sideWeapon
+        val gx = d.x + d.face * 10f
+        val gy = d.y - 92f
+        for (k in 0 until run.throwN) {
+            val a = run.throwA + (k - (run.throwN - 1) / 2f) * 0.1f + rnd(-0.02f, 0.02f)
+            g.roomProjectiles.add(Projectile(WeaponType.PISTOL, gx, gy, cos(a) * w.speed, sin(a) * w.speed, run.throwDmg, w.pierce, 0f).also {
+                it.life = (w.range + 200f) / w.speed + 0.3f
+                it.side = w
+                it.grav = w.gravity
+            })
+        }
+        g.sfx.play(Sfx.S.BOW, if (w == SideWeapon.AXE) 0.6f else 0.45f)
     }
 
     private fun powersTick(run: RoomRun, dt: Float) {
@@ -601,6 +639,7 @@ class RoomRules(private val g: Game) {
             s.y += s.vy * dt
             if (s.life <= 0f || s.y > 0f || s.y < -600f || s.x < 0f || s.x > rm.width) {
                 s.alive = false
+                if (s.y > 0f && s.side?.thrown == true) g.dustAt(s.x, 0f, 3, 70f)
                 continue
             }
             for (f in rm.foes) {
@@ -608,7 +647,7 @@ class RoomRules(private val g: Game) {
                 if (!z.alive || z in s.hit) continue
                 if (abs(z.x - s.x) < z.type.w / 2 + 8f && s.y > z.y - z.type.h - 8f && s.y < z.y + 8f) {
                     s.hit.add(z)
-                    hurt(run, f, s.damage, s.vx * 0.06f)
+                    hurt(run, f, s.damage, if (s.side != null && s.side!!.knock > 0f) sign(s.vx) * s.side!!.knock else s.vx * 0.06f)
                     if (run.lv(Power.NITRO) > 0) f.slowT = 1.6f
                     if (--s.pierce <= 0) {
                         s.alive = false; break
@@ -667,8 +706,10 @@ class RoomRules(private val g: Game) {
                 c.vx = dx / max(1f, dist) * sp
                 c.vy = dy / max(1f, dist) * sp
             } else {
-                c.vy += Game.G * dt
+                // paper: after the pop it drifts down slowly, swaying side to side
+                c.vy = min(c.vy + Game.G * 0.55f * dt, if (c.vy > 0f) 230f else 1e9f)
                 c.vx *= 1f - min(1f, dt * 2f)
+                if (c.vy > 0f && !c.heart) c.vx += sin(c.t * 7f + c.x) * 260f * dt
             }
             c.x += c.vx * dt
             c.y += c.vy * dt

@@ -42,7 +42,9 @@ fun main() {
         }
     }
     // expedition (god mode bot)
+    save.side = com.khongvinh.carsurvival.SideWeapon.AXE.ordinal
     tap(g, "expedition"); tick(g, 0.6f)
+    var throwShots = 0
     val run = g.rooms
     println("expedition: rooms=${run?.total} state=${g.state}")
     var t = 0f
@@ -66,6 +68,7 @@ fun main() {
         g.touchUp(6)
         if (crate != null && crate[1] > 0f && abs(dx) < 200f) g.touchDown(6, j.cx, j.cy)
         tick(g, 0.1f); t += 0.1f
+        if (g.driver.atkT > 0f && throwShots < 6) shot(g, "v8_throw${throwShots++}")
         if (t > 5f && t < 5.11f) shot(g, "v7_loot")
         if (g.state == State.PICK && t < 3f) shot(g, "v7_pick")
     }

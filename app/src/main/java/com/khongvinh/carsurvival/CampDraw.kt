@@ -117,7 +117,7 @@ internal fun Renderer.drawCamp(c: Canvas) {
         val sway = sin(zz.phase)
         val big = if (cp.isBoss(f)) 220f else zz.type.h * 1.3f
         val steps = (cp.isBoss(f) && pic == "boss_brute") || (!cp.isBoss(f) && Sprites.walks(zz.type))
-        if (steps && walkSprite(c, pic, zz.x, zz.y + 4f, big, true, stepPhase(zz.x, big, true), if (cp.isBoss(f)) 16f else Sprites.stride(zz.type), lean = 4f)) {
+        if (steps && walkSprite(c, pic, zz.x, zz.y + 4f, big, true, stepPhase(zz.x, big, true) + zz.gaitOff, if (cp.isBoss(f)) 16f else Sprites.stride(zz.type), lean = 4f, shamble = if (cp.isBoss(f)) 0.6f else Sprites.shamble(zz.type))) {
             // legs stepping, cut from the AI picture
         } else if (sprite(c, pic, zz.x, zz.y + 4f - kotlin.math.abs(sway) * 5f, big, flip = true,
                 rot = sway * 6f, squash = 1f + 0.05f * kotlin.math.abs(sin(zz.phase * 2f)))) {

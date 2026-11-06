@@ -388,7 +388,7 @@ class Campaign(private val g: Game) {
             val (bx, bd) = blockerAt(z.x)
             val stopAt = bx + z.type.w / 2 + (if (f.ranged) 380f else 4f)
             if (z.x > stopAt) {
-                z.x -= speed * dt
+                z.x -= speed * dt * (if (Sprites.walks(z.type)) lurchSpeed(z.x, z.type.h * 1.3f, z.gaitOff) else 1f)
             } else if (f.ranged) {
                 f.spitCd -= dt
                 if (f.spitCd <= 0f) {
@@ -702,7 +702,7 @@ class Campaign(private val g: Game) {
             lootParts[bp.id] = (lootParts[bp.id] ?: 0) + 1
             note("🔧 MẢNH ${bp.title.uppercase()}", 0xFF80D8FF.toInt())
         }
-        g.sfx.play(Sfx.S.WOOD, 0.8f)
+        g.sfx.play(Sfx.S.LOOT, 0.7f)
         g.burstAt(x, y, 0xFFFFD740.toInt(), 14)
     }
 

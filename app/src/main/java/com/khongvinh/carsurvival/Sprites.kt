@@ -55,6 +55,13 @@ object Sprites {
     /** Upright monsters whose legs can step (see [Rig]). */
     fun walks(t: ZombieType) = t == ZombieType.WALKER || t == ZombieType.RUNNER || t == ZombieType.FAT
 
+    /** How much a monster limps and lurches (0 = clean run, 1 = full shamble). */
+    fun shamble(t: ZombieType) = when (t) {
+        ZombieType.RUNNER -> 0.35f
+        ZombieType.FAT -> 0.8f
+        else -> 1f
+    }
+
     fun stride(t: ZombieType) = when (t) {
         ZombieType.RUNNER -> 34f
         ZombieType.FAT -> 14f
@@ -141,7 +148,7 @@ object Sprites {
 
     fun side(w: SideWeapon) = when (w) {
         SideWeapon.PISTOL -> "wpn_pistol"
-        SideWeapon.DART -> "wpn_shuriken"
+        SideWeapon.DART -> "wpn_knife_throw" // none yet: drawn in code
         SideWeapon.SPEAR -> "wpn_spear"
         SideWeapon.BOW -> "wpn_bow"
         SideWeapon.AXE -> "wpn_axe"

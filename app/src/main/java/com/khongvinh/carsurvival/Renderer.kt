@@ -1200,7 +1200,7 @@ class Renderer(internal val g: Game) {
         // AI sprites face right; turn them towards the player
         val sway = sin(z.phase)
         val pic = if (z.spitter && Sprites.has("zombie_spitter")) "zombie_spitter" else Sprites.zombie(z.type)
-        if ((Sprites.walks(z.type) && walkSprite(c, pic, z.x, z.y + 4f, z.type.h * 1.3f, dir < 0f, stepPhase(z.x, z.type.h * 1.3f, dir < 0f), Sprites.stride(z.type), lean = 4f)) ||
+        if ((Sprites.walks(z.type) && walkSprite(c, pic, z.x, z.y + 4f, z.type.h * 1.3f, dir < 0f, stepPhase(z.x, z.type.h * 1.3f, dir < 0f) + z.gaitOff, Sprites.stride(z.type), lean = 4f, shamble = Sprites.shamble(z.type))) ||
             sprite(c, pic, z.x, z.y + 4f - kotlin.math.abs(sway) * 4f, z.type.h * 1.3f, flip = dir < 0f,
                 rot = sway * (if (z.type.flying) 10f else 6f), squash = 1f + 0.04f * kotlin.math.abs(sin(z.phase * 2f)))) {
             if (z.burnT > 0f) burning(c, z.x, z.y + 4f - z.fly, z.type.h * 1.3f)
@@ -1613,6 +1613,42 @@ class Renderer(internal val g: Game) {
         }
     }
 
+    /**
+     * A dollar bill: green note with a white border, "$" in an oval and corner marks.
+     * It flips (squashes across its width) and flutters while it flies, and lies flat with a glint once landed.
+     */
+    internal fun banknote(c: Canvas, x: Float, y: Float, t: Float, landed: Boolean) {
+        c.save()
+        c.translate(x, y)
+        if (landed) {
+            c.rotate(-8f + sin(x) * 6f)
+        } else {
+            c.rotate(sin(t * 7f + x) * 30f)
+            c.scale(0.25f + 0.75f * kotlin.math.abs(cos(t * 9f + x * 0.1f)), 1f)
+        }
+        // shadow edge, paper, inner print
+        fill.color = 0xFF1B5E20.toInt()
+        c.drawRoundRect(-25f, -13f, 25f, 13f, 3f, 3f, fill)
+        fill.color = 0xFFF1F8E9.toInt()
+        c.drawRoundRect(-23f, -11f, 23f, 11f, 2f, 2f, fill)
+        fill.color = 0xFF66BB6A.toInt()
+        c.drawRoundRect(-20f, -8f, 20f, 8f, 2f, 2f, fill)
+        fill.color = 0xFF43A047.toInt()
+        c.drawCircle(-15f, -4f, 2.5f, fill)
+        c.drawCircle(15f, 4f, 2.5f, fill)
+        fill.color = 0xFFE8F5E9.toInt()
+        c.drawOval(-8f, -7f, 8f, 7f, fill)
+        text.textAlign = Paint.Align.CENTER
+        text.textSize = 13f
+        text.color = 0xFF1B5E20.toInt()
+        c.drawText("$", 0f, 5f, text)
+        if (landed && (g.anim * 1.3f + x * 0.01f) % 1f < 0.15f) {
+            fill.color = 0xAAFFFFFF.toInt()
+            c.drawCircle(14f, -8f, 3f, fill)
+        }
+        c.restore()
+    }
+
     /** Muzzle flash: the AI effect picture if there is one, else a hot star. */
     internal fun muzzle(c: Canvas, x: Float, y: Float, a: Float) {
         c.save()
@@ -1655,7 +1691,18 @@ class Renderer(internal val g: Game) {
         // landing squash: shorter for a moment
         val squat = if (d.landT > 0f) 1f - 0.12f * (d.landT / 0.16f) else 1f
         val kick = if (d.muzzleT > 0f) -4f * f else 0f
-        if (walkSprite(c, pic, x + kick, y + 4f, 108f * squat, f < 0f, phase, stride, if (hurt) 150 else 255, if (moving) 5f else 0f)) {
+        // throw: lean back while winding up, then whip forward and step into it
+        val tw = if (g.save.sideWeapon.thrown && d.atkT > 0f) 1f - d.atkT / THROW_T else -1f
+        val throwLean = when {
+            tw < 0f -> 0f
+            tw < 0.4f -> -16f * (tw / 0.4f)
+            else -> -16f + 40f * kotlin.math.min(1f, (tw - 0.4f) / 0.2f) - 24f * kotlin.math.max(0f, (tw - 0.6f) / 0.4f)
+        }
+        val throwStep = if (tw >= 0.4f) f * 8f * kotlin.math.sin((tw - 0.4f) / 0.6f * PI.toFloat()) else 0f
+        if (tw >= 0f && tw < 0.4f) throwPose(c, d, x + kick + throwStep, y, f)
+        if (walkSprite(c, pic, x + kick + throwStep, y + 4f, 108f * squat, f < 0f, phase, stride, if (hurt) 150 else 255,
+                (if (moving) 5f else 0f) + throwLean * f)) {
+            if (tw >= 0.4f) throwPose(c, d, x + kick + throwStep, y, f)
             if (d.muzzleT > 0f) muzzle(c, x + cos(d.aim) * 62f, y - 58f + sin(d.aim) * 62f, d.aim)
             driverHp(c, d, x, y)
             return
@@ -4607,12 +4654,11 @@ class Renderer(internal val g: Game) {
                 c.drawRect(-2f, -6f, 18f, 0f, fill)
                 c.drawRect(-2f, 0f, 4f, 9f, fill)
             }
-            SideWeapon.DART -> {
-                c.save()
-                c.translate(8f, -2f)
-                c.rotate(g.anim * 200f)
-                star(c, 0f, 0f, 10f, 0xFFB0BEC5.toInt())
-                c.restore()
+            SideWeapon.DART -> { // throwing knife
+                fill.color = 0xFF4E342E.toInt()
+                c.drawRoundRect(-6f, -3.5f, 8f, 3.5f, 2f, 2f, fill)
+                fill.color = 0xFFCFD8DC.toInt()
+                path.reset(); path.moveTo(8f, -5f); path.lineTo(32f, -1f); path.lineTo(34f, 0f); path.lineTo(8f, 5f); path.close(); c.drawPath(path, fill)
             }
             SideWeapon.SPEAR -> {
                 stroke.color = 0xFF8D6E63.toInt()
@@ -4663,19 +4709,88 @@ class Renderer(internal val g: Game) {
         c.restore()
     }
 
+    /**
+     * A thrown weapon in flight: the spear flies point-first along its path, the axe and the
+     * knife spin end over end; a faint motion trail follows each.
+     */
+    private fun thrownWeapon(c: Canvas, w: SideWeapon, x: Float, y: Float, dirDeg: Float, age: Float, left: Boolean) {
+        // motion trail
+        val rad = dirDeg * PI.toFloat() / 180f
+        for (k in 1..3) {
+            fill.color = Color.argb(70 - k * 20, 255, 255, 255)
+            c.drawCircle(x - cos(rad) * k * 14f, y - sin(rad) * k * 14f, 7f - k * 1.5f, fill)
+        }
+        c.save()
+        c.translate(x, y)
+        when (w) {
+            SideWeapon.SPEAR -> {
+                c.rotate(dirDeg)
+                if (!spriteBox(c, "wpn_spear", -60f, -12f, 60f, 12f)) {
+                    stroke.color = 0xFF8D6E63.toInt(); stroke.strokeWidth = 5f
+                    c.drawLine(-55f, 0f, 40f, 0f, stroke)
+                    fill.color = 0xFFCFD8DC.toInt()
+                    path.reset(); path.moveTo(40f, -7f); path.lineTo(62f, 0f); path.lineTo(40f, 7f); path.close(); c.drawPath(path, fill)
+                }
+            }
+            SideWeapon.AXE -> {
+                c.rotate((if (left) -1f else 1f) * age * 900f)
+                if (!spriteBox(c, "wpn_axe", -26f, -34f, 26f, 34f)) { c.scale(0.9f, 0.9f); handWeapon(c, w, 1f) }
+            }
+            else -> { // throwing knife
+                c.rotate((if (left) -1f else 1f) * age * 1300f)
+                fill.color = 0xFF4E342E.toInt()
+                c.drawRoundRect(-16f, -3.5f, -2f, 3.5f, 2f, 2f, fill)
+                fill.color = 0xFFCFD8DC.toInt()
+                path.reset(); path.moveTo(-2f, -5f); path.lineTo(22f, -1f); path.lineTo(24f, 0f); path.lineTo(-2f, 5f); path.close(); c.drawPath(path, fill)
+                fill.color = 0xFFFFFFFF.toInt()
+                c.drawRect(2f, -3f, 18f, -1.5f, fill)
+            }
+        }
+        c.restore()
+    }
+
+    /** Throw pose overlay: the weapon held back over the shoulder, then a swoosh as the arm comes over. */
+    private fun throwPose(c: Canvas, d: Driver, x: Float, y: Float, f: Float) {
+        val w = g.save.sideWeapon
+        if (!w.thrown || d.atkT <= 0f) return
+        val t = 1f - d.atkT / THROW_T
+        val sx = x - f * 6f
+        val sy = y - 92f
+        if (t < 0.4f) {
+            // wind-up: weapon raised behind the head, swinging further back
+            val k = t / 0.4f
+            val ang = if (f > 0f) 200f + 70f * k else -20f - 70f * k
+            c.save()
+            c.translate(sx, sy)
+            c.rotate(ang + 180f)
+            when (w) {
+                SideWeapon.SPEAR -> spriteBox(c, "wpn_spear", -10f, -10f, 100f, 10f)
+                SideWeapon.AXE -> { c.rotate(-90f); spriteBox(c, "wpn_axe", -20f, -60f, 20f, 0f) }
+                else -> { thrownWeapon(c, w, 34f, 0f, 0f, 0f, false) }
+            }
+            c.restore()
+        } else {
+            // follow-through: a white arc sweeping over the shoulder to the front
+            val k = (t - 0.4f) / 0.6f
+            stroke.color = Color.argb((180 * (1f - k)).toInt(), 255, 255, 255)
+            stroke.strokeWidth = 7f * (1f - k) + 1f
+            stroke.strokeCap = Paint.Cap.ROUND
+            r.set(sx - 70f, sy - 70f, sx + 70f, sy + 70f)
+            if (f > 0f) c.drawArc(r, 200f, 120f * (0.4f + k), false, stroke) else c.drawArc(r, 340f - 120f * (0.4f + k), 120f * (0.4f + k), false, stroke)
+            stroke.strokeCap = Paint.Cap.BUTT
+        }
+    }
+
     /** Bullets, darts and arrows from the driver's hand weapon. */
     internal fun sideShot(c: Canvas, s: Projectile) {
         val l = hypot(s.vx, s.vy).coerceAtLeast(1f)
         val ux = s.vx / l
         val uy = s.vy / l
+        if (s.side?.thrown == true) {
+            thrownWeapon(c, s.side!!, s.x, s.y, kotlin.math.atan2(s.vy, s.vx) * 180f / PI.toFloat(), s.age, s.vx < 0f)
+            return
+        }
         when (s.side) {
-            SideWeapon.DART -> {
-                c.save()
-                c.translate(s.x, s.y)
-                c.rotate(s.age * 1400f)
-                star(c, 0f, 0f, 11f, 0xFFCFD8DC.toInt())
-                c.restore()
-            }
             SideWeapon.BOW -> {
                 stroke.color = 0xFF8D6E63.toInt()
                 stroke.strokeWidth = 4f
@@ -5406,17 +5521,8 @@ class Renderer(internal val g: Game) {
                 path.reset()
                 path.moveTo(cs.x - 16f, cs.y); path.lineTo(cs.x, cs.y + 16f); path.lineTo(cs.x + 16f, cs.y); path.close()
                 c.drawPath(path, fill)
-            } else if (!sprite(c, "item_cash", cs.x, cs.y + 14f, 30f)) {
-                c.save()
-                c.translate(cs.x, cs.y)
-                c.rotate(sin(cs.t * 6f + cs.x) * 25f)
-                fill.color = 0xFF2E7D32.toInt()
-                c.drawRect(-18f, -9f, 18f, 9f, fill)
-                fill.color = 0xFF66BB6A.toInt()
-                c.drawRect(-15f, -6f, 15f, 6f, fill)
-                fill.color = 0xFF2E7D32.toInt()
-                c.drawCircle(0f, 0f, 4f, fill)
-                c.restore()
+            } else {
+                banknote(c, cs.x, cs.y, cs.t, cs.vy == 0f)
             }
         }
         // loot crates still to open
@@ -5615,7 +5721,7 @@ class Renderer(internal val g: Game) {
             0 -> sprite(c, "item_crate", x, 0f, 80f) &&
                 sprite(c, "def_turret_cannon", x, -70f + (if (b.fireCd < 0.15f) 4f else 0f), 120f, flip = g.driver.x < x, alpha = hit)
             1 -> walkSprite(c, "boss_brute", x, 0f, b.h * 1.25f, !face, stepPhase(x, b.h * 1.25f, !face),
-                if (b.chargeT > 0f) 30f else 18f, hit, if (b.chargeT > 0f) 10f else 3f)
+                if (b.chargeT > 0f) 30f else 18f, hit, if (b.chargeT > 0f) 10f else 3f, if (b.chargeT > 0f) 0.2f else 0.6f)
             else -> Sprites.boss(b.look.tier)?.let { bossSprite(c, it, x, 0f, b.look, hit) } ?: false
         }
         if (!drawn) when (b.kind) {

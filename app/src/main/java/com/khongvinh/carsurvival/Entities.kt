@@ -60,6 +60,9 @@ class Zombie(val type: ZombieType, var x: Float, var y: Float) {
     var alive = true
     var phase = (x * 0.37f) % 6.28f
 
+    /** Fixed offset into the step cycle so a crowd does not walk in lock-step. */
+    val gaitOff = ((x * 1.731f) % 6.28f + 6.28f) % 6.28f
+
     /** Road spitters lob acid at the car / driver (about one zombie in five). */
     var spitter = !type.flying && type != ZombieType.LIZARD && (x.toInt() / 13 and 0x7fffffff) % 5 == 0
     var spitCd = 1.5f + (x % 2f + 2f) % 2f

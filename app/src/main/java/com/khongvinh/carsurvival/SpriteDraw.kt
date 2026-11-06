@@ -70,17 +70,24 @@ internal fun Renderer.walkSprite(
     stride: Float,
     alpha: Int = 255,
     lean: Float = 0f,
+    shamble: Float = 0f,
 ): Boolean {
     if (name == null) return false
+    // zombie gait (shamble 0..1): a limp — the step hesitates (phase warp), one leg drags short and
+    // stiff, the torso lurches forward on every push and rolls side to side
+    val ph = phase + shamble * 0.45f * kotlin.math.sin(phase)
+    val lurch = shamble * (7f + 7f * kotlin.math.sin(ph * 2f + 0.6f))
+    val roll = shamble * 4f * kotlin.math.sin(ph)
     // real drawn frames win over the cut-out legs
     val n = Sprites.frames(name)
     if (n > 0 && stride > 0f) {
-        val k = ((phase / (2f * kotlin.math.PI.toFloat()) * n).toInt() % n + n) % n
-        return sprite(c, "${name}_$k", cx, bottom, h, flip, alpha, lean * 0.5f)
+        val k = ((ph / (2f * kotlin.math.PI.toFloat()) * n).toInt() % n + n) % n
+        val bobF = 1f - shamble * 0.035f * kotlin.math.abs(kotlin.math.sin(ph))
+        return sprite(c, "${name}_$k", cx, bottom, h, flip, alpha, (lean * 0.5f + lurch * 0.6f + roll) * (if (flip) -1f else 1f), bobF)
     }
     val rig = Rig.of(name) ?: return sprite(c, name, cx, bottom, h, flip, alpha, lean)
     val s = h / rig.h
-    val sw = kotlin.math.sin(phase)
+    val sw = kotlin.math.sin(ph)
     val lift = kotlin.math.abs(sw)
     c.save()
     c.translate(cx, bottom)
@@ -90,14 +97,16 @@ internal fun Renderer.walkSprite(
     bmpPaint.alpha = alpha
     val hip = rig.hip.toFloat()
     // the body rises a little as a leg passes under it
-    val bob = if (stride > 0f) -lift * rig.h * 0.025f else kotlin.math.sin(phase * 0.5f) * rig.h * 0.008f
+    val bob = if (stride > 0f) -lift * rig.h * (0.025f + 0.02f * shamble) else kotlin.math.sin(phase * 0.5f) * rig.h * 0.008f
     // two-bone legs: the thigh swings from the hip, the shin hangs from the knee and folds back
     // while the leg travels forward (that is what makes it read as a step, not a slide)
     val run = stride >= 26f
     val bend = if (stride <= 0f) 0f else if (run) 70f else 45f
-    fun leg(l: Rig.Leg, x0: Float, p: Float) {
-        val thighA = -stride * kotlin.math.sin(p)
-        val kneeA = bend * maxOf(0f, kotlin.math.cos(p))
+    fun leg(l: Rig.Leg, x0: Float, p: Float, drag: Boolean) {
+        // the dragging leg takes half a step and hardly bends its knee
+        val amp = if (drag) stride * (1f - 0.5f * shamble) else stride
+        val thighA = -amp * kotlin.math.sin(p)
+        val kneeA = bend * (if (drag) 1f - 0.7f * shamble else 1f) * maxOf(0f, kotlin.math.cos(p))
         c.save()
         c.translate(x0 + l.hipX, hip + bob * 0.4f)
         c.rotate(thighA)
@@ -108,16 +117,16 @@ internal fun Renderer.walkSprite(
         c.restore()
     }
     // the leg behind first
-    if (kotlin.math.sin(phase) < 0f) {
-        leg(rig.a, 0f, phase)
-        leg(rig.b, (rig.w - rig.legB.width).toFloat(), phase + kotlin.math.PI.toFloat())
+    if (sw < 0f) {
+        leg(rig.a, 0f, ph, false)
+        leg(rig.b, (rig.w - rig.legB.width).toFloat(), ph + kotlin.math.PI.toFloat(), true)
     } else {
-        leg(rig.b, (rig.w - rig.legB.width).toFloat(), phase + kotlin.math.PI.toFloat())
-        leg(rig.a, 0f, phase)
+        leg(rig.b, (rig.w - rig.legB.width).toFloat(), ph + kotlin.math.PI.toFloat(), true)
+        leg(rig.a, 0f, ph, false)
     }
     c.save()
     c.translate(rig.w / 2f, hip + bob)
-    c.rotate(lean + (if (stride > 0f) sw * stride * 0.08f else 0f))
+    c.rotate(lean + lurch + roll + (if (stride > 0f) sw * stride * 0.08f else 0f))
     c.translate(-rig.w / 2f, -hip)
     c.drawBitmap(rig.body, 0f, 0f, bmpPaint)
     c.restore()
@@ -158,4 +167,13 @@ internal fun Renderer.burning(c: Canvas, x: Float, y: Float, h: Float): Boolean 
 internal fun stepPhase(x: Float, h: Float, facingLeft: Boolean): Float {
     val cycle = h * 0.95f
     return (if (facingLeft) -x else x) / cycle * 2f * kotlin.math.PI.toFloat()
+}
+
+/**
+ * Zombie lurch: how fast a shambling monster moves at this point of its step (average ~1).
+ * Fast on the push, almost stopped while the dragging leg catches up — so feet stay planted.
+ */
+internal fun lurchSpeed(x: Float, h: Float, off: Float = 0f): Float {
+    val p = stepPhase(x, h, false) + off
+    return 0.45f + 1.1f * kotlin.math.abs(kotlin.math.sin(p + 0.45f * kotlin.math.sin(p)))
 }

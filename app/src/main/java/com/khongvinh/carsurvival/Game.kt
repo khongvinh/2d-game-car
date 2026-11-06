@@ -24,7 +24,7 @@ import kotlin.random.Random
 class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
     companion object {
         /** Shown on the menu so the installed build is easy to check. */
-        const val VERSION = "8.5"
+        const val VERSION = "8.6"
 
         const val VIRTUAL_HEIGHT = 720f
         const val METER = 30f
@@ -861,6 +861,7 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
             return
         }
         // thrown / fired: arcing weapons aim a little high to drop onto the target
+        if (w.thrown) d.atkT = THROW_T
         val dist = hypot(tx - gx, ty - gy)
         val lob = if (w.gravity > 0f) w.gravity * dist / (w.speed * w.speed) * 0.5f else 0f
         for (k in 0 until w.pellets) {
@@ -1787,7 +1788,7 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
             })
             val chaseX = if (driver.out) driver.x else c.x
             if (abs(dx) < 1300f) {
-                z.x += sign(chaseX - z.x) * z.type.speed * dt
+                z.x += sign(chaseX - z.x) * z.type.speed * dt * (if (Sprites.walks(z.type)) lurchSpeed(z.x, z.type.h * 1.3f, z.gaitOff) else 1f)
             }
             // spitters fire back: a lobbed blob of acid aimed where the target will be
             if (z.spitter && dyingT <= 0f) {

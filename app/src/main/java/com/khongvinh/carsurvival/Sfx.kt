@@ -18,7 +18,7 @@ import kotlin.random.Random
  * to a small WAV file in the cache dir and played through a [SoundPool].
  */
 class Sfx(context: Context) {
-    enum class S { COIN, POWER, HIT, EXPLODE, SHOOT, BOW, CATAPULT, BOOM, BEEP, GO, WIN, STAGE, LOSE, STORM, CLONE, CLICK, SPLAT, WOOD, BOOST, LAND, ROAR, ENGINE }
+    enum class S { COIN, POWER, HIT, EXPLODE, SHOOT, BOW, CATAPULT, BOOM, BEEP, GO, WIN, STAGE, LOSE, STORM, CLONE, CLICK, SPLAT, WOOD, BOOST, LAND, ROAR, ENGINE, LOOT }
 
     private val pool: SoundPool = SoundPool.Builder()
         .setMaxStreams(16)
@@ -140,19 +140,19 @@ class Sfx(context: Context) {
     }
 
     private companion object {
-        const val VERSION = 4
+        const val VERSION = 5
 
         /** Recorded effects (assets/sfx/<name>.mp3) used instead of the synthesised ones. */
         val ASSET = mapOf(
             S.SHOOT to "sfx_pistol", S.BOW to "sfx_bow", S.EXPLODE to "sfx_explosion", S.BOOM to "sfx_explosion",
-            S.SPLAT to "sfx_zombie_death", S.ROAR to "sfx_boss_roar", S.COIN to "sfx_coin", S.CLICK to "sfx_click",
+            S.SPLAT to "sfx_zombie_death", S.ROAR to "sfx_boss_roar", S.CLICK to "sfx_click",
             S.WIN to "sfx_win", S.LOSE to "sfx_lose", S.STAGE to "sfx_level_up", S.POWER to "sfx_gem",
-            S.WOOD to "sfx_build", S.CATAPULT to "sfx_rocket", S.STORM to "sfx_wave_horn", S.HIT to "sfx_axe",
+            S.CATAPULT to "sfx_rocket", S.STORM to "sfx_wave_horn", S.HIT to "sfx_axe",
         )
         val MIN_GAP_NS = LongArray(S.entries.size) { i ->
             when (S.entries[i]) {
                 S.SHOOT -> 90_000_000L
-                S.SPLAT, S.COIN, S.WOOD, S.LAND -> 45_000_000L
+                S.SPLAT, S.COIN, S.WOOD, S.LAND, S.LOOT -> 45_000_000L
                 else -> 25_000_000L
             }
         }
@@ -221,9 +221,18 @@ class Sfx(context: Context) {
     private fun min1(v: Float) = if (v > 1f) 1f else v
 
     private fun synth(s: S): Buf = when (s) {
-        S.COIN -> buf(0.18f).also {
-            tone(it, 0f, 0.06f, 988f, 988f, 0.5f, true, 1f)
-            tone(it, 0.06f, 0.12f, 1319f, 1319f, 0.5f, true, 3f)
+        // soft sine "ding-ding", no square-wave buzz
+        S.COIN -> buf(0.3f).also {
+            tone(it, 0f, 0.12f, 1568f, 1568f, 0.28f, false, 6f)
+            tone(it, 0.07f, 0.23f, 2093f, 2093f, 0.24f, false, 7f)
+        }
+        // crate opened: a muffled wooden knock, then a gentle rising chime
+        S.LOOT -> buf(0.55f).also {
+            tone(it, 0f, 0.09f, 180f, 110f, 0.55f, false, 9f)
+            noise(it, 0f, 0.06f, 0.25f, 0.06f, 12f)
+            tone(it, 0.08f, 0.16f, 784f, 784f, 0.22f, false, 5f)
+            tone(it, 0.15f, 0.16f, 988f, 988f, 0.2f, false, 5f)
+            tone(it, 0.22f, 0.33f, 1175f, 1175f, 0.2f, false, 4f)
         }
         S.POWER -> buf(0.35f).also {
             tone(it, 0f, 0.35f, 300f, 1200f, 0.5f, true, 2f)
@@ -280,9 +289,10 @@ class Sfx(context: Context) {
             noise(it, 0f, 0.25f, 0.9f, 0.18f, 7f)
             tone(it, 0f, 0.12f, 220f, 70f, 0.5f, false, 6f)
         }
-        S.WOOD -> buf(0.25f).also {
-            noise(it, 0f, 0.2f, 0.7f, 0.45f, 9f)
-            tone(it, 0f, 0.15f, 260f, 180f, 0.5f, true, 7f)
+        // low wooden thud (low-passed noise + sine), not a bright crackle
+        S.WOOD -> buf(0.22f).also {
+            noise(it, 0f, 0.16f, 0.45f, 0.08f, 10f)
+            tone(it, 0f, 0.14f, 150f, 90f, 0.5f, false, 8f)
         }
         S.BOOST -> buf(0.5f).also {
             noise(it, 0f, 0.5f, 0.7f, 0.25f, 1.5f)
