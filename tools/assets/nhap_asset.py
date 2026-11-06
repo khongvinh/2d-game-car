@@ -113,7 +113,7 @@ src = sys.argv[1]
 V2 = "--v2" in sys.argv[2:]
 if V2:
     # bộ 2 (vẽ lại lần 3, prompt dưới 77 token): những ảnh AI vẫn vẽ quay trái
-    FACING_LEFT = {"survivor_idle", "survivor_run", "survivor_shoot", "zombie_walker", "zombie_crawler", "car_sedan", "car_motorbike", "car_tank",
+    FACING_LEFT = {"survivor_idle", "survivor_run", "survivor_shoot", "zombie_walker", "zombie_spitter", "zombie_crawler", "car_sedan", "car_motorbike", "car_tank",
                    "wpn_mount_laser", "wpn_mount_shotgun", "wpn_mount_pistol", "wpn_mount_smg",
                    "survivor_ride", "wpn_flamethrower"}
     CUT_LEFT = {}
@@ -151,10 +151,12 @@ for group in sorted(os.listdir(src)):
                     im = im.crop((int(im.width * CUT_LEFT[name]), 0, im.width, im.height))
                 if name in CUT_RIGHT:
                     im = im.crop((0, 0, int(im.width * CUT_RIGHT[name]), im.height))
-                im = clean(im, keep=0.75 if name in ONLY_BIGGEST else 0.3)
+                # armed cars (xe_vu_khi/car_<xe>_<vũ khí>) are redrawn from the base car: same fixes
+                base = "_".join(name.split("_")[:2]) if group == "xe_vu_khi" else name
+                im = clean(im, keep=0.75 if base in ONLY_BIGGEST else 0.3)
                 if name in TOP_BAND:
                     im = top_band(im)
-                if name in FACING_LEFT:
+                if name in FACING_LEFT or (base != name and base in FACING_LEFT):
                     im = im.transpose(Image.FLIP_LEFT_RIGHT)
                 if name in TIP_UP:
                     im = im.transpose(Image.ROTATE_270)  # drawn standing, tip up: lay it down, tip right

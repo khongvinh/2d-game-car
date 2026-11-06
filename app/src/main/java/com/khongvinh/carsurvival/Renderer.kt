@@ -1165,16 +1165,31 @@ class Renderer(internal val g: Game) {
             val bounce = (car.compress[0] + car.compress[1]) * 0.25f
             // size the picture by length so its wheels sit over the physics wheels
             // (AI cars have their wheels at about 22% and 78% of their length)
-            val bm = Sprites.get(carPic)!!
-            val len = (Car.WHEEL_X[1] - Car.WHEEL_X[0]) / 0.56f
-            val ph = (len * bm.height / bm.width).coerceIn(70f, 150f)
+            // AI picture of this car already carrying this weapon (and its rider on the bike), if made
+            val armed = carPic + "_" + w.name.lowercase()
+            val hasArmed = Sprites.has(armed) && !g.driver.out
+            val bm = Sprites.get(if (hasArmed) armed else carPic)!!
+            // scale and place the picture so its own wheels sit on the physics wheels
+            val wf = Sprites.WHEELS[carPic] ?: floatArrayOf(0.22f, 0.78f, 0.15f, 0f)
+            val len = (Car.WHEEL_X[1] - Car.WHEEL_X[0]) / (wf[1] - wf[0])
+            val ph = len * bm.height / bm.width
             val base = Car.WHEEL_Y + Car.WHEEL_R + 2f + bounce
             val moto = v.cls == VehicleClass.MOTO
-            sprite(c, carPic, (Car.WHEEL_X[0] + Car.WHEEL_X[1]) / 2, base, ph)
-            spinWheels(c, car.wheelRot)
-            // the rider sits on the bike's seat (upper body of the driver picture), the gun in front of him
-            if (moto && !g.driver.out) rider(c, -18f, base - ph * 0.5f, 150f)
-            if (moto) roofGun(c, v, 0f, 14f, base - ph * 0.5f - 44f) else roofGun(c, v, base - ph)
+            val picX = Car.WHEEL_X[0] - wf[0] * len + len / 2f
+            sprite(c, if (hasArmed) armed else carPic, picX, base, ph)
+            if (wf[3] > 0f) spinWheels(c, car.wheelRot, wf[2] * ph, base)
+            if (hasArmed) {
+                // weapon and rider are part of the picture: only the flash when it fires
+                val since = g.wstats.interval - car.fireCd
+                if (since in 0f..0.07f && w != WeaponType.KNIFE) {
+                    val a = car.aim - car.angle - car.squat
+                    muzzle(c, picX + len * 0.25f, base - ph * 0.85f, a)
+                }
+            } else {
+                // the rider sits on the bike's seat (upper body of the driver picture), the gun in front of him
+                if (moto && !g.driver.out) rider(c, -18f, base - ph * 0.5f, 150f)
+                if (moto) roofGun(c, v, 0f, 14f, base - ph * 0.5f - 44f) else roofGun(c, v, base - ph)
+            }
             c.restore()
         } else if (!hurt) art.draw(c, v, car.x, car.y, car.angle, car.wheelRot, car.aim, car.boosting, w, false, car.compress, g.wrecked, car.squat, car.slashT)
         art.noRider = false
@@ -1542,19 +1557,19 @@ class Renderer(internal val g: Game) {
     }
 
     /** Spokes turning over the picture's wheels so they visibly roll. */
-    private fun spinWheels(c: Canvas, rot: Float) {
-        stroke.strokeWidth = 4f
+    private fun spinWheels(c: Canvas, rot: Float, rad: Float, base: Float) {
+        // spokes over the picture's own tyres, turning with the physics wheels
+        stroke.strokeWidth = maxOf(2f, rad * 0.12f)
         for (wx in Car.WHEEL_X) {
-            val cx = wx
-            val cy = Car.WHEEL_Y
-            val rr = Car.WHEEL_R * 0.72f
+            val cy = base - rad
+            val rr = rad * 0.6f
+            stroke.color = 0x99202020.toInt()
             for (k in 0 until 3) {
                 val a = rot + k * PI.toFloat() / 3f
-                stroke.color = 0xCC1A1A1A.toInt()
-                c.drawLine(cx - cos(a) * rr, cy - sin(a) * rr, cx + cos(a) * rr, cy + sin(a) * rr, stroke)
+                c.drawLine(wx - cos(a) * rr, cy - sin(a) * rr, wx + cos(a) * rr, cy + sin(a) * rr, stroke)
             }
-            fill.color = 0xAA9E9E9E.toInt()
-            c.drawCircle(cx, cy, 4f, fill)
+            fill.color = 0xCC9E9E9E.toInt()
+            c.drawCircle(wx, cy, rad * 0.16f, fill)
         }
     }
 
@@ -1683,6 +1698,9 @@ class Renderer(internal val g: Game) {
             // moving: real frames if any, else the standing picture (legs straight and side by side)
             // walked with a two-bone leg rig (thigh + shin, the knee folds) — reads as a proper step
             moving && Sprites.frames("survivor_run") > 0 -> "survivor_run"
+            // AI picture of the driver holding this weapon, else empty-handed + the weapon drawn in his hand
+            Sprites.has(holdPic(g.save.sideWeapon)) -> holdPic(g.save.sideWeapon)
+            Sprites.has("survivor_unarmed") -> "survivor_unarmed"
             Sprites.has("survivor_body") -> "survivor_body"
             else -> "survivor_idle"
         }
@@ -1703,9 +1721,9 @@ class Renderer(internal val g: Game) {
         }
         val throwStep = if (tw >= 0.4f) f * 8f * kotlin.math.sin((tw - 0.4f) / 0.6f * PI.toFloat()) else 0f
         if (tw >= 0f && tw < 0.4f) throwPose(c, d, x + kick + throwStep, y, f)
-        val holding = pic == "survivor_body" && !(g.save.sideWeapon.thrown && tw >= 0f)
+        val holding = (pic == "survivor_body" || pic == "survivor_unarmed") && !(g.save.sideWeapon.thrown && tw >= 0f)
         val hold: ((Canvas, Float, Float) -> Unit)? = if (!holding) null else { cv, rot, sc ->
-            heldWeapon(cv, g.save.sideWeapon, d, f, rot, sc)
+            heldWeapon(cv, g.save.sideWeapon, d, f, rot, sc, pic)
         }
         if (walkSprite(c, pic, x + kick + throwStep, y + 4f, 108f * squat, f < 0f, phase, stride, if (hurt) 150 else 255,
                 (if (moving) 5f else 0f) + throwLean * f, held = hold)) {
@@ -4764,15 +4782,17 @@ class Renderer(internal val g: Game) {
      * The player's hand weapon in the driver's front hand (picture coordinates of survivor_body,
      * already flipped and tilted with the body). Guns point at the target, and droop when idle.
      */
-    private fun heldWeapon(c: Canvas, w: SideWeapon, d: Driver, f: Float, bodyRot: Float, sc: Float) {
-        val rig = Rig.of("survivor_body") ?: return
+    private fun holdPic(w: SideWeapon) = "survivor_hold_" + w.name.lowercase()
+
+    private fun heldWeapon(c: Canvas, w: SideWeapon, d: Driver, f: Float, bodyRot: Float, sc: Float, pic: String) {
+        val rig = Rig.of(pic) ?: return
         val hx = rig.w * 0.73f
         val hy = rig.h * 0.47f
         // world aim -> this flipped, tilted frame
         val aimLocal = (if (f > 0f) d.aim else PI.toFloat() - d.aim) * 180f / PI.toFloat() - bodyRot
         val idle = d.atkT <= 0f && (d.aim == 0f || d.aim == PI.toFloat())
         val ang = if (idle) (if (w == SideWeapon.SPEAR) -10f else 35f) else aimLocal.coerceIn(-80f, 80f)
-        val u = 1.35f / sc
+        val u = 0.9f / sc
         val kick = if (d.muzzleT > 0f) -6f * u else 0f
         c.save()
         c.translate(hx, hy)
@@ -5651,6 +5671,26 @@ class Renderer(internal val g: Game) {
                     fill.color = 0xFFFFEB3B.toInt()
                     c.drawCircle(s.x, s.y, 8f, fill)
                 }
+                3 -> { // boss bomb: black ball with a fizzing fuse
+                    fill.color = 0xFF212121.toInt()
+                    c.drawCircle(s.x, s.y, 15f, fill)
+                    fill.color = 0x66FFFFFF
+                    c.drawCircle(s.x - 5f, s.y - 5f, 5f, fill)
+                    fill.color = if ((g.anim * 20f).toInt() % 2 == 0) 0xFFFFD740.toInt() else 0xFFFF6D00.toInt()
+                    c.drawCircle(s.x + 8f, s.y - 14f, 5f, fill)
+                }
+                4 -> { // boss bullet: short red tracer
+                    stroke.color = 0xFFFF5252.toInt()
+                    stroke.strokeWidth = 5f
+                    c.drawLine(s.x - s.vx * 0.02f, s.y - s.vy * 0.02f, s.x, s.y, stroke)
+                }
+                5 -> { // homing orb: pulsing purple
+                    val p = 1f + 0.2f * sin(g.anim * 14f)
+                    fill.color = 0x66AA00FF
+                    c.drawCircle(s.x, s.y, 22f * p, fill)
+                    fill.color = 0xFFE040FB.toInt()
+                    c.drawCircle(s.x, s.y, 11f * p, fill)
+                }
                 else -> {
                     c.save()
                     c.translate(s.x, s.y)
@@ -5758,12 +5798,35 @@ class Renderer(internal val g: Game) {
         val x = b.x
         val hit = if (b.flash > 0f) 160 else 255
         val face = b.dir > 0f
+        // the cleaver sweep: a red warning band while winding up, then a white crescent across a third of the room
+        val reach = (g.rooms?.room?.width ?: 2400f) / 3f
+        if (b.windT > 0f) {
+            fill.color = Color.argb((60 + 80 * sin(g.anim * 30f).coerceAtLeast(0f)).toInt(), 255, 30, 30)
+            val l = if (b.swingDir > 0f) x else x - reach
+            c.drawRect(l, b.y - b.h - 40f, l + reach, b.y + 4f, fill)
+        }
+        if (b.swingT > 0f) {
+            val k = b.swingT / 0.3f
+            stroke.color = Color.argb((230 * k).toInt(), 255, 245, 235)
+            stroke.strokeWidth = 26f * k + 4f
+            stroke.strokeCap = Paint.Cap.ROUND
+            r.set(x - reach, b.y - b.h - reach * 0.4f, x + reach, b.y + reach * 0.6f)
+            c.drawArc(r, if (b.swingDir > 0f) -60f else 180f, 60f + 60f * (1f - k), false, stroke)
+            stroke.strokeCap = Paint.Cap.BUTT
+        }
+        val lean = if (b.windT > 0f) -14f else if (b.swingT > 0f) 18f else if (b.chargeT > 0f) 10f else 3f
         val drawn = when (b.kind) {
             0 -> sprite(c, "item_crate", x, 0f, 80f) &&
-                sprite(c, "def_turret_cannon", x, -70f + (if (b.fireCd < 0.15f) 4f else 0f), 120f, flip = g.driver.x < x, alpha = hit)
-            1 -> walkSprite(c, "boss_brute", x, 0f, b.h * 1.25f, !face, stepPhase(x, b.h * 1.25f, !face),
-                if (b.chargeT > 0f) 30f else 18f, hit, if (b.chargeT > 0f) 10f else 3f, if (b.chargeT > 0f) 0.2f else 0.6f)
-            else -> Sprites.boss(b.look.tier)?.let { bossSprite(c, it, x, 0f, b.look, hit) } ?: false
+                sprite(c, "def_turret_cannon", x, -70f + (if (b.fireCd < 0.15f || b.burstLeft > 0) 4f * sin(g.anim * 60f) else 0f), 120f, flip = g.driver.x < x, alpha = hit)
+            1 -> walkSprite(c, "boss_brute", x, b.y, b.h * 1.25f, !face, stepPhase(x, b.h * 1.25f, !face),
+                if (b.vy != 0f) 0f else if (b.chargeT > 0f) 30f else 18f, hit, lean, if (b.chargeT > 0f) 0.2f else 0.6f)
+            else -> Sprites.boss(b.look.tier)?.let { bossSprite(c, it, x, b.y, b.look, hit) } ?: false
+        }
+        if (b.kind == 0 && b.nameT > 0f) {
+            text.textAlign = Paint.Align.CENTER
+            text.textSize = 34f
+            text.color = Color.argb((255 * min(1f, b.nameT * 2f)).toInt(), 255, 138, 101)
+            c.drawText(b.volleyName, x, -b.h - 90f, text)
         }
         if (!drawn) when (b.kind) {
             0 -> { // cannon turret on a crate base
@@ -5803,9 +5866,9 @@ class Renderer(internal val g: Game) {
         // health bar above
         val f = (b.hp / b.maxHp).coerceIn(0f, 1f)
         fill.color = 0xCC000000.toInt()
-        c.drawRoundRect(x - 90f, -b.h - 60f, x + 90f, -b.h - 44f, 6f, 6f, fill)
+        c.drawRoundRect(x - 90f, b.y - b.h - 60f, x + 90f, b.y - b.h - 44f, 6f, 6f, fill)
         fill.color = 0xFFD50000.toInt()
-        c.drawRoundRect(x - 87f, -b.h - 57f, x - 87f + 174f * f, -b.h - 47f, 4f, 4f, fill)
+        c.drawRoundRect(x - 87f, b.y - b.h - 57f, x - 87f + 174f * f, b.y - b.h - 47f, 4f, 4f, fill)
     }
 
     /** HUD over the rooms: level bar, room counter, health, power-ups, controls. */

@@ -169,6 +169,19 @@ object Sprites {
         SideWeapon.SMG -> "wpn_smg"
     }
 
+    /**
+     * Where the wheels are in each AI car picture: rear and front wheel centre (share of the width),
+     * wheel radius (share of the height), and whether to draw turning spokes (not on tracks).
+     * Measured by eye on the pictures; the car is scaled so these sit on the physics wheels.
+     */
+    val WHEELS = mapOf(
+        "car_motorbike" to floatArrayOf(0.12f, 0.86f, 0.22f, 1f),
+        "car_sedan" to floatArrayOf(0.14f, 0.60f, 0.17f, 1f),
+        "car_pickup" to floatArrayOf(0.14f, 0.60f, 0.19f, 1f),
+        "car_bus" to floatArrayOf(0.12f, 0.59f, 0.15f, 1f),
+        "car_tank" to floatArrayOf(0.15f, 0.85f, 0.12f, 0f),
+    )
+
     val CARS = arrayOf("car_motorbike", "car_sedan", "car_pickup", "car_bus", "car_tank")
 
     fun background(r: Region) = when (r) {

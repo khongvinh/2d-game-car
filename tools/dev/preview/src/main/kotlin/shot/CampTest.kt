@@ -49,10 +49,15 @@ fun main() {
     println("expedition: rooms=${run?.total} state=${g.state}")
     var t = 0f
     var died = false
-    while (g.rooms != null && t < 400f) {
+    var bossT = 0f
+    var bossShots = 0
+    while (g.rooms != null && t < 600f) {
         // endless rooms: stay alive for 3 rooms, then let the driver fall (run ends, loot kept)
         val idx = g.rooms?.index ?: 0
-        if (idx <= 3) g.driver.hp = g.driver.maxHp else if (!died) { g.driver.hp = 0f; died = true }
+        val bossRoom = g.rooms?.room?.roomBoss != null
+        if (bossRoom) bossT += 0.1f
+        if (idx <= 6 && bossT < 9f) g.driver.hp = g.driver.maxHp else if (!died) { g.driver.hp = 0f; died = true }
+        if (bossRoom && bossShots < 8 && (bossT * 10).toInt() % 10 == 5) shot(g, "v9_boss${bossShots++}")
         if (idx == 3 && t > 0f && g.state == State.PLAYING && g.rooms?.room?.foes?.size ?: 0 > 3) shot(g, "v7_room3")
         if (g.state == State.PICK) { tick(g, 0.45f); tap(g, "pick0"); t += 0.5f; continue }
         val r = g.rooms!!

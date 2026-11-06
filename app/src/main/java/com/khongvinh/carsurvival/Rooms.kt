@@ -59,6 +59,24 @@ class RoomBoss(val kind: Int, var x: Float, val tier: Int, hpMul: Float) {
     var anim = 0f
     var alive = true
 
+    /** Feet height (0 = floor, negative on a ledge) and vertical speed: walking bosses jump. */
+    var y = 0f
+    var vy = 0f
+    var jumpCd = 1.5f
+
+    /** Big cleaver swing: wind-up, then a sweep reaching a third of the room. */
+    var swingCd = 3f
+    var windT = 0f
+    var swingT = 0f
+    var swingDir = 1f
+
+    /** Turret: which kind of shot this volley fires, and a burst still being fired. */
+    var volley = 0
+    var burstLeft = 0
+    var burstCd = 0f
+    var volleyName = ""
+    var nameT = 0f
+
     /** Only for drawing the region boss with the road boss art. */
     val look = Boss(tier.coerceIn(1, 4), x, 0f)
     val w get() = if (kind == 0) 120f else if (kind == 1) 110f else look.w
@@ -67,7 +85,8 @@ class RoomBoss(val kind: Int, var x: Float, val tier: Int, hpMul: Float) {
 
 /** Spit, fireballs, dynamite and other things flying in a room. */
 class RoomShot(var x: Float, var y: Float, var vx: Float, var vy: Float, val kind: Int, val dmg: Float) {
-    /** 0 enemy spit, 1 boss fireball, 2 dynamite (the player's). */
+    /** 0 enemy spit, 1 boss fireball, 2 dynamite (the player's), 3 boss bomb (lobbed, bursts),
+     *  4 boss bullet (fast, straight), 5 homing orb. */
     var life = 4f
     var alive = true
 }
@@ -430,42 +449,124 @@ class RoomRules(private val g: Game) {
         b.dir = if (dx > 0f) 1f else -1f
         b.look.anim = b.anim
         b.fireCd -= dt
+        if (b.nameT > 0f) b.nameT -= dt
+        val rm = run.room
+        val dmgBase = 18f + run.stage * 1.5f
         when (b.kind) {
-            0 -> { // cannon turret: fans of fireballs
-                if (b.fireCd <= 0f) {
-                    b.fireCd = 2.2f
-                    for (k in -1..1) {
-                        val a = atan2(d.y - 60f - (-b.h + 30f), dx) + k * 0.18f
-                        run.room.shots.add(RoomShot(b.x, -b.h + 30f, cos(a) * 650f, sin(a) * 650f, 1, 18f + run.stage * 1.5f))
+            0 -> { // fixed gun: every volley is a different kind of shot
+                val gx = b.x
+                val gy = b.y - b.h + 30f
+                val aim = atan2(d.y - 60f - gy, dx)
+                if (b.burstLeft > 0) {
+                    b.burstCd -= dt
+                    if (b.burstCd <= 0f) {
+                        b.burstCd = 0.09f
+                        b.burstLeft--
+                        val a = aim + (Random.nextFloat() - 0.5f) * 0.12f
+                        rm.shots.add(RoomShot(gx, gy, cos(a) * 1100f, sin(a) * 1100f, 4, dmgBase * 0.35f).also { it.life = 2f })
+                        g.sfx.play(Sfx.S.SHOOT, 0.3f)
                     }
-                    g.sfx.play(Sfx.S.CATAPULT, 0.6f)
+                } else if (b.fireCd <= 0f) {
+                    b.fireCd = 2.4f
+                    when (b.volley % 4) {
+                        0 -> { // fan of five fireballs
+                            for (k in -2..2) {
+                                val a = aim + k * 0.16f
+                                rm.shots.add(RoomShot(gx, gy, cos(a) * 620f, sin(a) * 620f, 1, dmgBase))
+                            }
+                            b.volleyName = "QUẠT LỬA"
+                            g.sfx.play(Sfx.S.CATAPULT, 0.6f)
+                        }
+                        1 -> { // a rain of lobbed bombs around the player
+                            for (k in 0 until 4) {
+                                val tx = d.x + (k - 1.5f) * 160f
+                                val t = 1.1f + k * 0.12f
+                                rm.shots.add(RoomShot(gx, gy, (tx - gx) / t, (d.y - gy) / t - 0.5f * Game.G * t, 3, dmgBase * 1.2f).also { it.life = t + 0.5f })
+                            }
+                            b.volleyName = "MƯA BOM"
+                            g.sfx.play(Sfx.S.CATAPULT, 0.8f)
+                        }
+                        2 -> { // machine-gun burst
+                            b.burstLeft = 12
+                            b.burstCd = 0f
+                            b.volleyName = "XẢ ĐẠN"
+                        }
+                        else -> { // two slow homing orbs
+                            for (k in 0 until 2) {
+                                val a = aim + (k - 0.5f) * 1.2f
+                                rm.shots.add(RoomShot(gx, gy, cos(a) * 260f, sin(a) * 260f, 5, dmgBase * 1.1f).also { it.life = 4f })
+                            }
+                            b.volleyName = "CẦU TRUY ĐUỔI"
+                            g.sfx.play(Sfx.S.POWER, 0.6f)
+                        }
+                    }
+                    b.volley++
+                    b.nameT = 1.1f
                 }
             }
-            1 -> { // brute: lumbers over, then charges
-                if (b.chargeT > 0f) {
-                    b.chargeT -= dt
-                    b.x += b.dir * 620f * dt
+            else -> { // walking bosses: chase, jump after the driver, big cleaver sweeps
+                val onGround = b.vy == 0f
+                if (b.windT > 0f) {
+                    // winding up: stands still, telegraphs the sweep
+                    b.windT -= dt
+                    if (b.windT <= 0f) {
+                        b.swingT = 0.3f
+                        val reach = rm.width / 3f
+                        val dy = d.y - b.y
+                        if ((d.x - b.x) * b.swingDir in -40f..reach && dy > -b.h - 60f && dy < 60f) g.hurtDriver(38f + run.stage * 2.5f)
+                        g.shake = max(g.shake, 0.3f)
+                        g.sfx.play(Sfx.S.HIT, 1f)
+                    }
                 } else {
-                    b.x += b.dir * 70f * dt
-                    if (b.fireCd <= 0f && abs(dx) < 700f) {
-                        b.fireCd = 3.5f
-                        b.chargeT = 0.9f
-                        g.sfx.play(Sfx.S.ROAR, 0.6f)
+                    if (b.swingT > 0f) b.swingT -= dt
+                    b.swingCd -= dt
+                    b.jumpCd -= dt
+                    val speed = if (b.chargeT > 0f) 620f else 150f
+                    if (b.chargeT > 0f) b.chargeT -= dt
+                    if (abs(dx) > 30f) b.x += b.dir * speed * dt
+                    // jump up to the driver's ledge, or leap at him across the floor
+                    if (onGround && b.jumpCd <= 0f) {
+                        val up = b.y - d.y
+                        if (up > 60f && abs(dx) < 420f) {
+                            b.vy = -kotlin.math.sqrt(2f * Game.G * (up + 90f))
+                            b.jumpCd = 1.6f
+                        } else if (abs(dx) in 260f..700f && Random.nextFloat() < 0.5f) {
+                            b.vy = -620f
+                            b.chargeT = 0.7f
+                            b.jumpCd = 2.2f
+                            g.sfx.play(Sfx.S.ROAR, 0.5f)
+                        } else b.jumpCd = 0.6f
+                    }
+                    if (b.swingCd <= 0f && abs(dx) < rm.width / 3f && abs(d.y - b.y) < b.h && onGround) {
+                        b.windT = 0.65f
+                        b.swingDir = b.dir
+                        b.swingCd = 3.4f
+                        g.sfx.play(Sfx.S.ROAR, 0.7f)
+                    }
+                    // the region boss also hurls fire now and then
+                    if (b.kind == 2 && b.fireCd <= 0f) {
+                        b.fireCd = 2.2f
+                        val a = atan2(d.y - 60f - (b.y - b.h * 0.6f), dx)
+                        rm.shots.add(RoomShot(b.x, b.y - b.h * 0.6f, cos(a) * 560f, sin(a) * 560f, 1, dmgBase))
                     }
                 }
-            }
-            else -> { // big boss: closes in and hurls fire
-                b.x += b.dir * 55f * dt
-                if (b.fireCd <= 0f) {
-                    b.fireCd = 1.8f
-                    val a = atan2(d.y - 60f - (-b.h * 0.6f), dx)
-                    run.room.shots.add(RoomShot(b.x, -b.h * 0.6f, cos(a) * 560f, sin(a) * 560f, 1, 20f + run.stage * 1.5f))
+                // gravity, landing on ledges or the floor
+                if (b.vy != 0f || b.y > rm.support(b.x, b.y) + 0.5f || b.y < rm.support(b.x, b.y) - 0.5f) {
+                    b.vy += Game.G * dt
+                    var feet = b.y + b.vy * dt
+                    val gnd = rm.support(b.x, b.y)
+                    if (b.vy > 0f && feet >= gnd) {
+                        feet = gnd
+                        if (b.vy > 300f) { g.dustAt(b.x, gnd, 10, 180f); g.shake = max(g.shake, 0.2f) }
+                        b.vy = 0f
+                    }
+                    b.y = feet
                 }
             }
         }
         b.x = b.x.coerceIn(150f, run.room.width - 150f)
         b.look.x = b.x
-        if (abs(dx) < b.w / 2 + 20f && d.y > -b.h) g.hurtDriver((if (b.chargeT > 0f) 75f else 32f) * dt)
+        if (abs(dx) < b.w / 2 + 20f && d.y > b.y - b.h && d.y < b.y + 20f) g.hurtDriver((if (b.chargeT > 0f) 75f else 32f) * dt)
     }
 
     private fun stats(run: RoomRun): Triple<Float, Float, Int> {
@@ -515,7 +616,7 @@ class RoomRules(private val g: Game) {
                 best = dd; tx = z.x; ty = z.y - z.type.h * 0.55f
             }
         }
-        rm.roomBoss?.let { b -> if (b.alive) { val dd = hypot(b.x - gx, -b.h / 2 - gy) - b.w / 2; if (dd < best) { best = dd; tx = b.x; ty = -b.h / 2 } } }
+        rm.roomBoss?.let { b -> if (b.alive) { val dd = hypot(b.x - gx, b.y - b.h / 2 - gy) - b.w / 2; if (dd < best) { best = dd; tx = b.x; ty = b.y - b.h / 2 } } }
         if (best >= reach) {
             if (d.atkT <= 0f) d.aim = if (d.face > 0f) 0f else PI.toFloat()
             return
@@ -695,7 +796,7 @@ class RoomRules(private val g: Game) {
             }
             if (!s.alive) continue
             rm.roomBoss?.let { b ->
-                if (b.alive && b !in s.hit && abs(b.x - s.x) < b.w / 2 && s.y > -b.h - 20f) {
+                if (b.alive && b !in s.hit && abs(b.x - s.x) < b.w / 2 && s.y > b.y - b.h - 20f && s.y < b.y + 20f) {
                     s.hit.add(b)
                     hurtBoss(run, b, s.damage)
                     if (--s.pierce <= 0) s.alive = false
@@ -706,7 +807,16 @@ class RoomRules(private val g: Game) {
         for (s in rm.shots) {
             if (!s.alive) continue
             s.life -= dt
-            if (s.kind != 1) s.vy += Game.G * dt
+            if (s.kind == 5) {
+                // homing orb: steers towards the driver
+                val ax = d.x - s.x
+                val ay = d.y - 60f - s.y
+                val l = max(1f, hypot(ax, ay))
+                s.vx += ax / l * 520f * dt
+                s.vy += ay / l * 520f * dt
+                val v = hypot(s.vx, s.vy)
+                if (v > 330f) { s.vx *= 330f / v; s.vy *= 330f / v }
+            } else if (s.kind != 1 && s.kind != 4) s.vy += Game.G * dt
             s.x += s.vx * dt
             s.y += s.vy * dt
             if (s.kind == 2) {
@@ -717,9 +827,17 @@ class RoomRules(private val g: Game) {
                 }
                 continue
             }
+            if (s.kind == 3 && (s.life <= 0f || s.y > rm.support(s.x, s.y - 1f))) {
+                // boss bomb bursts where it lands
+                s.alive = false
+                g.explodeAt(s.x, s.y, 24)
+                g.sfx.play(Sfx.S.BOOM, 0.5f)
+                if (abs(d.x - s.x) < 130f && abs(d.y - s.y) < 130f) g.hurtDriver(s.dmg)
+                continue
+            }
             if (s.life <= 0f || s.y > 0f || s.x < 0f || s.x > rm.width) {
                 s.alive = false
-                if (s.kind == 1) g.sparksAt(s.x, min(s.y, 0f))
+                if (s.kind == 1 || s.kind == 4 || s.kind == 5) g.sparksAt(s.x, min(s.y, 0f))
                 continue
             }
             if (abs(s.x - d.x) < 26f && s.y > d.y - 100f && s.y < d.y + 6f) {
@@ -820,7 +938,7 @@ class RoomRules(private val g: Game) {
         g.sfx.play(Sfx.S.BOOM, 0.5f)
         g.shake = max(g.shake, 0.12f)
         for (f in run.room.foes.toList()) if (f !== skip && f.z.alive && hypot(f.z.x - x, f.z.y - f.z.type.h / 2 - y) < r) hurt(run, f, dmg, sign(f.z.x - x) * 200f)
-        run.room.roomBoss?.let { b -> if (b.alive && hypot(b.x - x, -b.h / 2 - y) < r + b.w / 2) hurtBoss(run, b, dmg) }
+        run.room.roomBoss?.let { b -> if (b.alive && hypot(b.x - x, b.y - b.h / 2 - y) < r + b.w / 2) hurtBoss(run, b, dmg) }
     }
 
     private fun gainXp(run: RoomRun, n: Int) {

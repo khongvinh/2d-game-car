@@ -133,20 +133,28 @@ HINH = [
     ("nhan_vat", "survivor_shoot", "male survivor, red cap, brown leather jacket, blue jeans, boots, aiming pistol forward", "nguoi", DOC),
     ("nhan_vat", "survivor_hurt", "male survivor, red cap, leather jacket, blue jeans, flinching in pain", True, VUONG),
     ("nhan_vat", "survivor_ride", "one man sitting, red cap, red leather jacket, blue jeans, knees bent, hands forward, no vehicle", "nguoi", DOC),
+    ("nhan_vat", "survivor_unarmed", "male survivor, red cap, red leather jacket, blue jeans, boots, empty hands, fists, standing", "nguoi", DOC),
+    ("nhan_vat", "survivor_hold_pistol", "male survivor, red cap, red leather jacket, blue jeans, holding small pistol forward", "nguoi", DOC),
+    ("nhan_vat", "survivor_hold_smg", "male survivor, red cap, red leather jacket, blue jeans, holding submachine gun", "nguoi", DOC),
+    ("nhan_vat", "survivor_hold_shotgun", "male survivor, red cap, red leather jacket, blue jeans, holding shotgun", "nguoi", DOC),
+    ("nhan_vat", "survivor_hold_bow", "male survivor, red cap, red leather jacket, blue jeans, holding wooden bow", "nguoi", DOC),
+    ("nhan_vat", "survivor_hold_spear", "male survivor, red cap, red leather jacket, blue jeans, holding long spear", "nguoi", DOC),
+    ("nhan_vat", "survivor_hold_axe", "male survivor, red cap, red leather jacket, blue jeans, holding axe", "nguoi", DOC),
+    ("nhan_vat", "survivor_hold_dart", "male survivor, red cap, red leather jacket, blue jeans, holding throwing knife", "nguoi", DOC),
     ("nhan_vat", "survivor_dead", "male survivor in red cap lying knocked out on the ground", True, VUONG),
     ("nhan_vat", "merchant", "burly merchant, red bandana, beard, green vest, hook hand", True, VUONG),
     # --- Zombie và trùm ---
-    ("zombie", "zombie_walker", "shambling green-skinned zombie in torn plaid shirt and jeans, arms reaching forward, walking", "nguoi", DOC),
-    ("zombie", "zombie_runner", "fast skinny grey zombie in rags sprinting, leaning forward", "nguoi", DOC),
-    ("zombie", "zombie_fat", "huge fat bloated green zombie in torn overalls, waddling", "nguoi", DOC),
-    ("zombie", "zombie_spitter", "hunched green zombie with swollen glowing acid throat and dripping mouth, walking", "nguoi", DOC),
-    ("zombie", "zombie_armored", "zombie wearing dented riot police armor and cracked helmet, walking", "nguoi", DOC),
-    ("zombie", "zombie_bat", "mutant zombie bat flying, wings spread", True, VUONG),
-    ("zombie", "zombie_crawler", "legless zombie crawling on its hands", True, VUONG),
-    ("zombie", "zombie_dog", "rabid rotten zombie dog running", True, VUONG),
-    ("zombie", "boss_brute", "giant muscular butcher zombie boss with bloody apron and huge cleaver, walking", "nguoi", DOC),
-    ("zombie", "boss_mutant_worm", "giant pink mutant worm boss rearing up, round mouth full of teeth", True, VUONG),
-    ("zombie", "boss_tank_zombie", "massive hulking zombie boss with rusty metal plates bolted onto its body, walking", "nguoi", DOC),
+    ("zombie", "zombie_walker", "green zombie, torn plaid shirt, jeans, arms reaching forward, walking", "nguoi", DOC),
+    ("zombie", "zombie_runner", "skinny grey zombie, torn white shirt, sprinting, leaning forward", "nguoi", DOC),
+    ("zombie", "zombie_fat", "huge fat green zombie, torn overalls, heavy walk", "nguoi", DOC),
+    ("zombie", "zombie_spitter", "hunched green zombie, glowing acid throat, drooling, walking", "nguoi", DOC),
+    ("zombie", "zombie_armored", "zombie in riot police armor, cracked helmet, walking", "nguoi", DOC),
+    ("zombie", "zombie_bat", "mutant zombie bat flying, wings spread, side view, facing right", True, VUONG),
+    ("zombie", "zombie_crawler", "legless zombie crawling on its hands, side view, facing right", True, NGANG),
+    ("zombie", "zombie_dog", "rabid rotten zombie dog running, side view, facing right", True, NGANG),
+    ("zombie", "boss_brute", "giant muscular zombie butcher, bloody apron, huge cleaver, walking", "nguoi", DOC),
+    ("zombie", "boss_mutant_worm", "giant pink mutant worm boss rearing up, toothed mouth, side view, facing right", True, VUONG),
+    ("zombie", "boss_tank_zombie", "massive hulking zombie, rusty metal plates on body, walking", "nguoi", DOC),
     # --- Xe (nhìn ngang, đầu xe bên phải) ---
     ("xe", "car_motorbike", "rusty dirt motorbike with rider seat", True, NGANG),
     ("xe", "car_sedan", "rusty orange sedan, armor plates, bull bar, " + NGANG_HAN, True, NGANG),
@@ -287,9 +295,28 @@ HINH = [
 ]
 
 # Ảnh hỏng: xóa rồi vẽ lại MỘT lần cho mỗi ĐỢT (đổi DOT để vẽ lại đợt mới).
-# Không còn ảnh cần vẽ lại (những ảnh AI không vẽ được đã chuyển sang vẽ bằng code).
-DOT = "dot6"
-VE_LAI = set()
+# Đợt 7: vẽ lại TOÀN BỘ zombie và trùm (mô tả gọn, nhìn ngang, quay phải).
+DOT = "dot7"
+VE_LAI = {
+    "zombie_walker", "zombie_runner", "zombie_fat", "zombie_spitter", "zombie_armored",
+    "zombie_bat", "zombie_crawler", "zombie_dog", "boss_brute", "boss_tank_zombie", "boss_mutant_worm",
+}
+
+# --- Xe gắn sẵn vũ khí (vẽ từ ảnh xe gốc bằng img2img để giữ nguyên dáng xe) ---
+# Mỗi xe x mỗi vũ khí gắn xe trong gara; xe máy có người lái ngồi trên.
+XE_GOC = {
+    "car_motorbike": "rusty motorbike, rider in red cap and red jacket",
+    "car_sedan": "rusty orange sedan car",
+    "car_pickup": "armored orange pickup truck",
+    "car_bus": "armored orange school bus",
+    "car_tank": "olive military tank",
+}
+VU_KHI_XE = {
+    "pistol": "twin pistols", "knife": "steel blades on the front bumper", "smg": "submachine gun",
+    "crossbow": "heavy crossbow", "shotgun": "double barrel shotgun", "catapult": "small catapult",
+    "flamer": "flamethrower", "rocket": "rocket launcher", "laser": "laser cannon", "minigun": "rotary minigun",
+}
+DO_GIU_XE = 0.55   # img2img strength: thấp = giữ xe gốc nhiều hơn, cao = vẽ vũ khí rõ hơn (0.45-0.65)
 
 
 # 6. HÀM XỬ LÝ ÂM THANH
@@ -364,6 +391,28 @@ def loc_rac(anh):
         l, t, r, b = hop
         ra = ra.crop((max(0, l - 8), max(0, t - 8), min(ra.width, r + 8), min(ra.height, b + 8)))
     return ra
+
+_i2i = None
+def ve_xe_vu_khi(goc_path, mo_ta, ten):
+    """Vẽ lại ảnh xe gốc kèm vũ khí (img2img, cùng phong cách), trả về ảnh tạm."""
+    global _i2i
+    if _i2i is None:
+        from diffusers import AutoPipelineForImage2Image
+        _i2i = AutoPipelineForImage2Image.from_pipe(pipe)
+    goc = Image.open(goc_path).convert("RGBA")
+    nen = Image.new("RGB", goc.size, (255, 255, 255))
+    nen.paste(goc, mask=goc.split()[3])
+    w, h = nen.size
+    k = 1024 / max(w, h)
+    nen = nen.resize((int(w * k) // 8 * 8, int(h * k) // 8 * 8))
+    seed = SEED_GOC + zlib.crc32(ten.encode()) % 100000
+    p = f"{mo_ta}, {PHONG_CACH}"
+    image = _i2i(prompt=p, negative_prompt=CAM, image=nen, strength=DO_GIU_XE,
+                 num_inference_steps=max(SO_BUOC, int(SO_BUOC / DO_GIU_XE) + 1), guidance_scale=DO_BAM_SAT,
+                 generator=torch.Generator("cuda").manual_seed(seed)).images[0]
+    tam = "/content/temp_i2i.png"
+    image.save(tam)
+    return tam
 
 _rembg = None
 def xoa_phong_va_cat(duong_vao, duong_ra):
@@ -447,6 +496,28 @@ def chay():
             print(f"   => Đã xong: {dich}")
         except Exception as e:
             print(f"   ❌ Lỗi vẽ ảnh: {e}")
+
+    # --- A2. XE GẮN SẴN VŨ KHÍ ---
+    print("\n--- 🚗 XE GẮN SẴN VŨ KHÍ ---")
+    os.makedirs(f"{THU_MUC}/xe_vu_khi", exist_ok=True)
+    for xe, mo_xe in XE_GOC.items():
+        goc = f"{THU_MUC}/xe/{xe}.png"
+        if not os.path.exists(goc):
+            print("⚠️  Thiếu ảnh xe gốc:", goc); continue
+        for vk, mo_vk in VU_KHI_XE.items():
+            ten = f"{xe}_{vk}"
+            dich = f"{THU_MUC}/xe_vu_khi/{ten}.png"
+            if os.path.exists(dich):
+                bo_qua += 1; continue
+            gan = "with " + mo_vk + (" in rider hands" if xe == "car_motorbike" and vk != "knife" else
+                                     "" if vk == "knife" else " mounted on the roof")
+            mo_ta = f"{mo_xe}, {gan}, side view, facing right"
+            print(f"🚗 {ten}  ({dem_token(mo_ta + ', ' + PHONG_CACH)} token)")
+            try:
+                xoa_phong_va_cat(ve_xe_vu_khi(goc, mo_ta, ten), dich)
+                xong += 1
+            except Exception as e:
+                print("   ❌ Lỗi:", e)
 
     # --- B. TẠO ÂM THANH ---
     print("\n--- 🔊 BẮT ĐẦU TẠO ÂM THANH ---")
