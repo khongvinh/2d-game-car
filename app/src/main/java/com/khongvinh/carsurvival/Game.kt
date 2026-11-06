@@ -24,7 +24,7 @@ import kotlin.random.Random
 class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
     companion object {
         /** Shown on the menu so the installed build is easy to check. */
-        const val VERSION = "8.7"
+        const val VERSION = "8.8"
 
         const val VIRTUAL_HEIGHT = 720f
         const val METER = 30f
@@ -35,6 +35,10 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
         const val LEVELS_PER_STAGE = 5
         const val MAX_PER_HUNDRED = 9
         const val ZOOM = 0.8f
+
+        /** The warehouse search is shown closer than the road so the fighters are big. */
+        const val ROOM_ZOOM = 1.2f
+        const val CAMP_VIEW = 1750f
 
         /** Storm phases: Bo 1 (60 s), Bo 2 (20 s), Bo 3 (5 s), then fully closed. */
         val PHASE_TIME = floatArrayOf(60f, 20f, 5f)
@@ -79,6 +83,8 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
     var camX = 0f
     var camY = 0f
     val viewW get() = W / ZOOM
+    val roomViewW get() = W / ROOM_ZOOM
+    val roomViewH get() = H / ROOM_ZOOM
     val viewH get() = H / ZOOM
 
     var stormX = 0f
@@ -958,7 +964,8 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
         d.vy = 0f
         d.face = 1f
         d.shieldT = 0f
-        run.camX = d.x - viewW * 0.42f
+        run.camX = d.x - roomViewW * 0.42f
+        run.camY = -roomViewH * 0.76f
         roomProjectiles.clear()
         particles.clear()
         texts.clear()
@@ -998,7 +1005,8 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
             d.x = run.room.entryX
             d.y = 0f
             d.vy = 0f
-            run.camX = d.x - viewW * 0.42f
+            run.camX = d.x - roomViewW * 0.42f
+            run.camY = -roomViewH * 0.76f
             roomProjectiles.clear()
             particles.clear()
             texts.clear()
@@ -1309,12 +1317,17 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
             State.PLAYING -> updatePlay(dt)
             State.PAUSED, State.SOUND, State.PICK -> {}
             State.CAMP -> {
+                campCamX += (-120f - campCamX) * min(1f, dt * 3f)
                 if (campaign.bannerT > 0f) campaign.bannerT -= dt
                 updateEffects(dt)
             }
             State.SIEGE -> {
                 campaign.updateSiege(dt)
                 updateEffects(dt)
+                // follow the fight: look out towards the horde, but never lose the wall
+                val front = campaign.foes.minOfOrNull { it.z.x } ?: 0f
+                val want = if (campaign.foes.isEmpty()) -120f else (front - CAMP_VIEW * 0.8f).coerceIn(-120f, 560f)
+                campCamX += (want - campCamX) * min(1f, dt * 1.5f)
             }
             else -> {
                 updateEffects(dt)
@@ -3136,8 +3149,10 @@ class Game(val save: SaveData, val sfx: Sfx, val music: Music) {
     }
 
     // camp layout: a fixed view of x -150..2450 with the ground at 80% of the screen
-    val campZoom get() = W / 2600f
-    fun campX(wx: Float) = (wx + 150f) * campZoom
+    /** Camp view: about 1900 world units wide (was 2600) so people and monsters read bigger; pans at night. */
+    val campZoom get() = W / CAMP_VIEW
+    var campCamX = -120f
+    fun campX(wx: Float) = (wx - campCamX) * campZoom
     fun campY(wy: Float) = H * 0.8f + wy * campZoom
 
     fun slotHit(i: Int): FloatArray {

@@ -84,7 +84,7 @@ class Campaign(private val g: Game) {
         val WALL_NAMES = arrayOf("Tường gỗ", "Tường sắt", "Tường bê tông")
 
         /** Slot positions: 0 on the wall, 1 on the watchtower, 2..6 on the ground in front. */
-        val SLOT_X = floatArrayOf(WALL_X + 20f, 470f, 920f, 1110f, 1300f, 1490f, 1680f)
+        val SLOT_X = floatArrayOf(WALL_X + 20f, 470f, 900f, 1060f, 1220f, 1380f, 1540f)
         const val SLOTS = 7
     }
 

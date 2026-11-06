@@ -223,6 +223,9 @@ class RoomRun(val stage: Int, val region: Region, private val seed: Int, val tot
     var merchantQueued = 0
 
     var camX = 0f
+
+    /** Top of the view in world units (follows the driver up onto the ledges). */
+    var camY = -500f
     var dynCd = 2f
     var batCd = 2f
     var adrenT = 0f
@@ -336,7 +339,9 @@ class RoomRules(private val g: Game) {
                 g.sfx.play(Sfx.S.POWER, 0.7f)
             }
         }
-        run.camX += ((d.x - g.viewW * 0.42f).coerceIn(-120f, max(-120f, rm.width - g.viewW + 120f)) - run.camX) * min(1f, dt * 6f)
+        run.camX += ((d.x - g.roomViewW * 0.42f).coerceIn(-30f, max(-30f, rm.width - g.roomViewW + 30f)) - run.camX) * min(1f, dt * 6f)
+        val wantY = (min(0f, d.y) - g.roomViewH * 0.76f).coerceIn(-720f, -g.roomViewH * 0.76f)
+        run.camY += (wantY - run.camY) * min(1f, dt * 4f)
     }
 
     private fun updateFoes(run: RoomRun, dt: Float) {

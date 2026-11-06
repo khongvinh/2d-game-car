@@ -25,7 +25,7 @@ internal fun Renderer.drawCamp(c: Canvas) {
     val z = g.campZoom
     c.translate(0f, H * 0.8f)
     c.scale(z, z)
-    c.translate(150f, 0f)
+    c.translate(-g.campCamX, 0f)
     // ground
     val th = g.theme
     fill.color = th.ground[0]
@@ -115,7 +115,7 @@ internal fun Renderer.drawCamp(c: Canvas) {
         val zz = f.z
         val pic = Sprites.foe(f, cp.isBoss(f), cp.region)
         val sway = sin(zz.phase)
-        val big = if (cp.isBoss(f)) 220f else zz.type.h * 1.3f
+        val big = if (cp.isBoss(f)) 270f else zz.type.h * 1.6f
         val steps = (cp.isBoss(f) && pic == "boss_brute") || (!cp.isBoss(f) && Sprites.walks(zz.type))
         if (steps && walkSprite(c, pic, zz.x, zz.y + 4f, big, true, stepPhase(zz.x, big, true) + zz.gaitOff, if (cp.isBoss(f)) 16f else Sprites.stride(zz.type), lean = 4f, shamble = if (cp.isBoss(f)) 0.6f else Sprites.shamble(zz.type))) {
             // legs stepping, cut from the AI picture
@@ -294,8 +294,8 @@ private fun Renderer.drawDef(c: Canvas, d: Def, x: Float, y: Float) {
     val hit = d.flash > 0f
     val h = when {
         d.type == DefType.MINE -> 34f
-        d.type.blocks -> 120f
-        else -> 130f
+        d.type.blocks -> 140f
+        else -> 160f
     }
     val kick = if (d.fireT > 0f) -8f else 0f
     val shake = if (hit) (kotlin.random.Random.nextFloat() - 0.5f) * 6f else 0f

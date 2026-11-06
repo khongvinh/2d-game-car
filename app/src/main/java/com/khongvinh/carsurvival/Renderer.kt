@@ -5320,12 +5320,12 @@ class Renderer(internal val g: Game) {
             val s = g.shake * 30f
             c.translate((Random.nextFloat() - 0.5f) * s, (Random.nextFloat() - 0.5f) * s)
         }
-        c.scale(Game.ZOOM, Game.ZOOM)
-        val camY = -g.viewH * 0.72f
+        c.scale(Game.ROOM_ZOOM, Game.ROOM_ZOOM)
+        val camY = run.camY
         c.translate(-run.camX, -camY)
         val ceil = -600f
         val x0 = run.camX - 100f
-        val x1 = run.camX + g.viewW + 100f
+        val x1 = run.camX + g.roomViewW + 100f
         if (!hall) {
             // far mesas outside
             fill.color = shade(sky[0], 0.75f)
