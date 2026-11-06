@@ -27,6 +27,9 @@ CUT_LEFT = {"survivor_run": 0.4}
 CUT_RIGHT = {}
 
 
+# weapons the AI drew standing upright with the tip up
+TIP_UP = {"wpn_knife_throw"}
+
 # pictures where the AI drew a second, smaller copy: keep only the big one
 ONLY_BIGGEST = {"car_sedan", "car_tank", "wpn_mount_rocket", "prop_catwalk", "wpn_smg", "wpn_shotgun", "wpn_laser", "wpn_minigun", "part_chassis",
                 "part_gun_barrel", "survivor_dead"}
@@ -109,7 +112,7 @@ if V2:
                    "wpn_mount_laser", "wpn_mount_shotgun", "wpn_mount_pistol", "wpn_mount_smg",
                    "survivor_ride", "wpn_flamethrower"}
     CUT_LEFT = {}
-    CUT_RIGHT = {"survivor_ride": 0.7}   # a piece of vehicle the AI drew on the right
+    CUT_RIGHT = {"survivor_ride": 0.7, "wpn_knife_throw": 0.2}   # extra copies / junk the AI drew on the right
 root = os.path.join(os.path.dirname(__file__), "..", "..", "app", "src", "main", "assets")
 img_dir = os.path.join(root, "img")
 os.makedirs(img_dir, exist_ok=True)
@@ -148,6 +151,8 @@ for group in sorted(os.listdir(src)):
                     im = top_band(im)
                 if name in FACING_LEFT:
                     im = im.transpose(Image.FLIP_LEFT_RIGHT)
+                if name in TIP_UP:
+                    im = im.transpose(Image.ROTATE_270)  # drawn standing, tip up: lay it down, tip right
                 # full colour, but no bigger than the screen ever shows it: a
                 # 1024 px RGBA bitmap takes 4 MB of phone memory once decoded
                 im.thumbnail((512, 512))
