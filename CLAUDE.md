@@ -39,3 +39,4 @@ GitHub Actions "Build APK" xanh → gửi APK cho người dùng.
 - Mọi thứ trong game còn vẽ bằng code, hoặc ảnh AI bị lỗi (sai hướng, dính rác, sai nội dung, không đồng đều),
   trợ lý TỰ đề xuất và viết/bổ sung script Colab (tools/assets/) để vẽ bằng AI, nối sẵn tên ảnh trong code
   (có ảnh thì tự dùng, chưa có thì vẽ code tạm), rồi báo người dùng danh sách cần chạy.
+- Người dùng render xong → làm theo skill `/nhap-anh` (`.claude/skills/nhap-anh/SKILL.md`): tải, duyệt từng ảnh, nhập, build, gửi APK.
