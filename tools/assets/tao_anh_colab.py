@@ -133,10 +133,10 @@ HINH = [
     ("nhan_vat", "survivor_shoot", "male survivor, red cap, brown leather jacket, blue jeans, boots, aiming pistol forward", "nguoi", DOC),
     ("nhan_vat", "survivor_hurt", "male survivor, red cap, leather jacket, blue jeans, flinching in pain", True, VUONG),
     ("nhan_vat", "survivor_ride", "one man sitting, red cap, red leather jacket, blue jeans, knees bent, hands forward, no vehicle", "nguoi", DOC),
-    ("nhan_vat", "survivor_unarmed", "male survivor, red cap, red leather jacket, blue jeans, boots, empty hands, fists, standing", "nguoi", DOC),
+    ("nhan_vat", "survivor_unarmed", "male survivor, red cap, red jacket, blue jeans, boots, empty hands, full body head to boots", "nguoi", DOC),
     ("nhan_vat", "survivor_hold_pistol", "male survivor, red cap, red leather jacket, blue jeans, holding small pistol forward", "nguoi", DOC),
-    ("nhan_vat", "survivor_hold_smg", "male survivor, red cap, red leather jacket, blue jeans, holding submachine gun", "nguoi", DOC),
-    ("nhan_vat", "survivor_hold_shotgun", "male survivor, red cap, red leather jacket, blue jeans, holding shotgun", "nguoi", DOC),
+    ("nhan_vat", "survivor_hold_smg", "male survivor, red cap, red jacket, blue jeans, one submachine gun in both hands", "nguoi", DOC),
+    ("nhan_vat", "survivor_hold_shotgun", "male survivor, red cap, red jacket, blue jeans, one long shotgun in both hands", "nguoi", DOC),
     ("nhan_vat", "survivor_hold_bow", "male survivor, red cap, red leather jacket, blue jeans, holding wooden bow", "nguoi", DOC),
     ("nhan_vat", "survivor_hold_spear", "male survivor, red cap, red leather jacket, blue jeans, holding long spear", "nguoi", DOC),
     ("nhan_vat", "survivor_hold_axe", "male survivor, red cap, red leather jacket, blue jeans, holding axe", "nguoi", DOC),
@@ -295,18 +295,16 @@ HINH = [
 ]
 
 # Ảnh hỏng: xóa rồi vẽ lại MỘT lần cho mỗi ĐỢT (đổi DOT để vẽ lại đợt mới).
-# Đợt 7: vẽ lại TOÀN BỘ zombie và trùm (mô tả gọn, nhìn ngang, quay phải).
-DOT = "dot7"
-VE_LAI = {
-    "zombie_walker", "zombie_runner", "zombie_fat", "zombie_spitter", "zombie_armored",
-    "zombie_bat", "zombie_crawler", "zombie_dog", "boss_brute", "boss_tank_zombie", "boss_mutant_worm",
-}
+# Đợt 8: tài xế tay không (đợt 7 bị cắt mất chân), tiểu liên/hoa cải (cầm 2 súng), và VẼ LẠI 50 ảnh
+# xe gắn vũ khí (đợt 7: img2img giữ xe quá chặt nên KHÔNG thấy vũ khí; sedan ra 3 chiếc).
+DOT = "dot8"
+VE_LAI = {"survivor_unarmed", "survivor_hold_smg", "survivor_hold_shotgun"}
 
 # --- Xe gắn sẵn vũ khí (vẽ từ ảnh xe gốc bằng img2img để giữ nguyên dáng xe) ---
 # Mỗi xe x mỗi vũ khí gắn xe trong gara; xe máy có người lái ngồi trên.
 XE_GOC = {
     "car_motorbike": "rusty motorbike, rider in red cap and red jacket",
-    "car_sedan": "rusty orange sedan car",
+    "car_sedan": "one rusty orange sedan car",
     "car_pickup": "armored orange pickup truck",
     "car_bus": "armored orange school bus",
     "car_tank": "olive military tank",
@@ -316,7 +314,8 @@ VU_KHI_XE = {
     "crossbow": "heavy crossbow", "shotgun": "double barrel shotgun", "catapult": "small catapult",
     "flamer": "flamethrower", "rocket": "rocket launcher", "laser": "laser cannon", "minigun": "rotary minigun",
 }
-DO_GIU_XE = 0.55   # img2img strength: thấp = giữ xe gốc nhiều hơn, cao = vẽ vũ khí rõ hơn (0.45-0.65)
+DO_GIU_XE = 0.72   # img2img strength: thấp = giữ xe gốc nhiều hơn, cao = vẽ vũ khí rõ hơn (đợt 7: 0.55 không thấy vũ khí)
+VE_LAI_XE = True   # đợt 8: xóa và vẽ lại toàn bộ 50 ảnh xe gắn vũ khí (đặt False sau khi xong)
 
 
 # 6. HÀM XỬ LÝ ÂM THANH
@@ -507,10 +506,16 @@ def chay():
         for vk, mo_vk in VU_KHI_XE.items():
             ten = f"{xe}_{vk}"
             dich = f"{THU_MUC}/xe_vu_khi/{ten}.png"
+            da_lam = f"{THU_MUC}/_da_ve_lai_{DOT}.txt"
+            xong_roi = set(open(da_lam).read().split()) if os.path.exists(da_lam) else set()
+            if VE_LAI_XE and os.path.exists(dich) and ten not in xong_roi:
+                os.remove(dich)
+                with open(da_lam, "a") as f:
+                    f.write(ten + "\n")
             if os.path.exists(dich):
                 bo_qua += 1; continue
-            gan = "with " + mo_vk + (" in rider hands" if xe == "car_motorbike" and vk != "knife" else
-                                     "" if vk == "knife" else " mounted on the roof")
+            gan = "big " + mo_vk + (" in rider hands" if xe == "car_motorbike" and vk != "knife" else
+                                    " on front bumper" if vk == "knife" else " turret on the roof")
             mo_ta = f"{mo_xe}, {gan}, side view, facing right"
             print(f"🚗 {ten}  ({dem_token(mo_ta + ', ' + PHONG_CACH)} token)")
             try:

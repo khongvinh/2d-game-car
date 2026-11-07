@@ -113,7 +113,8 @@ src = sys.argv[1]
 V2 = "--v2" in sys.argv[2:]
 if V2:
     # bộ 2 (vẽ lại lần 3, prompt dưới 77 token): những ảnh AI vẫn vẽ quay trái
-    FACING_LEFT = {"survivor_idle", "survivor_run", "survivor_shoot", "zombie_walker", "zombie_spitter", "zombie_crawler", "car_sedan", "car_motorbike", "car_tank",
+    # đợt 7: walker, runner, spitter, crawler, giáo quay trái
+    FACING_LEFT = {"survivor_idle", "survivor_run", "survivor_shoot", "zombie_walker", "zombie_runner", "zombie_spitter", "survivor_hold_spear", "zombie_crawler", "car_sedan", "car_motorbike", "car_tank",
                    "wpn_mount_laser", "wpn_mount_shotgun", "wpn_mount_pistol", "wpn_mount_smg",
                    "survivor_ride", "wpn_flamethrower"}
     CUT_LEFT = {}
