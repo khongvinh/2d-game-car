@@ -4786,8 +4786,9 @@ class Renderer(internal val g: Game) {
 
     private fun heldWeapon(c: Canvas, w: SideWeapon, d: Driver, f: Float, bodyRot: Float, sc: Float, pic: String) {
         val rig = Rig.of(pic) ?: return
-        val hx = rig.w * 0.73f
-        val hy = rig.h * 0.47f
+        // front hand in the picture (the empty-handed AI driver is drawn front-on, hands lower and wider)
+        val hx = rig.w * (if (pic == "survivor_unarmed") 0.85f else 0.73f)
+        val hy = rig.h * (if (pic == "survivor_unarmed") 0.50f else 0.47f)
         // world aim -> this flipped, tilted frame
         val aimLocal = (if (f > 0f) d.aim else PI.toFloat() - d.aim) * 180f / PI.toFloat() - bodyRot
         val idle = d.atkT <= 0f && (d.aim == 0f || d.aim == PI.toFloat())

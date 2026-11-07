@@ -42,7 +42,7 @@ fun main() {
         }
     }
     // expedition (god mode bot)
-    save.side = com.khongvinh.carsurvival.SideWeapon.AXE.ordinal
+    save.side = com.khongvinh.carsurvival.SideWeapon.SMG.ordinal
     tap(g, "expedition"); tick(g, 0.6f)
     var throwShots = 0
     val run = g.rooms

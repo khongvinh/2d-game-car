@@ -295,10 +295,9 @@ HINH = [
 ]
 
 # Ảnh hỏng: xóa rồi vẽ lại MỘT lần cho mỗi ĐỢT (đổi DOT để vẽ lại đợt mới).
-# Đợt 8: tài xế tay không (đợt 7 bị cắt mất chân), tiểu liên/hoa cải (cầm 2 súng), và VẼ LẠI 50 ảnh
-# xe gắn vũ khí (đợt 7: img2img giữ xe quá chặt nên KHÔNG thấy vũ khí; sedan ra 3 chiếc).
-DOT = "dot8"
-VE_LAI = {"survivor_unarmed", "survivor_hold_smg", "survivor_hold_shotgun"}
+# Không còn ảnh cần vẽ lại. Tài xế cầm tiểu liên/hoa cải: AI vẽ 2 khẩu súng lục 2 lần liền → thôi, game ghép vũ khí.
+DOT = "dot9"
+VE_LAI = set()
 
 # --- Xe gắn sẵn vũ khí (vẽ từ ảnh xe gốc bằng img2img để giữ nguyên dáng xe) ---
 # Mỗi xe x mỗi vũ khí gắn xe trong gara; xe máy có người lái ngồi trên.
@@ -315,7 +314,10 @@ VU_KHI_XE = {
     "flamer": "flamethrower", "rocket": "rocket launcher", "laser": "laser cannon", "minigun": "rotary minigun",
 }
 DO_GIU_XE = 0.72   # img2img strength: thấp = giữ xe gốc nhiều hơn, cao = vẽ vũ khí rõ hơn (đợt 7: 0.55 không thấy vũ khí)
-VE_LAI_XE = True   # đợt 8: xóa và vẽ lại toàn bộ 50 ảnh xe gắn vũ khí (đặt False sau khi xong)
+VE_LAI_XE = False
+# img2img không thêm được vũ khí lên xe (thử 0,55 và 0,72 đều ra xe trơn) → TẮT mục xe gắn vũ khí;
+# game ghép súng nóc bằng ảnh wpn_mount_* (đã đẹp). Đặt True nếu muốn thử cách khác.
+VE_XE_VU_KHI = False
 
 
 # 6. HÀM XỬ LÝ ÂM THANH
@@ -499,7 +501,7 @@ def chay():
     # --- A2. XE GẮN SẴN VŨ KHÍ ---
     print("\n--- 🚗 XE GẮN SẴN VŨ KHÍ ---")
     os.makedirs(f"{THU_MUC}/xe_vu_khi", exist_ok=True)
-    for xe, mo_xe in XE_GOC.items():
+    for xe, mo_xe in (XE_GOC.items() if VE_XE_VU_KHI else []):
         goc = f"{THU_MUC}/xe/{xe}.png"
         if not os.path.exists(goc):
             print("⚠️  Thiếu ảnh xe gốc:", goc); continue
