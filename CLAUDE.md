@@ -40,3 +40,10 @@ GitHub Actions "Build APK" xanh → gửi APK cho người dùng.
   trợ lý TỰ đề xuất và viết/bổ sung script Colab (tools/assets/) để vẽ bằng AI, nối sẵn tên ảnh trong code
   (có ảnh thì tự dùng, chưa có thì vẽ code tạm), rồi báo người dùng danh sách cần chạy.
 - Người dùng render xong → làm theo skill `/nhap-anh` (`.claude/skills/nhap-anh/SKILL.md`): tải, duyệt từng ảnh, nhập, build, gửi APK.
+
+## Tuân thủ Google Play (bắt buộc, người dùng dặn)
+- Người dùng chuẩn bị đưa game lên Google Play và đã chấp nhận Thỏa thuận Phân phối cho Nhà phát triển (DDA).
+  Mọi việc phải theo `docs/TUAN_THU_GOOGLE_PLAY.md`: không dùng/nhắc tên, hình, âm thanh của game/thương
+  hiệu khác; chỉ dùng asset/thư viện có giấy phép thương mại và ghi vào `docs/NGUON_TAI_NGUYEN.md`;
+  không xin quyền/SDK thu dữ liệu khi chưa báo; ký bằng khóa upload riêng khi phát hành.
+- Trước mỗi bản lên Play: rà tuân thủ và báo rủi ro cho người dùng.

@@ -392,6 +392,9 @@ Tài liệu bàn giao để tiếp tục làm việc ở phiên chat mới mà k
 - Bỏ: survivor_hold_smg/shotgun (lần 2 vẫn vẽ 2 khẩu súng lục) → thôi vẽ, giữ ghép. 50 ảnh xe_vu_khi lần 2 (img2img 0,72) vẫn là xe trơn, không vũ khí, sedan 3 chiếc → img2img không thêm được vũ khí; TẮT mục xe gắn vũ khí trong script (VE_XE_VU_KHI = False, VE_LAI_XE = False); game giữ cách ghép súng nóc bằng ảnh wpn_mount_*.
 - Script: DOT "dot9", VE_LAI rỗng (không còn ảnh chờ vẽ lại).
 
+### Tuân thủ Google Play (13/11/2026)
+- Người dùng chấp nhận DDA, chuẩn bị tài khoản Play. Quy tắc: docs/TUAN_THU_GOOGLE_PLAY.md; nguồn & giấy phép asset: docs/NGUON_TAI_NGUYEN.md. Đã bỏ "Earn to Die" khỏi chú thích code và prompt tạo ảnh (thay "zombie survival cartoon style"). Còn phải xác nhận giấy phép thương mại âm thanh ElevenLabs trước khi lên Play.
+
 ## 3. Luật chơi cũ trước v7.0 (v6.1, để tham khảo)
 
 ### Điều khiển

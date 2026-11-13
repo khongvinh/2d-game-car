@@ -107,10 +107,10 @@ DOC = "832x1216"
 
 # Prompt kiểu TỪ KHÓA, ngắn: CLIP của SDXL chỉ đọc 77 token (gồm 2 token đầu/cuối),
 # phần vượt bị cắt mất. Mỗi prompt = mô tả (≤ ~30 token) + phong cách (~20 token) ≈ 45–60 token.
-PHONG_CACH_CHUNG = "comic game art, Earn to Die style, thick black outlines, cel shading, gritty post-apocalyptic colors"
+PHONG_CACH_CHUNG = "comic game art, zombie survival cartoon style, thick black outlines, cel shading, gritty post-apocalyptic colors"
 PHONG_CACH = PHONG_CACH_CHUNG + ", game sprite, single object centered, whole object in frame, clean edges, detailed, plain white background"
 PHONG_CACH_NGUOI = PHONG_CACH_CHUNG + ", full body, side view, facing right, legs apart, one character, white background"
-PHONG_CACH_ICON = "mobile game icon, comic style, Earn to Die style, bold black outline, cel shading, bright saturated colors, glossy highlight, clean edges, high detail, game UI asset, single object centered, plain white background"
+PHONG_CACH_ICON = "mobile game icon, comic style, zombie survival cartoon style, bold black outline, cel shading, bright saturated colors, glossy highlight, clean edges, high detail, game UI asset, single object centered, plain white background"
 PHONG_CACH_NEN = PHONG_CACH_CHUNG + ", 2D side-scrolling game background, wide panorama, flat horizon, sunset light, no people"
 PHONG_CACH_SANG = PHONG_CACH_CHUNG + ", glowing game visual effect, bright core, single effect centered, nothing else, pure black background"
 CAM = "text, watermark, logo, cropped, 3d, photo, realistic, background, shadow, front view, facing left, extra limbs, duplicate, multiple, collage"

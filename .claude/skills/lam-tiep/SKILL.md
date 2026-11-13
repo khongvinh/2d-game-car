@@ -24,5 +24,8 @@ Sửa code → `cd tools/dev/compile && gradle compileKotlin` (hoặc `cd tools/
 
 - Tự đề xuất vẽ AI cho mọi thứ còn vẽ code / ảnh AI lỗi (xem CLAUDE.md) — không đợi người dùng nhắc.
 
+## Tuân thủ Google Play
+- Đọc `docs/TUAN_THU_GOOGLE_PLAY.md`; mọi asset/thư viện/quyền mới phải đúng giấy phép và ghi vào `docs/NGUON_TAI_NGUYEN.md`.
+
 ## Trả lời
 Luôn bằng tiếng Việt. Theo dõi ngữ cảnh: ≥ 90% thì lưu tiến trình và nhắc mở chat mới (xem CLAUDE.md).

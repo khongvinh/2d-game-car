@@ -19,7 +19,7 @@ class SaveData(context: Context) {
     /** Stage chosen in the menu. */
     var stageSel = prefs.getInt("stageSel", 1)
 
-    /** Days survived (one run = one day), like Earn to Die. */
+    /** Days survived (one run = one day). */
     var day = prefs.getInt("day", 1)
 
     /** Best distance (m) reached on each stage, to draw the "record" flag. */

@@ -49,7 +49,7 @@ NHAN_VAT = [
     ("boss_brute", "zombie", "huge hulking fat muscular green zombie butcher, very wide body, orange bloody apron, huge cleaver", "lach"),
 ]
 
-PHONG_CACH = ("comic game art, Earn to Die style, thick black outlines, cel shading, game sprite, "
+PHONG_CACH = ("comic game art, zombie survival cartoon style, thick black outlines, cel shading, game sprite, "
               "full body, side view, facing right, same outfit, white background")
 CAM = "different clothes, text, watermark, cropped, 3d, photo, realistic, background, shadow, front view, facing left, extra limbs"
 

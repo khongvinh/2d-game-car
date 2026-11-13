@@ -14,7 +14,7 @@ import kotlin.math.sin
 import kotlin.random.Random
 
 /**
- * Side-scrolling survival driving in the style of "Earn to Die": drive as far as you
+ * Side-scrolling survival driving: drive as far as you
  * can over hilly desert roads full of zombies, earn money, upgrade, and try again
  * until you reach the evacuation point at the end of each stage. A toxic storm
  * ("vòng bo") chases you from behind in three phases.

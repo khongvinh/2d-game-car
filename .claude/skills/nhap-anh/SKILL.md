@@ -44,5 +44,8 @@ Người dùng gọi: `/nhap-anh [ghi chú]` sau khi chạy `tools/assets/tao_an
 - Commit, push nhánh làm việc; kiểm tra GitHub Actions "Build APK".
 - Gửi người dùng: APK + ảnh chụp thử. Báo ngắn: ảnh đã cài, ảnh bỏ (vì sao), đề xuất đợt vẽ lại tiếp theo (theo quy tắc tự đề xuất ảnh AI trong CLAUDE.md); nếu có đợt mới thì cập nhật `DOT`/`VE_LAI` trong script và gửi kèm script.
 
+## Tuân thủ
+- Theo `docs/TUAN_THU_GOOGLE_PLAY.md`: prompt không chứa tên game/thương hiệu khác; ghi nguồn asset mới vào `docs/NGUON_TAI_NGUYEN.md`.
+
 ## Trả lời
 Luôn bằng tiếng Việt, ngắn gọn; đặt tiêu đề phiên theo CLAUDE.md.
